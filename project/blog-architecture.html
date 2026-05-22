@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Key-value separation &amp; why compaction shouldn't touch values · VeltrixDB</title>
+<meta name="description" content="How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load. An engineering deep-dive into the VeltrixDB storage engine." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
+    --surface:#15151E; --surface-2:#1B1B26;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
+    --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
+    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --warm:#F4A65A; --good:#46D391;
+    --grid:1280px;
+    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:'Newsreader', 'Times New Roman', serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),
+      var(--bg);
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--red);color:#FFFFFF}
+  .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark svg{width:14px;height:14px}
+  .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
+  .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
+  .nav-links{display:flex;gap:28px}
+  .nav-links a{font-size:13.5px;color:var(--ink-2);transition:color .15s;font-weight:500;position:relative}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--red);transition:right .25s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  .btn{height:38px;padding:0 16px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-.005em;border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:all .2s ease;font-family:var(--sans);text-decoration:none}
+  .btn:hover{background:rgba(255,255,255,.04);border-color:var(--line-strong)}
+  .btn.primary{background:var(--red);color:#FFFFFF;border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -8px var(--red-glow);position:relative;overflow:hidden}
+  .btn.primary:hover{background:var(--red-2);transform:translateY(-1px)}
+  .btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+  .btn.primary:hover::after{transform:translateX(120%)}
+  .btn .arrow{transition:transform .2s}
+  .btn:hover .arrow{transform:translate(2px,-2px)}
+  .phone{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+  .phone:hover{color:var(--ink)}
+
+  /* article hero */
+  .article-hero{position:relative;padding:96px 0 64px;border-bottom:1px solid var(--line);overflow:hidden}
+  .article-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px);background-size:84px 84px;mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);pointer-events:none}
+  .article-hero::after{content:"";position:absolute;right:-300px;top:-200px;width:900px;height:900px;background:radial-gradient(circle, rgba(229,18,28,.14) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
+  .crumb{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .crumb a{color:var(--ink-3);transition:color .15s}
+  .crumb a:hover{color:var(--red)}
+  .crumb .sep{color:var(--ink-4)}
+  .crumb .cur{color:var(--red)}
+  .ah-kind{margin-top:18px;display:inline-flex;align-items:center;gap:14px;padding:6px 14px;border:1px solid rgba(229,18,28,.30);border-radius:999px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);background:rgba(229,18,28,.06)}
+  h1.ah-title{margin:24px 0 0;font-size:clamp(36px,4.6vw,64px);line-height:1.04;letter-spacing:-.035em;font-weight:600;color:var(--ink);max-width:18ch}
+  h1.ah-title .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .ah-sub{margin:24px 0 0;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:680px;font-weight:400}
+  .ah-meta{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px}
+  .ah-author{display:flex;align-items:center;gap:14px}
+  .ah-author .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1B1B26,#0A0A12);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red)}
+  .ah-author .am{display:flex;flex-direction:column;gap:2px}
+  .ah-author .nm{font-size:14px;font-weight:600;color:var(--ink);line-height:1.2}
+  .ah-author .role{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r b{color:var(--ink-2);font-weight:500}
+
+  /* article body */
+  .a-wrap{padding:64px 0 96px;max-width:1080px;margin:0 auto}
+  .a-wrap .wrap{padding:0 28px}
+  .a-grid{display:grid;grid-template-columns:140px 1fr;gap:48px;align-items:start}
+  .a-num{font-family:var(--serif);font-style:italic;font-size:96px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:sticky;top:96px}
+  .a-body{max-width:680px}
+  .a-section + .a-section{margin-top:80px;padding-top:48px;border-top:1px solid var(--line-2)}
+  .a-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:14px}
+  .a-kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:80px}
+  .a-h{margin:18px 0 0;font-size:clamp(24px,2.6vw,34px);font-weight:500;letter-spacing:-.025em;line-height:1.15;color:var(--ink)}
+  .a-h .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-lede{margin:24px 0 0;font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-2);font-weight:400;font-style:normal;border-left:2px solid var(--red);padding:4px 0 4px 18px}
+  .a-body p{margin:22px 0 0;color:var(--ink-2);font-size:16px;line-height:1.75;font-weight:300}
+  .a-body p b{color:var(--ink);font-weight:600}
+  .a-body p code, .a-body li code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 7px;border-radius:4px;font-size:13.5px;letter-spacing:-.005em}
+  .a-body a.inline{color:var(--ink);border-bottom:1px solid var(--red);transition:color .15s,background .15s;padding:1px 3px;border-radius:2px}
+  .a-body a.inline:hover{color:var(--red);background:rgba(229,18,28,.08)}
+  .a-body h3{margin:42px 0 0;font-size:22px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink)}
+  .a-body h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-body ul{margin:18px 0 0;padding:0;list-style:none}
+  .a-body ul li{padding:8px 0 8px 24px;position:relative;color:var(--ink-2);font-size:15.5px;line-height:1.65;font-weight:300}
+  .a-body ul li::before{content:"";position:absolute;left:0;top:18px;width:8px;height:1px;background:var(--red)}
+  .a-body ul li b{color:var(--ink);font-weight:600}
+
+  /* pull-stat row */
+  .a-pull{margin:36px 0;padding:24px 28px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.04),transparent);display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+  .a-pull .pull{padding:0 18px;border-right:1px solid var(--line)}
+  .a-pull .pull:first-child{padding-left:0}
+  .a-pull .pull:last-child{border-right:0}
+  .a-pull .pl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+  .a-pull .pv{margin-top:6px;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+  .a-pull .pv .red{color:var(--red)}
+  .a-pull .pd{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.02em}
+
+  /* code */
+  .a-code{margin:32px 0;border:1px solid var(--line-2);border-radius:10px;background:#0A0A12;overflow:hidden}
+  .a-code-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .a-code-head .ttl{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .a-code-head .lights{display:flex;gap:6px}
+  .a-code-head .lights i{display:block;width:9px;height:9px;border-radius:50%}
+  .a-code-head .lights i:nth-child(1){background:#FF5F56}
+  .a-code-head .lights i:nth-child(2){background:#FFBD2E}
+  .a-code-head .lights i:nth-child(3){background:#27C93F}
+  .a-code pre{margin:0;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink-2)}
+  .a-code .c{color:var(--ink-4)}
+  .a-code .k{color:#FF6B73}
+  .a-code .s{color:var(--warm)}
+  .a-code .n{color:var(--good)}
+
+  /* schematic */
+  .schem{margin:36px 0;padding:32px 24px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#0A0A12 0%,#07070B 100%);position:relative;overflow:hidden}
+  .schem::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.02) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.02) 1px, transparent 1px);background-size:32px 32px;pointer-events:none}
+  .schem-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);margin-bottom:18px;position:relative}
+  .schem-rows{display:flex;flex-direction:column;gap:14px;position:relative}
+  .schem-row{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}
+  .schem-row .pre{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-3);text-align:right}
+  .schem-row .post{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .schem-node{padding:10px 14px;border:1px solid var(--line-2);border-radius:8px;background:rgba(255,255,255,.04);font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:.02em;white-space:nowrap}
+  .schem-node.us{border-color:rgba(229,18,28,.40);background:rgba(229,18,28,.08);color:var(--red);box-shadow:0 0 18px -6px rgba(229,18,28,.40)}
+  .schem-arr{color:var(--ink-4);font-family:var(--mono);font-size:14px}
+
+  /* compare table (write amp) */
+  .cmp{margin:32px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .cmp table{width:100%;border-collapse:collapse;font-size:14px}
+  .cmp th,.cmp td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--line);color:var(--ink-2);line-height:1.5}
+  .cmp tr:last-child td{border-bottom:0}
+  .cmp thead th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);background:rgba(255,255,255,.02);font-weight:500}
+  .cmp thead th.us{color:var(--red)}
+  .cmp td.us{background:linear-gradient(180deg,rgba(229,18,28,.10),rgba(229,18,28,.03));color:var(--ink);border-left:1px solid rgba(229,18,28,.30);border-right:1px solid rgba(229,18,28,.30)}
+  .cmp tbody tr:last-child td.us{border-bottom:1px solid rgba(229,18,28,.30)}
+  .cmp .first{font-weight:600;color:var(--ink)}
+
+  /* callout */
+  .callout{margin:32px 0;padding:24px 28px;border:1px solid rgba(229,18,28,.28);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.06),rgba(229,18,28,.02));display:flex;gap:18px;align-items:flex-start}
+  .callout .ico{flex:0 0 32px;width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.16);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .callout p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.65;font-weight:300}
+  .callout p b{color:var(--ink);font-weight:600}
+
+  /* foot/next */
+  .a-foot{margin-top:64px;padding-top:32px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;align-items:center}
+  .a-foot .cite{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .a-foot .cite b{color:var(--ink-2);font-weight:600}
+  .a-foot .links{display:flex;gap:14px;flex-wrap:wrap}
+  .a-foot .links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;transition:color .15s}
+  .a-foot .links a::after{content:" →";color:var(--red)}
+  .a-foot .links a:hover{color:var(--red)}
+  .next-up{margin-top:80px;padding:48px 0 64px;border-top:1px solid var(--line)}
+  .next-up h4{margin:0 0 28px;font-family:var(--mono);font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:var(--ink-3)}
+  .next-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .next{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent);transition:border-color .2s,transform .2s;display:flex;flex-direction:column;gap:14px}
+  .next:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .next .kind{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .next h5{margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;color:var(--ink)}
+  .next p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.55}
+  .next .m{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-4);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+  .cta-mini{margin-top:24px;padding:48px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(135deg,rgba(229,18,28,.08),rgba(255,255,255,.02));display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center}
+  .cta-mini h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .cta-mini h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .cta-mini p{margin:12px 0 0;color:var(--ink-3);font-size:14px;line-height:1.6}
+  .cta-mini .actions{display:flex;flex-direction:column;gap:10px}
+  .cta-mini .btn{justify-content:center;height:48px}
+
+  footer{border-top:1px solid var(--line);padding:56px 0 36px;background:#0A0A12}
+  .ft{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;align-items:start}
+  .ft .brand-block{max-width:320px}
+  .ft .brand-block p{margin:14px 0 0;color:var(--ink-3);font-size:13px;line-height:1.6}
+  .ft h5{margin:0 0 14px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .ft ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ft ul a{font-size:13.5px;color:var(--ink-2);transition:color .15s}
+  .ft ul a:hover{color:var(--red)}
+  .ft-bar{margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--ink-4);letter-spacing:.04em}
+
+  @media (max-width:1080px){
+    .a-grid{grid-template-columns:1fr;gap:18px}
+    .a-num{position:static;font-size:64px;text-align:left}
+    .a-pull{grid-template-columns:1fr;gap:14px}
+    .a-pull .pull{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px}
+    .a-pull .pull:last-child{border-bottom:0;padding-bottom:0}
+    .next-grid{grid-template-columns:1fr}
+    .cta-mini{grid-template-columns:1fr;padding:32px}
+    .ft{grid-template-columns:1fr 1fr;gap:32px}
+    .schem-row{grid-template-columns:1fr;gap:6px}
+    .schem-row .pre{text-align:left}
+  }
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .phone{display:none}
+    .wrap{padding:0 20px}
+    .nav-inner{height:58px}
+    .nav-cta .btn{height:36px;padding:0 14px;font-size:12.5px}
+    .article-hero{padding:48px 0 36px}
+    h1.ah-title{font-size:32px;letter-spacing:-.025em}
+    .ah-sub{font-size:16px}
+    .ah-meta{flex-direction:column;align-items:flex-start}
+    .a-wrap{padding:36px 0 56px}
+    .a-h{font-size:22px}
+    .a-body p{font-size:15px}
+    .ft{grid-template-columns:1fr;gap:24px}
+    .ft-bar{flex-direction:column;gap:10px;align-items:flex-start}
+  }
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="VeltrixDB Aerospike.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="VeltrixDB Aerospike.html#why">Platform</a>
+      <a href="VeltrixDB Aerospike.html#performance">Benchmark</a>
+      <a href="VeltrixDB Aerospike.html#compare">Compare</a>
+      <a href="VeltrixDB Aerospike.html#pricing">Pricing</a>
+      <a href="VeltrixDB Aerospike.html#calc">Cost</a>
+      <a href="whitepaper.html">Whitepaper</a>
+      <a href="VeltrixDB Aerospike.html#how">Architecture</a>
+    </div>
+    <div class="nav-cta">
+      <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">↗</span></a>
+    </div>
+  </div>
+</nav>
+
+<header class="article-hero">
+  <div class="wrap">
+    <div class="crumb">
+      <a href="VeltrixDB Aerospike.html">VeltrixDB</a>
+      <span class="sep">/</span>
+      <a href="VeltrixDB Aerospike.html#docs">Resources</a>
+      <span class="sep">/</span>
+      <span class="cur">Architecture deep-dive</span>
+    </div>
+    <span class="ah-kind">Engineering blog · 18 min read</span>
+    <h1 class="ah-title">Key-value separation &amp; <span class="em">why compaction shouldn't touch values</span>.</h1>
+    <p class="ah-sub">A first-principles walk through the VeltrixDB storage engine — the VLog, the ART index, io_uring SQPOLL, and the LIRS cache — and the design decisions that keep P99 stable when everyone else's tail explodes.</p>
+    <div class="ah-meta">
+      <div class="ah-author">
+        <div class="av">AG</div>
+        <div class="am">
+          <div class="nm">Akanksha Gupta</div>
+          <div class="role">Founder · VeltrixDB</div>
+        </div>
+      </div>
+      <div class="ah-meta-r">
+        <span><b>Published</b> · May 14, 2026</span>
+        <span><b>Read time</b> · 18 minutes</span>
+        <span><b>Audience</b> · DB engineers, SREs</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="a-wrap">
+  <div class="wrap">
+
+    <!-- 01 Problem -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">01</div>
+      <div class="a-body">
+        <div class="a-kicker">The problem</div>
+        <h2 class="a-h">Compaction is the <span class="em">silent tax</span> you pay on every read.</h2>
+        <p class="a-lede">Classical LSM trees — the storage engine inside RocksDB, Cassandra, LevelDB, and a dozen others — rewrite your values during compaction. That rewrite is what makes their P99 graph look like a sawblade.</p>
+        <p>Here's the shape of the problem. An LSM tree absorbs writes into a fast in-memory level (the memtable), then flushes that level to disk as an immutable SSTable. To keep read amplification bounded, the engine periodically <b>merges</b> SSTables — that's compaction. And compaction has to rewrite every byte that lives in the SSTables being merged: <i>keys and values</i>.</p>
+        <p>If your values are 128 bytes and your keys are 16 bytes, you've just paid an <b>8× rewrite tax</b> on data that didn't change. Measured end-to-end across the entire lifecycle of a value, the industry term for this is <b>write amplification</b>, and it sits between <code>6×</code> and <code>12×</code> for tuned RocksDB and Cassandra deployments. It's the reason teams burn through NVMe every few months, and the reason your P99 spikes at the worst possible moment.</p>
+        <p>VeltrixDB makes one architectural decision that eliminates this entirely: <b>we never put values inside the LSM</b>. The index — which is what gets compacted — only ever sees 24-byte pointers.</p>
+
+        <div class="cmp">
+          <table>
+            <thead>
+              <tr><th>Engine</th><th>Storage model</th><th>Write amplification</th><th class="us">P99 stability</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="first">RocksDB</td><td>LSM, values in SSTables</td><td>6–10×</td><td class="us">sawblade</td></tr>
+              <tr><td class="first">Cassandra</td><td>LSM, values in SSTables</td><td>8–12×</td><td class="us">sawblade</td></tr>
+              <tr><td class="first">LevelDB</td><td>LSM, values in SSTables</td><td>10–15×</td><td class="us">sawblade</td></tr>
+              <tr><td class="first">VeltrixDB</td><td>KV separation · WiscKey-style</td><td><b>1.0×</b></td><td class="us"><b>flat</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>The benchmark we publish <a class="inline" href="VeltrixDB Aerospike.html#performance">on the performance page</a> measures write amplification of <code>1.0×</code> sustained over a 60-minute window. That's not theoretical — that's the actual ratio of <code>bytes_written_to_nvme</code> over <code>bytes_written_by_clients</code>, scraped from <code>/metrics</code>.</p>
+      </div>
+    </section>
+
+    <!-- 02 WiscKey -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">02</div>
+      <div class="a-body">
+        <div class="a-kicker">The idea</div>
+        <h2 class="a-h">WiscKey, <span class="em">production-hardened</span>.</h2>
+        <p class="a-lede">In 2016, a paper out of Wisconsin proposed the separation we use today. We took the idea, kept its core insight, and rebuilt the engine end-to-end to make it survive in multi-cloud production.</p>
+        <p>The <b>WiscKey paper (FAST '16)</b> made one elegant observation: if you separate keys from values, only the keys have to participate in compaction. Values can live in an append-only log on disk — they're written once, never rewritten, and only touched again when garbage collection decides to reclaim space.</p>
+        <p>The original WiscKey paper proved it worked in a research setting. VeltrixDB takes the idea further — we re-architected it around three production realities the paper sidestepped:</p>
+        <ul>
+          <li><b>Sharded clusters</b> · the paper assumed a single node; we shard the key space across 1024 logical shards, each with its own VLog</li>
+          <li><b>Modern kernels</b> · io_uring didn't exist when WiscKey was published; we exploit it heavily to drive down per-op overhead</li>
+          <li><b>Caching</b> · the paper had a basic LRU; we replaced it with LIRS, which dramatically improves hit rate under skewed access</li>
+        </ul>
+
+        <h3>What lives in the index</h3>
+        <p>Each VeltrixDB shard maintains an <b>adaptive radix tree (ART)</b> index — entirely in RAM. The leaves of the ART don't store values; they store <b>24-byte VLog pointers</b>. The pointer encodes which VLog segment file the value lives in, the byte offset within that file, and the value's length.</p>
+
+        <div class="schem">
+          <div class="schem-label">Index entry layout · 24 bytes</div>
+          <div class="schem-rows">
+            <div class="schem-row">
+              <div class="pre">struct</div>
+              <div class="post">
+                <span class="schem-node">segment_id : u32</span>
+                <span class="schem-arr">·</span>
+                <span class="schem-node">offset : u64</span>
+                <span class="schem-arr">·</span>
+                <span class="schem-node">length : u32</span>
+                <span class="schem-arr">·</span>
+                <span class="schem-node">flags : u32</span>
+                <span class="schem-arr">·</span>
+                <span class="schem-node">checksum : u32</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p>An ART of 24-byte pointers for 1 billion keys consumes <b>~24 GB of RAM per shard set</b> — which is why the <a class="inline" href="VeltrixDB Aerospike.html#requirements">honest fit check</a> is honest about the RAM budget. The trade-off is that compaction never has to do anything other than merge these tiny, fixed-size pointer records. That's why our compaction is cheap and our P99 stays flat.</p>
+      </div>
+    </section>
+
+    <!-- 03 Write path -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">03</div>
+      <div class="a-body">
+        <div class="a-kicker">Write path</div>
+        <h2 class="a-h">Value lands on NVMe <span class="em">before ack</span>.</h2>
+        <p class="a-lede">A write isn't acknowledged until the value is durable on disk. We do that with group-commit WAL fsync and O_DIRECT VLog appends — together they cost us about 130 microseconds.</p>
+        <p>When a write enters VeltrixDB it follows five stages. Each one has been tuned to within an inch of its life:</p>
+
+        <div class="schem">
+          <div class="schem-label">Write path · App → durable ack</div>
+          <div class="schem-rows">
+            <div class="schem-row"><div class="pre">01 · ~12 µs</div><div class="post"><span class="schem-node">App</span><span class="schem-arr">→</span><span class="schem-node">WAL ring</span></div></div>
+            <div class="schem-row"><div class="pre">02 · ~80 µs</div><div class="post"><span class="schem-node us">WAL fsync</span><span class="schem-arr">·</span><span class="schem-node">group-commit batch</span></div></div>
+            <div class="schem-row"><div class="pre">03 · ~30 µs</div><div class="post"><span class="schem-node us">VLog append</span><span class="schem-arr">·</span><span class="schem-node">O_DIRECT</span></div></div>
+            <div class="schem-row"><div class="pre">04 · ~8 µs</div><div class="post"><span class="schem-node">Index pointer update</span><span class="schem-arr">·</span><span class="schem-node">ART insert</span></div></div>
+            <div class="schem-row"><div class="pre">05 · ~5 µs</div><div class="post"><span class="schem-node">Cache warm</span><span class="schem-arr">→</span><span class="schem-node">ack</span></div></div>
+          </div>
+        </div>
+
+        <h3>Group-commit WAL</h3>
+        <p>The WAL ring is a lock-free queue per shard. Writers append their record and park on a futex. A dedicated <b>commit thread</b> wakes every 50µs (or earlier, if the batch fills), issues a single <code>fsync</code>, and wakes every parked writer at once.</p>
+        <p>This means the <code>fsync</code> cost — the floor of disk durability, typically 60-100µs on a healthy NVMe — is <b>amortized across every concurrent writer in the batch</b>. At our test load of 2M ops/sec per node, the average batch contains ~95 writes. So 80µs of fsync becomes <code>~0.85 µs</code> per write.</p>
+
+        <h3>VLog append</h3>
+        <p>Once the WAL acknowledges, the value gets streamed into the VLog — an append-only segment file on NVMe, written with <code>O_DIRECT | O_SYNC</code>. Bypassing the page cache here is deliberate: the page cache adds non-determinism (eviction noise, dirty-page writeback storms) that we don't want anywhere near the latency-critical path.</p>
+        <p>Each VLog segment is <b>1 GB</b> by default. When a segment fills, we close it for writes and the GC subsystem can later reclaim it. Segments are sealed with a checksum trailer and never modified after seal.</p>
+
+        <h3>Index update</h3>
+        <p>Finally, the 24-byte pointer is inserted into the ART. The ART uses <b>per-node fine-grained latches</b> (RCU-style) so concurrent inserts on different key prefixes don't block each other. Read traffic continues to see the previous version of the affected node until the insert is published.</p>
+      </div>
+    </section>
+
+    <!-- 04 Read path -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">04</div>
+      <div class="a-body">
+        <div class="a-kicker">Read path</div>
+        <h2 class="a-h"><span class="em">io_uring SQPOLL</span> — zero syscalls on the hot path.</h2>
+        <p class="a-lede">When a read misses the cache and has to go to NVMe, we want exactly one thing to happen: the kernel hands the value back. No syscall trap. No context switch. No page cache interference.</p>
+        <p>The traditional read path on Linux costs you at minimum a syscall (<code>read(2)</code> or <code>pread(2)</code>), a kernel-mode trap, a context switch, and — under contention — a wait on the page cache. None of that is free. At the latency budgets we operate in, each layer is measurable.</p>
+
+        <h3>io_uring SQPOLL mode</h3>
+        <p><code>io_uring</code> with <b>SQPOLL</b> mode pins a kernel thread to a CPU core whose job is to poll a shared ring buffer for I/O requests. Our user-space code writes a submission entry into the ring; the kernel polls it within microseconds, dispatches the I/O to the NVMe queue, and writes the completion entry back into the ring. <b>Our process never traps into kernel mode.</b></p>
+        <p>The benefit isn't just the saved syscall — it's that the entire latency floor drops. On our hardware, the difference between <code>pread()</code> and io_uring SQPOLL for a 128-byte NVMe read is around <b>4-7µs of wall-clock time</b>, and far more under contention.</p>
+
+        <h3>O_DIRECT — out of the page cache</h3>
+        <p>We open the VLog with <code>O_DIRECT</code>. This tells the kernel to bypass the page cache entirely — the read goes from NVMe straight into our user-space buffer with no intermediate copy. Two consequences:</p>
+        <ul>
+          <li><b>Deterministic latency</b> · no page cache evictions, no surprise jitter from a noisy tenant doing a large sequential scan</li>
+          <li><b>Less RAM pressure</b> · we choose what to cache; the kernel doesn't fight us by caching VLog blocks we'll never re-read</li>
+        </ul>
+
+        <h3>1024 parallel queues</h3>
+        <p>Each shard owns its own io_uring instance and its own NVMe submission queue. On a 1024-shard cluster, that's <b>1024 dedicated, kernel-polled queues</b>. From the kernel's vantage point we look less like a database and more like a parallel storage controller.</p>
+
+        <div class="a-pull">
+          <div class="pull"><div class="pl">Syscalls / read</div><div class="pv"><span class="red">0</span></div><div class="pd">SQPOLL kernel thread polls</div></div>
+          <div class="pull"><div class="pl">Parallel queues</div><div class="pv">1024</div><div class="pd">one per shard</div></div>
+          <div class="pull"><div class="pl">P99 NVMe read</div><div class="pv"><span class="red">4.9 ms</span></div><div class="pd">under sustained writes</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 LIRS cache -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">05</div>
+      <div class="a-body">
+        <div class="a-kicker">The cache</div>
+        <h2 class="a-h">LIRS — <span class="em">because LRU isn't smart enough</span>.</h2>
+        <p class="a-lede">94% of reads in steady state are served from RAM. The reason isn't more cache — it's a better eviction policy than LRU.</p>
+        <p>Most databases use LRU (Least Recently Used) for their block cache. LRU has one famous failure mode: a large cold scan walks through every block once, evicting the hot working set on its way through. Your "hot" cache is now full of cold data you'll never read again.</p>
+        <p>VeltrixDB uses <b>LIRS (Low Inter-reference Recency Set)</b>. LIRS keeps two stacks — one for <b>LIR blocks</b> (proven hot) and one for <b>HIR blocks</b> (probationary). A block has to demonstrate reuse before it gets promoted out of probation, which means a single-pass scan can't pollute the resident set.</p>
+
+        <h3>Why this matters in production</h3>
+        <p>Consider a session store: 90% of requests hit the last hour of sessions; 10% are background jobs reading older history. With LRU, the background jobs would constantly evict hot sessions and your cache hit rate would collapse to ~60%. With LIRS, the background blocks live in HIR, get evicted on their second non-use, and the hot set stays resident. Measured hit rate in our 1B-key benchmark: <code>94.2%</code> with no warm-up babysitting.</p>
+
+        <div class="callout">
+          <div class="ico">i</div>
+          <p><b>One tuning knob.</b> Small hot keys (≤ 256 B) get <b>priority-2 eviction resistance</b> — they stay in the LIR stack even during sustained cold scans. This is the feature that lets a fraud-scoring workload survive a midnight ETL job sharing the same cluster.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 GC -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">06</div>
+      <div class="a-body">
+        <div class="a-kicker">Garbage collection</div>
+        <h2 class="a-h">GC runs on its own queue, <span class="em">never blocks reads</span>.</h2>
+        <p class="a-lede">Tombstones, deletes, and overwrites leave dead values in the VLog. We reclaim that space — but we do it on a completely separate I/O queue so user requests never wait behind cleanup.</p>
+        <p>VLog garbage collection runs in three modes, configurable per shard:</p>
+        <ul>
+          <li><b>Lazy</b> · pick the segment with the highest dead-byte ratio, copy live records forward, free the segment. Default mode.</li>
+          <li><b>Throttled</b> · same as lazy but with a configurable IOPS ceiling — useful for cost-sensitive deployments on slower NVMe</li>
+          <li><b>Aggressive</b> · target a specific free-space watermark; ramp up parallelism until the ceiling is met</li>
+        </ul>
+        <p>The crucial design decision: GC submits its I/O on a <b>separate io_uring instance</b> from the read path. Even if GC is moving gigabytes per second, the NVMe queue depth seen by user reads is unaffected. On Linux, this is enforced via <code>cgroup v2 io.weight</code> — GC's cgroup is given a 10× lower weight than the user-traffic cgroup, so on contention, reads always win.</p>
+
+        <div class="callout">
+          <div class="ico">!</div>
+          <p>This is the single biggest difference between our P99 graph and an LSM-based engine's. RocksDB compaction shares the same I/O scheduler as the read path — when it kicks off, reads queue behind it. VeltrixDB GC literally cannot interfere with reads. Watch a 60-minute window on the <a class="inline" href="VeltrixDB Aerospike.html#transparency">cluster dashboard</a> and look for the missing sawtooth.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 putting it together -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">07</div>
+      <div class="a-body">
+        <div class="a-kicker">Putting it together</div>
+        <h2 class="a-h">Four decisions, <span class="em">one outcome</span>.</h2>
+        <p class="a-lede">No single trick gets you to 4.9ms P99 on a 1-billion-key working set with values on disk. It's the compound effect of four design decisions that respect the boundary between user code and the kernel.</p>
+        <p>Each decision is independently boring. Together they are why the latency graph is flat:</p>
+        <ul>
+          <li><b>Key-value separation</b> · compaction touches 24-byte pointers, never the value blob</li>
+          <li><b>io_uring SQPOLL + O_DIRECT</b> · the kernel never gets in the way of a hot-path read</li>
+          <li><b>LIRS cache</b> · cold scans can't evict the hot set</li>
+          <li><b>Isolated GC I/O queue</b> · cleanup is invisible to user latency</li>
+        </ul>
+        <p>That's the entire engineering bet. Whether it's worth it for your workload depends on whether you live in the failure mode the design eliminates — sawtooth P99 from compaction interference. If you do, the <a class="inline" href="blog-benchmark.html">1B-key benchmark</a> is the cheapest 18 minutes of reading you'll do this quarter.</p>
+      </div>
+    </section>
+
+    <div class="a-foot reveal">
+      <div class="cite">
+        Citation: WiscKey (Lu et al., FAST '16) · Linux io_uring docs · LIRS (Jiang &amp; Zhang, SIGMETRICS '02)
+      </div>
+      <div class="links">
+        <a href="blog-benchmark.html">See the benchmark</a>
+        <a href="whitepaper.html">Read the whitepaper</a>
+        <a href="VeltrixDB Aerospike.html#transparency">Live cluster metrics</a>
+      </div>
+    </div>
+
+    <section class="next-up reveal">
+      <h4>Continue reading</h4>
+      <div class="next-grid">
+        <a class="next" href="blog-benchmark.html">
+          <span class="kind">Benchmark report</span>
+          <h5>The 1B-Key Benchmark — methodology &amp; raw data</h5>
+          <p>Hardware specs, workload generator config, percentile distributions, and replayable harness.</p>
+          <div class="m"><span>PDF · 32 pages</span><span>Read →</span></div>
+        </a>
+        <a class="next" href="blog-migration.html">
+          <span class="kind">Migration guide</span>
+          <h5>Moving from DynamoDB to VeltrixDB in two sprints</h5>
+          <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan — with copy-pasteable Terraform.</p>
+          <div class="m"><span>Guide · 12 min</span><span>Read →</span></div>
+        </a>
+      </div>
+
+      <div class="cta-mini">
+        <div>
+          <h3>The full <span class="em">technical whitepaper</span>, on your desk.</h3>
+          <p>42 pages — block-by-block diagrams, the durability proof, the sharding model, and the failure modes we test for in chaos engineering.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="whitepaper.html">Read the whitepaper <span class="arrow">↗</span></a>
+          <a class="btn" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a 30-min demo</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="VeltrixDB Aerospike.html">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#why">Platform</a></li>
+          <li><a href="VeltrixDB Aerospike.html#performance">Benchmark</a></li>
+          <li><a href="VeltrixDB Aerospike.html#compare">Comparison</a></li>
+          <li><a href="VeltrixDB Aerospike.html#how">Architecture</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="blog-benchmark.html">Benchmark report</a></li>
+          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
+          <li><a href="blog-migration.html">Migration guide</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#pricing">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v0.9.4-beta · build cb44a1f</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  },{threshold:.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>

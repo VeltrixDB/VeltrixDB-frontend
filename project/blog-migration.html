@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Moving from DynamoDB to VeltrixDB in two sprints · VeltrixDB</title>
+<meta name="description" content="A field-tested migration playbook — shadow reads, dual-writes, cutover checklist, and rollback plan, with copy-pasteable Terraform." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
+    --surface:#15151E; --surface-2:#1B1B26;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
+    --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
+    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --warm:#F4A65A; --good:#46D391;
+    --grid:1280px;
+    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:'Newsreader', 'Times New Roman', serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{background:radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),var(--bg);overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--red);color:#FFFFFF}
+  .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark svg{width:14px;height:14px}
+  .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
+  .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
+  .nav-links{display:flex;gap:28px}
+  .nav-links a{font-size:13.5px;color:var(--ink-2);transition:color .15s;font-weight:500;position:relative}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--red);transition:right .25s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  .btn{height:38px;padding:0 16px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-.005em;border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:all .2s ease;font-family:var(--sans);text-decoration:none}
+  .btn:hover{background:rgba(255,255,255,.04);border-color:var(--line-strong)}
+  .btn.primary{background:var(--red);color:#FFFFFF;border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -8px var(--red-glow);position:relative;overflow:hidden}
+  .btn.primary:hover{background:var(--red-2);transform:translateY(-1px)}
+  .btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+  .btn.primary:hover::after{transform:translateX(120%)}
+  .btn .arrow{transition:transform .2s}
+  .btn:hover .arrow{transform:translate(2px,-2px)}
+  .phone{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+  .phone:hover{color:var(--ink)}
+
+  /* article hero */
+  .article-hero{position:relative;padding:96px 0 64px;border-bottom:1px solid var(--line);overflow:hidden}
+  .article-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px);background-size:84px 84px;mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);pointer-events:none}
+  .article-hero::after{content:"";position:absolute;right:-300px;top:-200px;width:900px;height:900px;background:radial-gradient(circle, rgba(229,18,28,.14) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
+  .crumb{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .crumb a{color:var(--ink-3);transition:color .15s}
+  .crumb a:hover{color:var(--red)}
+  .crumb .sep{color:var(--ink-4)}
+  .crumb .cur{color:var(--red)}
+  .ah-kind{margin-top:18px;display:inline-flex;align-items:center;gap:14px;padding:6px 14px;border:1px solid rgba(229,18,28,.30);border-radius:999px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);background:rgba(229,18,28,.06)}
+  h1.ah-title{margin:24px 0 0;font-size:clamp(36px,4.6vw,64px);line-height:1.04;letter-spacing:-.035em;font-weight:600;color:var(--ink);max-width:18ch}
+  h1.ah-title .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .ah-sub{margin:24px 0 0;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:680px;font-weight:400}
+  .ah-meta{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px}
+  .ah-author{display:flex;align-items:center;gap:14px}
+  .ah-author .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1B1B26,#0A0A12);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red)}
+  .ah-author .am{display:flex;flex-direction:column;gap:2px}
+  .ah-author .nm{font-size:14px;font-weight:600;color:var(--ink);line-height:1.2}
+  .ah-author .role{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r b{color:var(--ink-2);font-weight:500}
+
+  /* body */
+  .a-wrap{padding:64px 0 96px;max-width:1080px;margin:0 auto}
+  .a-wrap .wrap{padding:0 28px}
+  .a-grid{display:grid;grid-template-columns:140px 1fr;gap:48px;align-items:start}
+  .a-num{font-family:var(--serif);font-style:italic;font-size:96px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:sticky;top:96px}
+  .a-body{max-width:680px}
+  .a-section + .a-section{margin-top:80px;padding-top:48px;border-top:1px solid var(--line-2)}
+  .a-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:14px}
+  .a-kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:80px}
+  .a-h{margin:18px 0 0;font-size:clamp(24px,2.6vw,34px);font-weight:500;letter-spacing:-.025em;line-height:1.15;color:var(--ink)}
+  .a-h .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-lede{margin:24px 0 0;font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-2);font-weight:400;font-style:normal;border-left:2px solid var(--red);padding:4px 0 4px 18px}
+  .a-body p{margin:22px 0 0;color:var(--ink-2);font-size:16px;line-height:1.75;font-weight:300}
+  .a-body p b{color:var(--ink);font-weight:600}
+  .a-body p code, .a-body li code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 7px;border-radius:4px;font-size:13.5px;letter-spacing:-.005em}
+  .a-body a.inline{color:var(--ink);border-bottom:1px solid var(--red);transition:color .15s,background .15s;padding:1px 3px;border-radius:2px}
+  .a-body a.inline:hover{color:var(--red);background:rgba(229,18,28,.08)}
+  .a-body h3{margin:42px 0 0;font-size:22px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink)}
+  .a-body h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-body ul{margin:18px 0 0;padding:0;list-style:none}
+  .a-body ul li{padding:8px 0 8px 24px;position:relative;color:var(--ink-2);font-size:15.5px;line-height:1.65;font-weight:300}
+  .a-body ul li::before{content:"";position:absolute;left:0;top:18px;width:8px;height:1px;background:var(--red)}
+  .a-body ul li b{color:var(--ink);font-weight:600}
+
+  /* timeline */
+  .timeline{margin:36px 0;padding:28px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+  .timeline-h{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:18px}
+  .tl-row{display:grid;grid-template-columns:90px 1fr;gap:18px;padding:14px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+  .tl-row:last-child{border-bottom:0}
+  .tl-day{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--red);font-weight:600}
+  .tl-day .sub{display:block;color:var(--ink-4);font-weight:400;letter-spacing:.04em;margin-top:2px;font-size:10.5px;text-transform:uppercase}
+  .tl-d{display:flex;flex-direction:column;gap:6px}
+  .tl-d .ti{font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.005em}
+  .tl-d .td{font-size:14px;color:var(--ink-3);line-height:1.55;font-weight:300}
+
+  /* checklist */
+  .ck{margin:32px 0;padding:24px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.018)}
+  .ck-h{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+  .ck ul{margin:0;padding:0;list-style:none}
+  .ck li{padding:10px 0 10px 30px;position:relative;color:var(--ink-2);font-size:14.5px;line-height:1.55;border-bottom:1px dashed var(--line)}
+  .ck li:last-child{border-bottom:0}
+  .ck li::before{content:"✓";position:absolute;left:0;top:10px;width:20px;height:20px;border-radius:4px;background:rgba(229,18,28,.12);border:1px solid rgba(229,18,28,.32);color:var(--red);display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600}
+  .ck li b{color:var(--ink);font-weight:600}
+
+  /* code */
+  .a-code{margin:32px 0;border:1px solid var(--line-2);border-radius:10px;background:#0A0A12;overflow:hidden}
+  .a-code-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .a-code-head .ttl{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .a-code-head .lights{display:flex;gap:6px}
+  .a-code-head .lights i{display:block;width:9px;height:9px;border-radius:50%}
+  .a-code-head .lights i:nth-child(1){background:#FF5F56}
+  .a-code-head .lights i:nth-child(2){background:#FFBD2E}
+  .a-code-head .lights i:nth-child(3){background:#27C93F}
+  .a-code pre{margin:0;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink-2)}
+  .a-code .c{color:var(--ink-4)}
+  .a-code .k{color:#FF6B73}
+  .a-code .s{color:var(--warm)}
+  .a-code .n{color:var(--good)}
+
+  /* callout */
+  .callout{margin:32px 0;padding:24px 28px;border:1px solid rgba(229,18,28,.28);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.06),rgba(229,18,28,.02));display:flex;gap:18px;align-items:flex-start}
+  .callout .ico{flex:0 0 32px;width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.16);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .callout p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.65;font-weight:300}
+  .callout p b{color:var(--ink);font-weight:600}
+
+  /* pull stats */
+  .a-pull{margin:36px 0;padding:24px 28px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.04),transparent);display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+  .a-pull .pull{padding:0 18px;border-right:1px solid var(--line)}
+  .a-pull .pull:first-child{padding-left:0}
+  .a-pull .pull:last-child{border-right:0}
+  .a-pull .pl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+  .a-pull .pv{margin-top:6px;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+  .a-pull .pv .red{color:var(--red)}
+  .a-pull .pd{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.02em}
+
+  /* foot */
+  .a-foot{margin-top:64px;padding-top:32px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;align-items:center}
+  .a-foot .cite{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .a-foot .cite b{color:var(--ink-2);font-weight:600}
+  .a-foot .links{display:flex;gap:14px;flex-wrap:wrap}
+  .a-foot .links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;transition:color .15s}
+  .a-foot .links a::after{content:" →";color:var(--red)}
+  .a-foot .links a:hover{color:var(--red)}
+  .next-up{margin-top:80px;padding:48px 0 64px;border-top:1px solid var(--line)}
+  .next-up h4{margin:0 0 28px;font-family:var(--mono);font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:var(--ink-3)}
+  .next-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .next{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent);transition:border-color .2s,transform .2s;display:flex;flex-direction:column;gap:14px}
+  .next:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .next .kind{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .next h5{margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;color:var(--ink)}
+  .next p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.55}
+  .next .m{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-4);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+  .cta-mini{margin-top:24px;padding:48px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(135deg,rgba(229,18,28,.08),rgba(255,255,255,.02));display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center}
+  .cta-mini h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .cta-mini h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .cta-mini p{margin:12px 0 0;color:var(--ink-3);font-size:14px;line-height:1.6}
+  .cta-mini .actions{display:flex;flex-direction:column;gap:10px}
+  .cta-mini .btn{justify-content:center;height:48px}
+
+  footer{border-top:1px solid var(--line);padding:56px 0 36px;background:#0A0A12}
+  .ft{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;align-items:start}
+  .ft .brand-block{max-width:320px}
+  .ft .brand-block p{margin:14px 0 0;color:var(--ink-3);font-size:13px;line-height:1.6}
+  .ft h5{margin:0 0 14px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .ft ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ft ul a{font-size:13.5px;color:var(--ink-2);transition:color .15s}
+  .ft ul a:hover{color:var(--red)}
+  .ft-bar{margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--ink-4);letter-spacing:.04em}
+
+  @media (max-width:1080px){
+    .a-grid{grid-template-columns:1fr;gap:18px}
+    .a-num{position:static;font-size:64px;text-align:left}
+    .a-pull{grid-template-columns:1fr;gap:14px}
+    .a-pull .pull{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px}
+    .a-pull .pull:last-child{border-bottom:0;padding-bottom:0}
+    .next-grid{grid-template-columns:1fr}
+    .cta-mini{grid-template-columns:1fr;padding:32px}
+    .ft{grid-template-columns:1fr 1fr;gap:32px}
+    .tl-row{grid-template-columns:1fr;gap:6px}
+  }
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .phone{display:none}
+    .wrap{padding:0 20px}
+    .nav-inner{height:58px}
+    .nav-cta .btn{height:36px;padding:0 14px;font-size:12.5px}
+    .article-hero{padding:48px 0 36px}
+    h1.ah-title{font-size:32px;letter-spacing:-.025em}
+    .ah-sub{font-size:16px}
+    .ah-meta{flex-direction:column;align-items:flex-start}
+    .a-wrap{padding:36px 0 56px}
+    .a-h{font-size:22px}
+    .a-body p{font-size:15px}
+    .ft{grid-template-columns:1fr;gap:24px}
+    .ft-bar{flex-direction:column;gap:10px;align-items:flex-start}
+  }
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="VeltrixDB Aerospike.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="VeltrixDB Aerospike.html#why">Platform</a>
+      <a href="VeltrixDB Aerospike.html#performance">Benchmark</a>
+      <a href="VeltrixDB Aerospike.html#compare">Compare</a>
+      <a href="VeltrixDB Aerospike.html#pricing">Pricing</a>
+      <a href="VeltrixDB Aerospike.html#calc">Cost</a>
+      <a href="whitepaper.html">Whitepaper</a>
+      <a href="VeltrixDB Aerospike.html#how">Architecture</a>
+    </div>
+    <div class="nav-cta">
+      <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">↗</span></a>
+    </div>
+  </div>
+</nav>
+
+<header class="article-hero">
+  <div class="wrap">
+    <div class="crumb">
+      <a href="VeltrixDB Aerospike.html">VeltrixDB</a>
+      <span class="sep">/</span>
+      <a href="VeltrixDB Aerospike.html#docs">Resources</a>
+      <span class="sep">/</span>
+      <span class="cur">Migration guide</span>
+    </div>
+    <span class="ah-kind">Migration playbook · 12 min read</span>
+    <h1 class="ah-title">Moving from DynamoDB to VeltrixDB <span class="em">in two sprints</span>.</h1>
+    <p class="ah-sub">A field-tested playbook used by four production migrations. Shadow reads, dual-writes, cutover checklist, and the rollback plan you'll hopefully never need — with copy-pasteable Terraform.</p>
+    <div class="ah-meta">
+      <div class="ah-author">
+        <div class="av">AG</div>
+        <div class="am">
+          <div class="nm">Akanksha Gupta</div>
+          <div class="role">Founder · VeltrixDB</div>
+        </div>
+      </div>
+      <div class="ah-meta-r">
+        <span><b>Published</b> · May 7, 2026</span>
+        <span><b>Read time</b> · 12 minutes</span>
+        <span><b>For</b> · SREs &amp; backend tech leads</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="a-wrap">
+  <div class="wrap">
+
+    <!-- 01 Why migrate -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">01</div>
+      <div class="a-body">
+        <div class="a-kicker">Why teams migrate</div>
+        <h2 class="a-h">Two reasons, <span class="em">always the same</span>.</h2>
+        <p class="a-lede">Every team that walked us through a DynamoDB-to-VeltrixDB migration showed up with the same two concerns. The bill, and the tail.</p>
+        <p>If you're reading this guide, you probably already know your <i>why</i>. But for the engineering manager you'll be selling this migration to, the case lands cleanest as two numbers:</p>
+        <ul>
+          <li><b>Cost</b> · DynamoDB on-demand bills at roughly <code>$1.00 per million blended ops</code>. At 10 B ops/month that's $10K. Most VeltrixDB customers land between <b>3–5× lower</b> on the same workload. The <a class="inline" href="VeltrixDB Aerospike.html#calc">cost calculator</a> is the fastest way to see the gap.</li>
+          <li><b>Tail latency</b> · DynamoDB's published P99 is ~10ms for single-key reads. Real-world it's closer to 12-18ms with throttling and burst-bucket effects. VeltrixDB is <code>4.9ms</code> sustained, with no throttling tier.</li>
+        </ul>
+
+        <div class="a-pull">
+          <div class="pull"><div class="pl">Median migration time</div><div class="pv"><span class="red">2 sprints</span></div><div class="pd">across 4 prod migrations</div></div>
+          <div class="pull"><div class="pl">P99 latency drop</div><div class="pv">12 ms → 4.9 ms</div><div class="pd">~60% reduction</div></div>
+          <div class="pull"><div class="pl">Cost reduction</div><div class="pv"><span class="red">3-5×</span></div><div class="pd">on equivalent ops</div></div>
+        </div>
+
+        <p>The rest of this guide is the actual playbook — the same one our solutions architects walk Enterprise customers through. Two sprints. No big-bang cutover. Rollback at every stage.</p>
+      </div>
+    </section>
+
+    <!-- 02 Pre-flight -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">02</div>
+      <div class="a-body">
+        <div class="a-kicker">Pre-flight</div>
+        <h2 class="a-h">Confirm you're <span class="em">in scope</span> — before you book the project.</h2>
+        <p class="a-lede">VeltrixDB is a scalpel, not a Swiss Army knife. Spend an hour validating fit before you spend two sprints validating performance.</p>
+        <p>Before you start, run the table through this checklist. If any row is a "no," talk to us before booking the migration — there's a good chance VeltrixDB is the wrong tool for that workload.</p>
+
+        <div class="ck">
+          <div class="ck-h">Workload fit</div>
+          <ul>
+            <li>Your hot path is <b>point lookups</b> — GET / SET / DEL / HGET-style. No <code>Query</code> calls with sort-key range conditions or <code>Scan</code>.</li>
+            <li>No global secondary indexes (GSIs) on the critical path. <b>Or</b> you can model the GSI access patterns as separate keys.</li>
+            <li>You have a <b>partition key</b> in DynamoDB that can map 1:1 to a VeltrixDB key. Composite (PK + SK) keys map to <code>pk:sk</code> string concatenations.</li>
+            <li>Values are <b>≤ 400 KB</b> (DynamoDB's own limit). VeltrixDB supports up to 64 MB, but smaller values keep your RAM budget honest.</li>
+            <li>You can run on <b>bare-metal NVMe or local SSD</b>. EBS, Azure managed disks, and any network-attached storage are not supported.</li>
+          </ul>
+        </div>
+
+        <div class="callout">
+          <div class="ico">!</div>
+          <p><b>If you're using DynamoDB Streams</b> · we ship a sidecar that consumes a CDC stream from your existing table during the migration window — you keep the rest of your event-driven architecture intact. Drop us a note before sprint 1 and we'll provision the right consumer for your event volume.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 Two-sprint plan -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">03</div>
+      <div class="a-body">
+        <div class="a-kicker">The plan</div>
+        <h2 class="a-h">Two sprints. <span class="em">Five stages</span>.</h2>
+        <p class="a-lede">No big-bang cutover. Every stage runs DynamoDB in parallel until the very last hour. Rollback is one config flip away at every checkpoint.</p>
+
+        <div class="timeline">
+          <div class="timeline-h">Migration timeline · 2 sprints / 14 working days</div>
+
+          <div class="tl-row">
+            <div class="tl-day">Days 1–2 <span class="sub">Sprint 1 · Stage 1</span></div>
+            <div class="tl-d">
+              <div class="ti">Stand up the cluster</div>
+              <div class="td">Helm install in your VPC. 94-second deploy. Wire up Prometheus + Grafana. Validate health checks against an empty cluster. No production traffic yet.</div>
+            </div>
+          </div>
+
+          <div class="tl-row">
+            <div class="tl-day">Days 3–5 <span class="sub">Sprint 1 · Stage 2</span></div>
+            <div class="tl-d">
+              <div class="ti">Bulk-load the snapshot</div>
+              <div class="td">Use DynamoDB's <code>ExportTableToPointInTime</code> to S3, then run our bulk-importer. ~3M writes/sec sustained — a 1B-key table fills in about 5.5 minutes. Validate row count and a sample of values match.</div>
+            </div>
+          </div>
+
+          <div class="tl-row">
+            <div class="tl-day">Days 6–9 <span class="sub">Sprint 1 · Stage 3</span></div>
+            <div class="tl-d">
+              <div class="ti">Enable dual-writes</div>
+              <div class="td">Route all writes to <b>both</b> DynamoDB and VeltrixDB synchronously. Failure handling: log mismatches, alert on divergence &gt; 0.1%, but do not roll back individual writes. DynamoDB remains the source of truth.</div>
+            </div>
+          </div>
+
+          <div class="tl-row">
+            <div class="tl-day">Days 10–11 <span class="sub">Sprint 2 · Stage 4</span></div>
+            <div class="tl-d">
+              <div class="ti">Shadow reads</div>
+              <div class="td">For each read served by DynamoDB, fire an async read against VeltrixDB. Compare responses, log mismatches, surface P99 latency on a side-by-side Grafana dashboard. Run for a full 48-hour weekend cycle.</div>
+            </div>
+          </div>
+
+          <div class="tl-row">
+            <div class="tl-day">Days 12–13 <span class="sub">Sprint 2 · Stage 5</span></div>
+            <div class="tl-d">
+              <div class="ti">Gradual cutover</div>
+              <div class="td">Flip the read source one cohort at a time — 5%, 25%, 50%, 100%. Each step requires the previous step's P99 to be stable for 4 hours. Rollback is a feature-flag flip, not a deploy.</div>
+            </div>
+          </div>
+
+          <div class="tl-row">
+            <div class="tl-day">Day 14 <span class="sub">Wrap-up</span></div>
+            <div class="tl-d">
+              <div class="ti">Decommission DynamoDB writes</div>
+              <div class="td">Drop the dual-write fan-out from your app. Optionally keep the DynamoDB table read-only for 7 days as cold backup. Save your final invoice — it's the receipt you bring to the QBR.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 Terraform -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">04</div>
+      <div class="a-body">
+        <div class="a-kicker">Infrastructure</div>
+        <h2 class="a-h">Terraform you can <span class="em">paste into your repo</span>.</h2>
+        <p class="a-lede">Three resources, eight inputs. Drop into your existing EKS module, change the instance type to a local-NVMe SKU, run terraform apply.</p>
+        <p>This snippet provisions a 3-node EKS-hosted VeltrixDB cluster on <code>i3en.6xlarge</code> instances (the AWS equivalent of our reference GCP rig). Adjust node count, instance class, or replace the EKS bits with GKE/AKS modules as needed.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">terraform · veltrixdb.tf</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c"># Helm release wrapping the VeltrixDB chart</span>
+<span class="k">resource</span> <span class="s">"helm_release"</span> <span class="s">"veltrixdb"</span> {
+  name       = <span class="s">"veltrixdb"</span>
+  repository = <span class="s">"https://charts.veltrixdb.com"</span>
+  chart      = <span class="s">"veltrixdb"</span>
+  version    = <span class="s">"0.9.4"</span>
+  namespace  = <span class="s">"veltrixdb"</span>
+  create_namespace = <span class="n">true</span>
+
+  values = [<span class="k">templatefile</span>(<span class="s">"./values.yaml.tpl"</span>, {
+    nodes          = <span class="n">3</span>
+    cache_gb       = <span class="n">256</span>
+    nvme_gb        = <span class="n">3000</span>
+    storage_class  = <span class="s">"veltrixdb-nvme"</span>
+    region         = <span class="s">"us-east-1"</span>
+  })]
+}
+
+<span class="c"># Local NVMe StorageClass (i3en family)</span>
+<span class="k">resource</span> <span class="s">"kubernetes_storage_class"</span> <span class="s">"nvme"</span> {
+  metadata { name = <span class="s">"veltrixdb-nvme"</span> }
+  storage_provisioner = <span class="s">"kubernetes.io/no-provisioner"</span>
+  volume_binding_mode = <span class="s">"WaitForFirstConsumer"</span>
+  parameters = {
+    type = <span class="s">"local-ssd"</span>
+    fsType = <span class="s">"ext4"</span>
+  }
+}
+
+<span class="c"># Node group: i3en.6xlarge — 24 vCPU, 192 GB RAM, 7.5 TB local NVMe</span>
+<span class="k">module</span> <span class="s">"veltrix_nodes"</span> {
+  source           = <span class="s">"terraform-aws-modules/eks/aws//modules/eks-managed-node-group"</span>
+  cluster_name     = <span class="k">var</span>.eks_cluster_name
+  name             = <span class="s">"veltrixdb-nodes"</span>
+  instance_types   = [<span class="s">"i3en.6xlarge"</span>]
+  desired_size     = <span class="n">3</span>
+  min_size         = <span class="n">3</span>
+  max_size         = <span class="n">6</span>
+  labels = { workload = <span class="s">"veltrixdb"</span> }
+  taints = [{ key = <span class="s">"workload"</span>, value = <span class="s">"veltrixdb"</span>, effect = <span class="s">"NO_SCHEDULE"</span> }]
+}</pre>
+        </div>
+
+        <h3>Bulk-import from DynamoDB</h3>
+        <p>The import runs as a Kubernetes Job that streams from your DynamoDB S3 export directly into the new VeltrixDB cluster. It's idempotent — safe to re-run if it crashes partway through.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">~/migration · zsh</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c">$</span> aws dynamodb export-table-to-point-in-time \
+    --table-arn arn:aws:dynamodb:us-east-1:123456789012:table/sessions \
+    --s3-bucket veltrix-migration-staging \
+    --export-format DYNAMODB_JSON
+
+<span class="c">$</span> kubectl apply -f - &lt;&lt;EOF
+apiVersion: batch/v1
+kind: Job
+metadata: { name: veltrix-import, namespace: veltrixdb }
+spec:
+  template:
+    spec:
+      containers:
+      - name: importer
+        image: ghcr.io/veltrixdb/ddb-importer:0.9.4
+        args: ["--s3-prefix", "s3://veltrix-migration-staging/AWSDynamoDB/.../"]
+      restartPolicy: OnFailure
+EOF
+
+<span class="c">$</span> kubectl logs -f -n veltrixdb job/veltrix-import
+<span class="n">imported 247,308,124 rows · 5m23s · 0 mismatches · ✓</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 Dual-write -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">05</div>
+      <div class="a-body">
+        <div class="a-kicker">Dual writes</div>
+        <h2 class="a-h">Fan out writes, <span class="em">keep DynamoDB as the source of truth</span>.</h2>
+        <p class="a-lede">During sprint 1, every write goes to both databases synchronously. If divergence climbs above 0.1%, an alarm fires and you fix it before you ever flip reads.</p>
+        <p>The dual-write step is where most botched migrations go wrong. The temptation is to fan out writes asynchronously to keep latency down — don't. Async fan-out hides bugs that only surface during cutover. Run the writes synchronously, in parallel, and accept the latency cost during the migration window.</p>
+
+        <h3>Reference implementation</h3>
+        <p>The pattern, in pseudocode, looks like this. The key invariants: write to DynamoDB first (still source of truth), then write to VeltrixDB, then log any inconsistencies — but never roll back a successful DynamoDB write because the VeltrixDB write failed.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">repo/sessions/dual_writer.go</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="k">func</span> (r *Repo) Put(ctx context.Context, k string, v []byte) error {
+    <span class="c">// 1. Source of truth still wins</span>
+    <span class="k">if</span> err := r.ddb.Put(ctx, k, v); err != nil {
+        <span class="k">return</span> err
+    }
+    <span class="c">// 2. Mirror to VeltrixDB · best-effort</span>
+    <span class="k">go func</span>() {
+        cctx, cancel := context.WithTimeout(ctx, <span class="n">200</span>*time.Millisecond)
+        <span class="k">defer</span> cancel()
+        <span class="k">if</span> err := r.veltrix.Put(cctx, k, v); err != nil {
+            metrics.DualWriteFail.WithLabelValues(<span class="s">"veltrix"</span>).Inc()
+            log.Warn(<span class="s">"veltrix mirror failed"</span>, <span class="s">"key"</span>, k, <span class="s">"err"</span>, err)
+        }
+    }()
+    <span class="k">return nil</span>
+}</pre>
+        </div>
+
+        <div class="callout">
+          <div class="ico">i</div>
+          <p><b>Watch the divergence metric.</b> A healthy dual-write phase should see <code>&lt;0.01%</code> mirror failures, almost entirely network blips. If you see &gt;0.1%, something is wrong — most often a payload that exceeds 400 KB in DynamoDB but fits in VeltrixDB's 64 MB envelope and gets corrupted during your encoder's roundtrip. Fix before proceeding.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 Shadow reads -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">06</div>
+      <div class="a-body">
+        <div class="a-kicker">Shadow reads</div>
+        <h2 class="a-h">Read both. <span class="em">Trust neither</span>. Compare everything.</h2>
+        <p class="a-lede">Before flipping the read path, you spend 48 hours reading from both databases and comparing the answers byte-for-byte. This is where you catch the bugs that bulk-import didn't.</p>
+        <p>The shadow-read phase runs on the same dual-write pattern, inverted. For every read your application makes, fire a second read against VeltrixDB, compare, log mismatches, and surface the side-by-side P99 chart in Grafana. Your users still see DynamoDB's answer — VeltrixDB is on probation.</p>
+
+        <div class="ck">
+          <div class="ck-h">Shadow-read exit criteria</div>
+          <ul>
+            <li>Mismatch rate <code>&lt; 0.001%</code> over a full weekend cycle (catches any time-zone or weekend-batch effects)</li>
+            <li>VeltrixDB P99 read latency <code>&lt; 8ms</code> for 4 hours straight under peak prod load</li>
+            <li>Cache hit rate <code>&gt; 90%</code> in steady state — the LIRS cache should be warm by now</li>
+            <li>Zero <code>5xx</code> errors on the VeltrixDB endpoint during the window</li>
+            <li>An incident runbook merged that documents the rollback procedure for the next stage</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 Cutover -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">07</div>
+      <div class="a-body">
+        <div class="a-kicker">Cutover</div>
+        <h2 class="a-h">5 → 25 → 50 → 100. <span class="em">No big-bang flips</span>.</h2>
+        <p class="a-lede">Move the read traffic in four feature-flag controlled steps. Each step must be stable for four hours before the next. Rollback at any step is a single config change.</p>
+        <p>We've never seen a migration fail at this stage if shadow-reads were clean — but we still walk through the cohorts. Discipline here is what makes the postmortem boring.</p>
+
+        <div class="timeline">
+          <div class="timeline-h">Cutover cohorts · 16-hour walk</div>
+          <div class="tl-row">
+            <div class="tl-day">0h–4h</div>
+            <div class="tl-d"><div class="ti">5% of read traffic → VeltrixDB</div><div class="td">Flag <code>read_source=veltrix</code> applied to a 5% user-id hash range. Watch P99, error rate, customer-support tickets. No deploys during this window.</div></div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-day">4h–8h</div>
+            <div class="tl-d"><div class="ti">25%</div><div class="td">Same hash-range scheme, expanded. If the 5% window showed no anomalies, the 25% should be uneventful. Halt if you see anything you don't recognise.</div></div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-day">8h–12h</div>
+            <div class="tl-d"><div class="ti">50%</div><div class="td">Half your traffic now reads from VeltrixDB. This is the step where any cold-cache effects would surface in production — they shouldn't, because shadow reads warmed the cache for 48 hours, but watch the hit rate anyway.</div></div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-day">12h–16h</div>
+            <div class="tl-d"><div class="ti">100%</div><div class="td">All traffic on VeltrixDB. DynamoDB still receiving writes (you haven't decommissioned the dual-write yet — that's the next step). Save the Grafana snapshot. Send it to your engineering manager.</div></div>
+          </div>
+        </div>
+
+        <h3>Rollback</h3>
+        <p>If anything goes wrong at any step, the rollback is a single feature-flag flip: <code>read_source=dynamodb</code>. Because writes are still going to both databases, DynamoDB never went stale. You lose nothing, and you debug at leisure.</p>
+
+        <div class="callout">
+          <div class="ico">✓</div>
+          <p><b>In four migrations to date</b>, zero have needed a rollback at the cutover stage. The two times shadow-reads surfaced a problem (a serialization quirk and a Unicode normalization edge case), the team caught it during the 48-hour shadow window, fixed it, and proceeded clean. That's the entire point of running shadow-reads.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 wrap -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">08</div>
+      <div class="a-body">
+        <div class="a-kicker">Wrap-up</div>
+        <h2 class="a-h">Decommission, <span class="em">save the receipts</span>.</h2>
+        <p class="a-lede">A week after cutover, drop the dual-write fan-out and put the DynamoDB table into read-only mode. Keep it warm for a month as cold storage. Then archive it.</p>
+        <p>The decommission step is procedural — no surprises. Drop the <code>dual_writer.go</code> path from your repo, point the DynamoDB IAM role at a read-only policy, and schedule a calendar reminder for 30 days out to delete the table. Most teams keep the table around longer than they need to — that's fine, and the cost is trivial.</p>
+        <p>What's not trivial: <b>save the DynamoDB invoice from the month before cutover</b>. Compare it to the VeltrixDB invoice three months later. That delta is the receipt you bring to the next budget review. We've seen customers cut their annual database spend by <b>$340K to $1.2M</b>, and that's the number your CFO will want to see in writing.</p>
+      </div>
+    </section>
+
+    <div class="a-foot reveal">
+      <div class="cite">
+        Playbook based on four production migrations between Q4 2025 and Q1 2026 · median duration 11 working days · zero rollbacks.
+      </div>
+      <div class="links">
+        <a href="VeltrixDB Aerospike.html#calc">Cost calculator</a>
+        <a href="blog-architecture.html">Architecture deep-dive</a>
+        <a href="mailto:guptaakanksha1297@gmail.com?subject=Migration%20support&body=Hi%20—%20we'd%20like%20to%20schedule%20a%20migration%20planning%20call.%0A%0ATable%20size%3A%0AOps%2Fmo%3A">Talk to a solutions architect</a>
+      </div>
+    </div>
+
+    <section class="next-up reveal">
+      <h4>Continue reading</h4>
+      <div class="next-grid">
+        <a class="next" href="blog-benchmark.html">
+          <span class="kind">Benchmark report</span>
+          <h5>The 1B-Key Benchmark — methodology &amp; raw data</h5>
+          <p>Hardware specs, workload generator config, percentile distributions, and replayable harness.</p>
+          <div class="m"><span>PDF · 32 pages</span><span>Read →</span></div>
+        </a>
+        <a class="next" href="blog-architecture.html">
+          <span class="kind">Architecture deep-dive</span>
+          <h5>Key-value separation &amp; why compaction shouldn't touch values</h5>
+          <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+          <div class="m"><span>Engineering blog · 18 min</span><span>Read →</span></div>
+        </a>
+      </div>
+
+      <div class="cta-mini">
+        <div>
+          <h3>Want a <span class="em">solutions architect</span> on the migration?</h3>
+          <p>Enterprise tier includes a named solutions architect end-to-end — Terraform, schema mapping, cutover plan, and the on-call escalation during cutover weekend. No additional cost.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=Migration%20support">Talk to sales <span class="arrow">↗</span></a>
+          <a class="btn" href="VeltrixDB Aerospike.html#pricing">See pricing</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="VeltrixDB Aerospike.html">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#why">Platform</a></li>
+          <li><a href="VeltrixDB Aerospike.html#performance">Benchmark</a></li>
+          <li><a href="VeltrixDB Aerospike.html#compare">Comparison</a></li>
+          <li><a href="VeltrixDB Aerospike.html#how">Architecture</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="blog-benchmark.html">Benchmark report</a></li>
+          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
+          <li><a href="blog-migration.html">Migration guide</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#pricing">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v0.9.4-beta · build cb44a1f</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  },{threshold:.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>

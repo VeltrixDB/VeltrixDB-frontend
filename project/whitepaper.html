@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VeltrixDB Technical Whitepaper — Architecture, Durability &amp; Failure Modes</title>
+<meta name="description" content="The full 42-page architectural whitepaper for VeltrixDB — the storage engine, the sharding model, durability proofs, and the failure modes we test in chaos engineering." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
+    --surface:#15151E; --surface-2:#1B1B26;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
+    --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
+    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --warm:#F4A65A; --good:#46D391;
+    --grid:1280px;
+    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:'Newsreader', 'Times New Roman', serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{background:radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),var(--bg);overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--red);color:#FFFFFF}
+  .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark svg{width:14px;height:14px}
+  .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
+  .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
+  .nav-links{display:flex;gap:28px}
+  .nav-links a{font-size:13.5px;color:var(--ink-2);transition:color .15s;font-weight:500;position:relative}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--red);transition:right .25s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav-links a.cur{color:var(--red)}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  .btn{height:38px;padding:0 16px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-.005em;border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:all .2s ease;font-family:var(--sans);text-decoration:none}
+  .btn:hover{background:rgba(255,255,255,.04);border-color:var(--line-strong)}
+  .btn.primary{background:var(--red);color:#FFFFFF;border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -8px var(--red-glow);position:relative;overflow:hidden}
+  .btn.primary:hover{background:var(--red-2);transform:translateY(-1px)}
+  .btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+  .btn.primary:hover::after{transform:translateX(120%)}
+  .btn .arrow{transition:transform .2s}
+  .btn:hover .arrow{transform:translate(2px,-2px)}
+  .phone{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+  .phone:hover{color:var(--ink)}
+
+  /* whitepaper hero */
+  .wp-hero{position:relative;padding:120px 0 88px;border-bottom:1px solid var(--line);overflow:hidden}
+  .wp-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.035) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px);background-size:84px 84px;mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);pointer-events:none}
+  .wp-hero::after{content:"";position:absolute;right:-260px;top:-180px;width:840px;height:840px;background:radial-gradient(circle, rgba(229,18,28,.16) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
+  .wp-hero-inner{position:relative;display:grid;grid-template-columns:1.4fr 1fr;gap:64px;align-items:center}
+  .wp-eyebrow{display:inline-flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--red)}
+  .wp-eyebrow::before{content:"";display:block;width:28px;height:1px;background:var(--red);opacity:.85}
+  h1.wp-title{margin:22px 0 0;font-size:clamp(40px,5vw,72px);line-height:1.0;letter-spacing:-.035em;font-weight:600;color:var(--ink);max-width:14ch}
+  h1.wp-title .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .wp-sub{margin:24px 0 0;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:580px;font-weight:400}
+  .wp-sub b{color:var(--ink);font-weight:600}
+  .wp-cta{margin-top:32px;display:flex;gap:14px;flex-wrap:wrap}
+  .wp-cta .btn{height:50px;padding:0 22px;font-size:14.5px;border-radius:8px}
+  .wp-meta{margin-top:32px;display:flex;gap:32px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+  .wp-meta b{color:var(--ink-2);font-weight:500}
+
+  /* document mock card */
+  .wp-doc{position:relative;border:1px solid var(--line-2);border-radius:14px;background:linear-gradient(180deg,#13131C,#0A0A12);padding:28px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(229,18,28,.30),0 0 0 1px rgba(255,255,255,.04)}
+  .wp-doc::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,#B30E16,#E5121C 50%,#FF3340)}
+  .wp-doc .seal{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+  .wp-doc .seal-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-4);line-height:1.6}
+  .wp-doc .seal-l b{color:var(--red);font-weight:500}
+  .wp-doc .seal-r{padding:6px 12px;border:1px solid rgba(229,18,28,.32);border-radius:4px;font-family:var(--mono);font-size:10.5px;color:var(--red);letter-spacing:.14em;text-transform:uppercase;background:rgba(229,18,28,.06)}
+  .wp-doc h3{margin:0;font-family:var(--serif);font-style:italic;font-size:30px;font-weight:400;line-height:1.15;letter-spacing:-.015em;color:var(--ink)}
+  .wp-doc .sub{margin-top:14px;font-size:14px;color:var(--ink-3);line-height:1.55}
+  .wp-doc .lines{margin-top:24px;display:flex;flex-direction:column;gap:8px}
+  .wp-doc .lines i{display:block;height:6px;background:rgba(255,255,255,.06);border-radius:2px}
+  .wp-doc .lines i:nth-child(1){width:100%}
+  .wp-doc .lines i:nth-child(2){width:92%}
+  .wp-doc .lines i:nth-child(3){width:78%}
+  .wp-doc .lines i:nth-child(4){width:100%}
+  .wp-doc .lines i:nth-child(5){width:64%}
+  .wp-doc .stats{margin-top:28px;padding-top:22px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .wp-doc .st{display:flex;flex-direction:column;gap:4px}
+  .wp-doc .st .v{font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+  .wp-doc .st .v .red{color:var(--red)}
+  .wp-doc .st .l{font-family:var(--mono);font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:var(--ink-4)}
+
+  /* sections (general) */
+  section{padding:120px 0;position:relative;border-top:1px solid var(--line)}
+  .sec-eyebrow{display:inline-flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--red)}
+  .sec-eyebrow::before{content:"";display:block;width:28px;height:1px;background:var(--red);opacity:.85}
+  h2.sh{font-size:clamp(28px,3.2vw,44px);line-height:1.05;letter-spacing:-.03em;font-weight:600;margin:22px 0 0;max-width:18ch;color:var(--ink)}
+  h2.sh .em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--red)}
+  .sh-sub{margin-top:18px;font-size:17px;color:var(--ink-3);max-width:720px;line-height:1.6}
+
+  /* what's inside grid */
+  .toc{margin-top:48px;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .toc-card{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);transition:border-color .2s,background .2s;display:flex;flex-direction:column;gap:12px;position:relative}
+  .toc-card:hover{border-color:var(--line-2);background:rgba(229,18,28,.04)}
+  .toc-card .num{font-family:var(--serif);font-style:italic;font-size:40px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:absolute;top:24px;right:24px}
+  .toc-card .ch{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .toc-card h3{margin:0;font-size:21px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink);max-width:80%}
+  .toc-card p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.55}
+  .toc-card .meta{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:.06em;display:flex;gap:14px;border-top:1px solid var(--line);padding-top:12px}
+
+  /* preview panels — what's actually in the paper */
+  .preview{margin-top:48px;display:flex;flex-direction:column;gap:48px}
+  .pv-row{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+  .pv-row.r{direction:rtl}
+  .pv-row.r > *{direction:ltr}
+  .pv-text{display:flex;flex-direction:column;gap:14px}
+  .pv-text .pk{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .pv-text h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .pv-text h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .pv-text p{margin:0;color:var(--ink-2);font-size:15.5px;line-height:1.7;font-weight:300}
+  .pv-text p b{color:var(--ink);font-weight:600}
+  .pv-text p code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 6px;border-radius:4px;font-size:13px}
+  .pv-figure{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#0A0A12,#07070B);position:relative;overflow:hidden;min-height:280px;padding:24px}
+  .pv-figure::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.02) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.02) 1px, transparent 1px);background-size:24px 24px;pointer-events:none}
+  .pv-figure .fl{position:relative;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);margin-bottom:16px;display:flex;justify-content:space-between}
+  .pv-figure .fl b{color:var(--red);font-weight:500}
+
+  /* schematic for figures */
+  .fig-stack{display:flex;flex-direction:column;gap:10px;position:relative}
+  .fig-row{display:grid;grid-template-columns:100px 1fr;gap:14px;align-items:center}
+  .fig-row .pre{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);text-align:right}
+  .fig-row .post{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fig-node{padding:8px 12px;border:1px solid var(--line-2);border-radius:6px;background:rgba(255,255,255,.04);font-family:var(--mono);font-size:11px;color:var(--ink-2);letter-spacing:.02em;white-space:nowrap}
+  .fig-node.us{border-color:rgba(229,18,28,.40);background:rgba(229,18,28,.08);color:var(--red);box-shadow:0 0 16px -6px rgba(229,18,28,.40)}
+  .fig-arr{color:var(--ink-4);font-family:var(--mono);font-size:13px}
+
+  /* table of contents */
+  .toc-doc{margin-top:48px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+  .toc-head{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.02)}
+  .toc-head h3{margin:0;font-size:18px;font-weight:600;letter-spacing:-.015em}
+  .toc-head .meta{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--ink-3);text-transform:uppercase}
+  .toc-list{padding:8px 0}
+  .toc-list .toc-item{padding:14px 28px;display:grid;grid-template-columns:60px 1fr 80px;gap:18px;align-items:center;border-bottom:1px dashed var(--line);transition:background .15s,color .15s}
+  .toc-list .toc-item:last-child{border-bottom:0}
+  .toc-list .toc-item:hover{background:rgba(229,18,28,.04);color:var(--red)}
+  .toc-list .ch{font-family:var(--mono);font-size:11.5px;letter-spacing:.10em;color:var(--ink-4);font-weight:600}
+  .toc-list .ch.us{color:var(--red)}
+  .toc-list .nm{font-size:15px;font-weight:500;color:var(--ink-2);letter-spacing:-.005em}
+  .toc-list .nm .sub{display:block;color:var(--ink-3);font-weight:300;font-size:13px;margin-top:2px}
+  .toc-list .pg{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right;letter-spacing:.04em}
+
+  /* failure modes (chaos) */
+  .chaos{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .chaos-cell{border:1px solid var(--line);border-radius:12px;padding:24px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent)}
+  .chaos-cell .ic{width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.12);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .chaos-cell h4{margin:14px 0 8px;font-size:16px;font-weight:600;letter-spacing:-.015em;color:var(--ink)}
+  .chaos-cell p{margin:0;color:var(--ink-3);font-size:13.5px;line-height:1.6;font-weight:300}
+  .chaos-cell p b{color:var(--ink);font-weight:600}
+
+  /* download CTA */
+  .download{margin-top:0;padding:120px 0;border-top:1px solid var(--line);background:radial-gradient(900px 360px at 50% 0%, rgba(229,18,28,.18), transparent 60%),linear-gradient(180deg, rgba(229,18,28,.06), transparent 50%);text-align:center;position:relative;overflow:hidden}
+  .download::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right,rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.04) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(ellipse 50% 70% at 50% 50%, black 30%, transparent 80%);pointer-events:none}
+  .download-inner{position:relative;z-index:1}
+  .download h2{font-size:clamp(32px,4vw,52px);line-height:1.05;letter-spacing:-.035em;font-weight:600;margin:0 auto;max-width:14ch;color:var(--ink)}
+  .download h2 .em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--red)}
+  .download p{margin:22px auto 0;color:var(--ink-2);max-width:540px;font-size:16px;line-height:1.6}
+  .download .actions{margin-top:38px;display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+  .download .actions .btn{height:52px;padding:0 24px;font-size:15px;border-radius:8px}
+  .download .fine{margin-top:24px;font-family:var(--mono);font-size:12px;color:var(--ink-4);letter-spacing:.04em}
+
+  footer{border-top:1px solid var(--line);padding:56px 0 36px;background:#0A0A12}
+  .ft{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;align-items:start}
+  .ft .brand-block{max-width:320px}
+  .ft .brand-block p{margin:14px 0 0;color:var(--ink-3);font-size:13px;line-height:1.6}
+  .ft h5{margin:0 0 14px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .ft ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ft ul a{font-size:13.5px;color:var(--ink-2);transition:color .15s}
+  .ft ul a:hover{color:var(--red)}
+  .ft-bar{margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--ink-4);letter-spacing:.04em}
+
+  @media (max-width:1080px){
+    .wp-hero-inner{grid-template-columns:1fr;gap:40px}
+    .toc{grid-template-columns:1fr}
+    .pv-row{grid-template-columns:1fr;gap:24px}
+    .pv-row.r{direction:ltr}
+    .chaos{grid-template-columns:1fr}
+    .ft{grid-template-columns:1fr 1fr;gap:32px}
+    .wp-hero{padding:80px 0 60px}
+    section{padding:80px 0}
+    .download{padding:80px 0}
+  }
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .phone{display:none}
+    .wrap{padding:0 20px}
+    .nav-inner{height:58px}
+    .nav-cta .btn{height:36px;padding:0 14px;font-size:12.5px}
+    h1.wp-title{font-size:36px}
+    .wp-sub{font-size:15.5px}
+    .wp-cta .btn{width:100%;justify-content:center}
+    .wp-doc{padding:22px}
+    .wp-doc .stats{grid-template-columns:1fr 1fr}
+    h2.sh{font-size:24px}
+    .toc-list .toc-item{grid-template-columns:50px 1fr;gap:14px}
+    .toc-list .pg{display:none}
+    .ft{grid-template-columns:1fr;gap:24px}
+    .ft-bar{flex-direction:column;gap:10px;align-items:flex-start}
+    .fig-row{grid-template-columns:1fr;gap:6px}
+    .fig-row .pre{text-align:left}
+  }
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="VeltrixDB Aerospike.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="VeltrixDB Aerospike.html#why">Platform</a>
+      <a href="VeltrixDB Aerospike.html#performance">Benchmark</a>
+      <a href="VeltrixDB Aerospike.html#compare">Compare</a>
+      <a href="VeltrixDB Aerospike.html#pricing">Pricing</a>
+      <a href="VeltrixDB Aerospike.html#calc">Cost</a>
+      <a href="whitepaper.html" class="cur">Whitepaper</a>
+      <a href="VeltrixDB Aerospike.html#how">Architecture</a>
+    </div>
+    <div class="nav-cta">
+      <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">↗</span></a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ WHITEPAPER HERO ============ -->
+<header class="wp-hero">
+  <div class="wrap">
+    <div class="wp-hero-inner">
+      <div>
+        <span class="wp-eyebrow">Technical whitepaper · v0.9.4</span>
+        <h1 class="wp-title">The VeltrixDB <span class="em">whitepaper</span>.</h1>
+        <p class="wp-sub">42 pages of how the storage engine actually works — <b>block-by-block diagrams, the durability proof, the sharding model, and the failure modes we test in chaos engineering</b>. Written for the engineer who'll be on call for this in production.</p>
+
+        <div class="wp-cta">
+          <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
+          <a class="btn" href="#contents">See what's inside</a>
+        </div>
+        <div class="wp-meta">
+          <span><b>Pages</b> · 42</span>
+          <span><b>Author</b> · A. Gupta</span>
+          <span><b>Updated</b> · May 2026</span>
+          <span><b>License</b> · Closed source · reproducible benchmarks</span>
+        </div>
+      </div>
+
+      <!-- doc preview card -->
+      <div class="wp-doc">
+        <div class="seal">
+          <div class="seal-l">
+            <b>VeltrixDB</b> · technical reference<br/>
+            v0.9.4-beta · build cb44a1f<br/>
+            42 pages · classified <b>shareable</b>
+          </div>
+          <div class="seal-r">PDF · 4.8 MB</div>
+        </div>
+        <h3>The extreme point-lookup engine — architecture &amp; durability.</h3>
+        <p class="sub">A first-principles walk through the storage layer, the I/O model, the sharding scheme, and the proofs behind a 99.999% durability SLA on commodity NVMe.</p>
+        <div class="lines"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="stats">
+          <div class="st"><div class="v"><span class="red">42</span></div><div class="l">pages</div></div>
+          <div class="st"><div class="v">18</div><div class="l">diagrams</div></div>
+          <div class="st"><div class="v">9</div><div class="l">chapters</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ WHY READ IT ============ -->
+<section>
+  <div class="wrap reveal">
+    <span class="sec-eyebrow">Why we wrote it</span>
+    <h2 class="sh">Closed source <span class="em">doesn't mean opaque</span>.</h2>
+    <p class="sh-sub">We're closed source — for reasons that are honest and uninteresting. But we shipped a 42-page architectural document so that no CTO ever has to take "trust us" for an answer. If your security-review team wants the engineer who wrote a section on a call, we'll send them. This is the document that makes that conversation possible.</p>
+
+    <div class="toc">
+      <div class="toc-card">
+        <span class="num">01</span>
+        <span class="ch">Storage engine</span>
+        <h3>Key–value separation, end to end.</h3>
+        <p>The full case for WiscKey-style separation — index layout, VLog segment format, pointer encoding, and the production-hardening changes we made over the original paper.</p>
+        <div class="meta"><span>Chapter 1–2</span><span>14 pages</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">02</span>
+        <span class="ch">Kernel I/O</span>
+        <h3>io_uring SQPOLL on the hot path.</h3>
+        <p>How we structure the submission and completion queues per shard, why we use O_DIRECT, and the benchmarks comparing io_uring vs <code>pread</code> at our P99 targets.</p>
+        <div class="meta"><span>Chapter 3</span><span>6 pages</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">03</span>
+        <span class="ch">Durability</span>
+        <h3>The fsync chain and the 99.999% SLA proof.</h3>
+        <p>Group-commit WAL, replication invariants, the actual probability calculus behind the published durability number, and the conditions under which it does not hold.</p>
+        <div class="meta"><span>Chapter 4</span><span>5 pages</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">04</span>
+        <span class="ch">Sharding &amp; placement</span>
+        <h3>1024 shards · consistent hashing · zone-aware.</h3>
+        <p>Why 1024, how we rebalance without read interruption, the operator's reshard procedure, and the cap on individual shard ownership during partition events.</p>
+        <div class="meta"><span>Chapter 5</span><span>6 pages</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">05</span>
+        <span class="ch">Cache (LIRS)</span>
+        <h3>Why LRU lies — and what we replaced it with.</h3>
+        <p>The LIRS algorithm in detail, the priority-2 eviction-resistance tweak for small hot keys, and the measured hit-rate uplift on Zipfian workloads vs LRU.</p>
+        <div class="meta"><span>Chapter 6</span><span>4 pages</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">06</span>
+        <span class="ch">Failure modes</span>
+        <h3>What we test in chaos engineering.</h3>
+        <p>The full failure-injection matrix — single-node loss, full-zone outage, NVMe bit-flip, kernel hang, network partition. Every test case, the expected behaviour, and the RTO/RPO numbers we hit.</p>
+        <div class="meta"><span>Chapter 7–8</span><span>7 pages</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SNEAK PEEK — what diagrams look like ============ -->
+<section>
+  <div class="wrap reveal">
+    <span class="sec-eyebrow">A sneak peek</span>
+    <h2 class="sh">The kind of detail <span class="em">you'd expect</span> from a paper.</h2>
+    <p class="sh-sub">Two pulled-out figures from the document — the write path, and the failure-injection matrix. The full PDF has 18 diagrams of this density.</p>
+
+    <div class="preview">
+      <div class="pv-row reveal">
+        <div class="pv-text">
+          <span class="pk">Figure 03 · Write path</span>
+          <h3>Group-commit WAL with <span class="em">amortized fsync</span>.</h3>
+          <p>The five-stage write pipeline. Application code lands in a per-shard ring buffer; a dedicated commit thread wakes every <code>50µs</code> (or on batch-full), issues a single <code>fsync</code>, and unparks every blocked writer at once. The 80µs fsync cost is divided across the entire batch — at 2M ops/sec, that's roughly <code>~0.85µs per write</code> for full durability.</p>
+          <p>The full chapter covers the lock-free queue design, the futex-park behaviour, the WAL crash-recovery protocol, and a proof that the WAL never loses an acknowledged write under any single-node failure.</p>
+        </div>
+        <div class="pv-figure">
+          <div class="fl"><span>FIG 03 · WRITE PATH · POST-ACK</span><span><b>P99 0.21ms</b></span></div>
+          <div class="fig-stack">
+            <div class="fig-row"><div class="pre">01 · 12µs</div><div class="post"><span class="fig-node">App</span><span class="fig-arr">→</span><span class="fig-node">WAL ring</span></div></div>
+            <div class="fig-row"><div class="pre">02 · 80µs</div><div class="post"><span class="fig-node us">WAL fsync</span><span class="fig-arr">·</span><span class="fig-node">group-commit</span></div></div>
+            <div class="fig-row"><div class="pre">03 · 30µs</div><div class="post"><span class="fig-node us">VLog append</span><span class="fig-arr">·</span><span class="fig-node">O_DIRECT</span></div></div>
+            <div class="fig-row"><div class="pre">04 · 8µs</div><div class="post"><span class="fig-node">Index pointer</span><span class="fig-arr">·</span><span class="fig-node">ART insert</span></div></div>
+            <div class="fig-row"><div class="pre">05 · 5µs</div><div class="post"><span class="fig-node">Cache warm</span><span class="fig-arr">→</span><span class="fig-node">ack</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-row r reveal">
+        <div class="pv-text">
+          <span class="pk">Figure 14 · Chaos matrix</span>
+          <h3>Every failure mode we test, <span class="em">and the SLO it owns</span>.</h3>
+          <p>The chaos-engineering matrix lives in chapter 7. We run each of these injections nightly against a production-equivalent cluster. The chapter documents the exact <code>fault-injection</code> spec, the expected user-observable behaviour, and the recovery time we measured over a 90-day window.</p>
+          <p>The point of publishing this isn't to say nothing ever fails — it's to say <b>we know what does, and we test for it</b>. When you have an incident, the failure mode you'll hit is almost certainly already in the matrix.</p>
+        </div>
+        <div class="pv-figure">
+          <div class="fl"><span>FIG 14 · FAILURE MATRIX</span><span><b>RTO &lt; 30s</b></span></div>
+          <div class="fig-stack">
+            <div class="fig-row"><div class="pre">single node</div><div class="post"><span class="fig-node">kill -9</span><span class="fig-arr">→</span><span class="fig-node us">RTO 8s</span></div></div>
+            <div class="fig-row"><div class="pre">full AZ</div><div class="post"><span class="fig-node">network drop</span><span class="fig-arr">→</span><span class="fig-node us">RTO 22s</span></div></div>
+            <div class="fig-row"><div class="pre">NVMe corrupt</div><div class="post"><span class="fig-node">bit-flip inject</span><span class="fig-arr">→</span><span class="fig-node us">detect &lt;1s</span></div></div>
+            <div class="fig-row"><div class="pre">kernel hang</div><div class="post"><span class="fig-node">CPU stall</span><span class="fig-arr">→</span><span class="fig-node us">eject 12s</span></div></div>
+            <div class="fig-row"><div class="pre">cross-region</div><div class="post"><span class="fig-node">QUIC partition</span><span class="fig-arr">→</span><span class="fig-node us">RPO &lt;30s</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TABLE OF CONTENTS ============ -->
+<section id="contents">
+  <div class="wrap reveal">
+    <span class="sec-eyebrow">Table of contents</span>
+    <h2 class="sh">All 42 pages, <span class="em">in order</span>.</h2>
+    <p class="sh-sub">Every section, every figure number, every page. If a chapter is what you're after, we'll send you the chapter — you don't have to take the whole PDF.</p>
+
+    <div class="toc-doc">
+      <div class="toc-head">
+        <h3>VeltrixDB · Technical Reference · v0.9.4-beta</h3>
+        <span class="meta">42 pages · 18 figures · 9 chapters</span>
+      </div>
+      <div class="toc-list">
+        <div class="toc-item"><span class="ch">00</span><span class="nm">Preface &amp; notation<span class="sub">Audience, scope, and how to read this paper</span></span><span class="pg">p. 1</span></div>
+        <div class="toc-item"><span class="ch us">01</span><span class="nm">The case for key-value separation<span class="sub">Why LSM compaction is the silent tail-latency killer</span></span><span class="pg">p. 4</span></div>
+        <div class="toc-item"><span class="ch us">02</span><span class="nm">Storage engine internals<span class="sub">VLog segment format, ART index, garbage collection</span></span><span class="pg">p. 9</span></div>
+        <div class="toc-item"><span class="ch us">03</span><span class="nm">Kernel I/O — io_uring SQPOLL + O_DIRECT<span class="sub">Submission queues, completion polling, syscall accounting</span></span><span class="pg">p. 16</span></div>
+        <div class="toc-item"><span class="ch us">04</span><span class="nm">Durability &amp; the 99.999% SLA proof<span class="sub">Group-commit WAL, replication invariants, probability calculus</span></span><span class="pg">p. 22</span></div>
+        <div class="toc-item"><span class="ch us">05</span><span class="nm">Sharding &amp; placement<span class="sub">1024-shard consistent hash, zone-awareness, online reshard</span></span><span class="pg">p. 26</span></div>
+        <div class="toc-item"><span class="ch us">06</span><span class="nm">LIRS cache &amp; small-hot-key resistance<span class="sub">The eviction algorithm and the priority-2 tuning</span></span><span class="pg">p. 31</span></div>
+        <div class="toc-item"><span class="ch us">07</span><span class="nm">Chaos engineering &amp; failure modes<span class="sub">Fault-injection matrix, RTO/RPO numbers, runbooks</span></span><span class="pg">p. 34</span></div>
+        <div class="toc-item"><span class="ch us">08</span><span class="nm">Security model<span class="sub">mTLS, AES-256, BYOK, key rotation, audit log</span></span><span class="pg">p. 38</span></div>
+        <div class="toc-item"><span class="ch">09</span><span class="nm">Appendix — wire protocol &amp; metrics reference<span class="sub">Binary protocol spec and the 50+ Prometheus metrics</span></span><span class="pg">p. 41</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CHAOS / FAILURE MODES ============ -->
+<section>
+  <div class="wrap reveal">
+    <span class="sec-eyebrow">Chapter 7 · sample</span>
+    <h2 class="sh">Five failure modes <span class="em">we test nightly</span>.</h2>
+    <p class="sh-sub">A taste of what's in the chaos chapter — every one of these is exercised against a production-equivalent cluster every night, and the results are published to the same Prometheus we expose on customer clusters.</p>
+
+    <div class="chaos">
+      <div class="chaos-cell">
+        <div class="ic">01</div>
+        <h4>Single-node loss</h4>
+        <p>We <code>kill -9</code> a healthy node at random under sustained 2M ops/sec load. Expected: reads continue from replica within 8 seconds, no acknowledged writes lost. <b>Measured RTO: 8.4s P99.</b></p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">02</div>
+        <h4>Full availability-zone outage</h4>
+        <p>iptables-drop all traffic from a zone for 30 minutes. Expected: traffic shifts to remaining zones, write quorum maintained on 2/3 zones. <b>Measured RTO: 22s · zero data loss.</b></p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">03</div>
+        <h4>NVMe corruption</h4>
+        <p>Inject a deliberate bit-flip into a sealed VLog segment. Expected: checksum trips on next read, value re-fetched from replica, bad segment quarantined. <b>Detection &lt; 1s.</b></p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">04</div>
+        <h4>Kernel CPU stall</h4>
+        <p>Stall a CPU running the io_uring SQPOLL thread for 30s. Expected: liveness probe trips, the node is auto-ejected from the read pool, traffic re-routes to healthy nodes. <b>Ejection in 12s.</b></p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">05</div>
+        <h4>Cross-region partition</h4>
+        <p>Cut QUIC replication between two regions for 5 minutes. Expected: both regions continue serving local reads &amp; writes, conflict resolution applies on heal. <b>RPO &lt; 30s, no acknowledged writes lost.</b></p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">06</div>
+        <h4>Compaction storm</h4>
+        <p>Force every shard into aggressive GC simultaneously while serving peak load. Expected: GC respects its cgroup weight, P99 reads stay under 8ms. <b>Measured P99 during storm: 6.4ms.</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD CTA ============ -->
+<section class="download">
+  <div class="wrap download-inner">
+    <h2>Get the full <span class="em">whitepaper</span> in your inbox.</h2>
+    <p>One email gets you the 42-page PDF — including the chapter you skipped. If you want a specific chapter, mention it in the body and we'll send just that.</p>
+    <div class="actions">
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A%0AChapters%20of%20most%20interest%3A">Email me the whitepaper <span class="arrow">↗</span></a>
+      <a class="btn" href="mailto:guptaakanksha1297@gmail.com?subject=Whitepaper%20walkthrough&body=Hi%20—%20we'd%20like%20to%20schedule%20a%2030-minute%20call%20with%20the%20engineer%20who%20wrote%20the%20whitepaper.%0A%0AName%3A%0ACompany%3A%0AChapters%20of%20most%20interest%3A">Schedule a walkthrough</a>
+    </div>
+    <div class="fine">Closed source · architecture documented in full · we'll walk a security-review team through any component</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="VeltrixDB Aerospike.html">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#why">Platform</a></li>
+          <li><a href="VeltrixDB Aerospike.html#performance">Benchmark</a></li>
+          <li><a href="VeltrixDB Aerospike.html#compare">Comparison</a></li>
+          <li><a href="VeltrixDB Aerospike.html#how">Architecture</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="blog-benchmark.html">Benchmark report</a></li>
+          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
+          <li><a href="blog-migration.html">Migration guide</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#pricing">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v0.9.4-beta · build cb44a1f</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  },{threshold:.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>

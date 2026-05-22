@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>The 1B-Key Benchmark — Methodology &amp; Raw Data · VeltrixDB</title>
+<meta name="description" content="Full methodology, hardware specs, workload generator config and percentile distributions from the VeltrixDB 1-billion-key benchmark." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
+    --surface:#15151E; --surface-2:#1B1B26;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
+    --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
+    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --warm:#F4A65A; --good:#46D391;
+    --grid:1280px;
+    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:'Newsreader', 'Times New Roman', serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),
+      var(--bg);
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--red);color:#FFFFFF}
+  .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+  .mono{font-family:var(--mono);letter-spacing:-.01em}
+
+  /* ============ NAV (shared) ============ */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark svg{width:14px;height:14px}
+  .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
+  .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
+  .nav-links{display:flex;gap:28px}
+  .nav-links a{font-size:13.5px;color:var(--ink-2);transition:color .15s;font-weight:500;position:relative}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--red);transition:right .25s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  .btn{height:38px;padding:0 16px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-.005em;border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:all .2s ease;font-family:var(--sans);text-decoration:none}
+  .btn:hover{background:rgba(255,255,255,.04);border-color:var(--line-strong)}
+  .btn.primary{background:var(--red);color:#FFFFFF;border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -8px var(--red-glow);position:relative;overflow:hidden}
+  .btn.primary:hover{background:var(--red-2);transform:translateY(-1px)}
+  .btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+  .btn.primary:hover::after{transform:translateX(120%)}
+  .btn .arrow{transition:transform .2s}
+  .btn:hover .arrow{transform:translate(2px,-2px)}
+  .phone{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+  .phone:hover{color:var(--ink)}
+
+  /* ============ ARTICLE HERO ============ */
+  .article-hero{
+    position:relative;padding:96px 0 64px;border-bottom:1px solid var(--line);overflow:hidden;
+  }
+  .article-hero::before{
+    content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px);
+    background-size:84px 84px;
+    mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);
+    pointer-events:none;
+  }
+  .article-hero::after{
+    content:"";position:absolute;right:-300px;top:-200px;width:900px;height:900px;
+    background:radial-gradient(circle, rgba(229,18,28,.14) 0%, transparent 60%);
+    filter:blur(40px);pointer-events:none;
+  }
+  .crumb{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .crumb a{color:var(--ink-3);transition:color .15s}
+  .crumb a:hover{color:var(--red)}
+  .crumb .sep{color:var(--ink-4)}
+  .crumb .cur{color:var(--red)}
+  .ah-kind{margin-top:18px;display:inline-flex;align-items:center;gap:14px;padding:6px 14px;border:1px solid rgba(229,18,28,.30);border-radius:999px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);background:rgba(229,18,28,.06)}
+  h1.ah-title{margin:24px 0 0;font-size:clamp(36px,4.6vw,64px);line-height:1.04;letter-spacing:-.035em;font-weight:600;color:var(--ink);max-width:18ch}
+  h1.ah-title .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .ah-sub{margin:24px 0 0;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:680px;font-weight:400}
+  .ah-meta{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px}
+  .ah-author{display:flex;align-items:center;gap:14px}
+  .ah-author .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1B1B26,#0A0A12);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red)}
+  .ah-author .am{display:flex;flex-direction:column;gap:2px}
+  .ah-author .nm{font-size:14px;font-weight:600;color:var(--ink);line-height:1.2}
+  .ah-author .role{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r b{color:var(--ink-2);font-weight:500}
+
+  /* ============ ARTICLE BODY ============ */
+  .a-wrap{padding:64px 0 96px;max-width:1080px;margin:0 auto}
+  .a-wrap .wrap{padding:0 28px}
+  .a-grid{display:grid;grid-template-columns:140px 1fr;gap:48px;align-items:start}
+  .a-num{font-family:var(--serif);font-style:italic;font-size:96px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:sticky;top:96px}
+  .a-body{max-width:680px}
+  .a-section + .a-section{margin-top:80px;padding-top:48px;border-top:1px solid var(--line-2)}
+  .a-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:14px}
+  .a-kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:80px}
+  .a-h{margin:18px 0 0;font-size:clamp(24px,2.6vw,34px);font-weight:500;letter-spacing:-.025em;line-height:1.15;color:var(--ink)}
+  .a-h .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-lede{margin:24px 0 0;font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-2);font-weight:400;font-style:normal;border-left:2px solid var(--red);padding:4px 0 4px 18px}
+  .a-body p{margin:22px 0 0;color:var(--ink-2);font-size:16px;line-height:1.75;font-weight:300}
+  .a-body p b{color:var(--ink);font-weight:600}
+  .a-body p code, .a-body li code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 7px;border-radius:4px;font-size:13.5px;letter-spacing:-.005em}
+  .a-body a.inline{color:var(--ink);border-bottom:1px solid var(--red);transition:color .15s,background .15s;padding:1px 3px;border-radius:2px}
+  .a-body a.inline:hover{color:var(--red);background:rgba(229,18,28,.08)}
+  .a-body h3{margin:42px 0 0;font-size:22px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink)}
+  .a-body h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-body ul{margin:18px 0 0;padding:0;list-style:none}
+  .a-body ul li{padding:8px 0 8px 24px;position:relative;color:var(--ink-2);font-size:15.5px;line-height:1.65;font-weight:300}
+  .a-body ul li::before{content:"";position:absolute;left:0;top:18px;width:8px;height:1px;background:var(--red)}
+  .a-body ul li b{color:var(--ink);font-weight:600}
+
+  /* pull-stat row */
+  .a-pull{margin:36px 0;padding:24px 28px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.04),transparent);display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+  .a-pull .pull{padding:0 18px;border-right:1px solid var(--line)}
+  .a-pull .pull:first-child{padding-left:0}
+  .a-pull .pull:last-child{border-right:0}
+  .a-pull .pl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+  .a-pull .pv{margin-top:6px;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+  .a-pull .pv .red{color:var(--red)}
+  .a-pull .pd{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.02em}
+
+  /* code block */
+  .a-code{margin:32px 0;border:1px solid var(--line-2);border-radius:10px;background:#0A0A12;overflow:hidden}
+  .a-code-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .a-code-head .ttl{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .a-code-head .lights{display:flex;gap:6px}
+  .a-code-head .lights i{display:block;width:9px;height:9px;border-radius:50%}
+  .a-code-head .lights i:nth-child(1){background:#FF5F56}
+  .a-code-head .lights i:nth-child(2){background:#FFBD2E}
+  .a-code-head .lights i:nth-child(3){background:#27C93F}
+  .a-code pre{margin:0;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink-2)}
+  .a-code .c{color:var(--ink-4)}
+  .a-code .k{color:#FF6B73}
+  .a-code .s{color:var(--warm)}
+  .a-code .n{color:var(--good)}
+
+  /* spec table */
+  .spec{margin:32px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .spec table{width:100%;border-collapse:collapse;font-size:14px}
+  .spec td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2);line-height:1.5}
+  .spec tr:last-child td{border-bottom:0}
+  .spec td:first-child{font-family:var(--mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--ink-4);width:40%;background:rgba(255,255,255,.018)}
+  .spec td b{color:var(--ink);font-weight:600}
+  .spec td code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 6px;border-radius:4px;font-size:12.5px}
+
+  /* percentile bars (mini latency chart) */
+  .pcts{margin:32px 0;border:1px solid var(--line);border-radius:12px;padding:24px;background:rgba(255,255,255,.018)}
+  .pcts-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
+  .pcts-h .ttl{font-size:14px;font-weight:600;color:var(--ink)}
+  .pcts-h .meta{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .pct-row{display:grid;grid-template-columns:64px 1fr 80px;gap:14px;align-items:center;margin-top:10px}
+  .pct-row .l{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+  .pct-row .t{height:18px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+  .pct-row .f{height:100%;background:linear-gradient(90deg,#B30E16,#E5121C 70%,#FF3340);transition:width 1.2s cubic-bezier(.2,.8,.2,1);width:0}
+  .pct-row .v{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:.04em;text-align:right}
+
+  /* callout */
+  .callout{margin:32px 0;padding:24px 28px;border:1px solid rgba(229,18,28,.28);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.06),rgba(229,18,28,.02));display:flex;gap:18px;align-items:flex-start}
+  .callout .ico{flex:0 0 32px;width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.16);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .callout p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.65;font-weight:300}
+  .callout p b{color:var(--ink);font-weight:600}
+
+  /* article footer / next read */
+  .a-foot{margin-top:64px;padding-top:32px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;align-items:center}
+  .a-foot .cite{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .a-foot .cite b{color:var(--ink-2);font-weight:600}
+  .a-foot .links{display:flex;gap:14px;flex-wrap:wrap}
+  .a-foot .links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;transition:color .15s}
+  .a-foot .links a::after{content:" →";color:var(--red)}
+  .a-foot .links a:hover{color:var(--red)}
+
+  /* next-read row */
+  .next-up{margin-top:80px;padding:48px 0 64px;border-top:1px solid var(--line)}
+  .next-up h4{margin:0 0 28px;font-family:var(--mono);font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:var(--ink-3)}
+  .next-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .next{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent);transition:border-color .2s,transform .2s;display:flex;flex-direction:column;gap:14px}
+  .next:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .next .kind{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .next h5{margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;color:var(--ink)}
+  .next p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.55}
+  .next .m{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-4);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+
+  /* CTA reused */
+  .cta-mini{margin-top:24px;padding:48px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(135deg,rgba(229,18,28,.08),rgba(255,255,255,.02));display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center}
+  .cta-mini h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .cta-mini h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .cta-mini p{margin:12px 0 0;color:var(--ink-3);font-size:14px;line-height:1.6}
+  .cta-mini .actions{display:flex;flex-direction:column;gap:10px}
+  .cta-mini .btn{justify-content:center;height:48px}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:56px 0 36px;background:#0A0A12}
+  .ft{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;align-items:start}
+  .ft .brand-block{max-width:320px}
+  .ft .brand-block p{margin:14px 0 0;color:var(--ink-3);font-size:13px;line-height:1.6}
+  .ft h5{margin:0 0 14px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .ft ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ft ul a{font-size:13.5px;color:var(--ink-2);transition:color .15s}
+  .ft ul a:hover{color:var(--red)}
+  .ft-bar{margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--ink-4);letter-spacing:.04em}
+
+  /* responsive */
+  @media (max-width:1080px){
+    .a-grid{grid-template-columns:1fr;gap:18px}
+    .a-num{position:static;font-size:64px;text-align:left}
+    .a-pull{grid-template-columns:1fr;gap:14px}
+    .a-pull .pull{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px}
+    .a-pull .pull:last-child{border-bottom:0;padding-bottom:0}
+    .next-grid{grid-template-columns:1fr}
+    .cta-mini{grid-template-columns:1fr;padding:32px}
+    .ft{grid-template-columns:1fr 1fr;gap:32px}
+  }
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .phone{display:none}
+    .wrap{padding:0 20px}
+    .nav-inner{height:58px}
+    .nav-cta .btn{height:36px;padding:0 14px;font-size:12.5px}
+    .article-hero{padding:48px 0 36px}
+    h1.ah-title{font-size:32px;letter-spacing:-.025em}
+    .ah-sub{font-size:16px}
+    .ah-meta{flex-direction:column;align-items:flex-start}
+    .a-wrap{padding:36px 0 56px}
+    .a-h{font-size:22px}
+    .a-body p{font-size:15px}
+    .ft{grid-template-columns:1fr;gap:24px}
+    .ft-bar{flex-direction:column;gap:10px;align-items:flex-start}
+  }
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){
+    .reveal{opacity:1!important;transform:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="VeltrixDB Aerospike.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="VeltrixDB Aerospike.html#why">Platform</a>
+      <a href="VeltrixDB Aerospike.html#performance">Benchmark</a>
+      <a href="VeltrixDB Aerospike.html#compare">Compare</a>
+      <a href="VeltrixDB Aerospike.html#pricing">Pricing</a>
+      <a href="VeltrixDB Aerospike.html#calc">Cost</a>
+      <a href="whitepaper.html">Whitepaper</a>
+      <a href="VeltrixDB Aerospike.html#how">Architecture</a>
+    </div>
+    <div class="nav-cta">
+      <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">↗</span></a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ ARTICLE HERO ============ -->
+<header class="article-hero">
+  <div class="wrap">
+    <div class="crumb">
+      <a href="VeltrixDB Aerospike.html">VeltrixDB</a>
+      <span class="sep">/</span>
+      <a href="VeltrixDB Aerospike.html#docs">Resources</a>
+      <span class="sep">/</span>
+      <span class="cur">Benchmark report</span>
+    </div>
+    <span class="ah-kind">Benchmark report · 32 pages</span>
+    <h1 class="ah-title">The 1B-Key Benchmark <span class="em">— methodology &amp; raw data</span>.</h1>
+    <p class="ah-sub">How we measured 4.9ms P99 reads on a 3-node cluster holding one billion keys under sustained mixed load — hardware, workload mix, harness configuration, and every percentile we recorded.</p>
+    <div class="ah-meta">
+      <div class="ah-author">
+        <div class="av">AG</div>
+        <div class="am">
+          <div class="nm">Akanksha Gupta</div>
+          <div class="role">Founder · VeltrixDB</div>
+        </div>
+      </div>
+      <div class="ah-meta-r">
+        <span><b>Published</b> · May 21, 2026</span>
+        <span><b>Read time</b> · 18 minutes</span>
+        <span><b>Reproducible</b> · Yes — harness on request</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ ARTICLE BODY ============ -->
+<main class="a-wrap">
+  <div class="wrap">
+
+    <!-- Section 01: Why a benchmark -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">01</div>
+      <div class="a-body">
+        <div class="a-kicker">Why we benchmark</div>
+        <h2 class="a-h">If you can't reproduce it, <span class="em">it didn't happen</span>.</h2>
+        <p class="a-lede">Most database benchmarks are marketing in a lab coat. They run on hand-tuned hardware, with cherry-picked workloads, and they never release the harness. We did the opposite — and we'll send you the test rig.</p>
+        <p>VeltrixDB sells itself on three numbers — <b>4.9ms P99</b>, <b>1 billion keys</b>, <b>2M ops/sec per node</b>. Each one is a claim that breaks if you change the hardware or the workload. So before we go any further: every number on the <a class="inline" href="VeltrixDB Aerospike.html#performance">performance page</a> traces back to a Prometheus scrape, a flamegraph, or a histogram bucket we'd be happy to walk you through line by line.</p>
+        <p>This article documents the exact methodology — the cluster topology, the kernel tuning, the workload generator, the percentile distributions, and the surprises we found along the way. By the end, you should be able to set up your own rig in an afternoon and reproduce every number we publish to <b>within ±3%</b>.</p>
+        <p>If anything below smells like a marketing benchmark, we want to hear about it. <a class="inline" href="mailto:guptaakanksha1297@gmail.com?subject=Benchmark%20question">Send us your questions</a> — we'll either fix the harness or write a follow-up explaining why a number is the way it is.</p>
+      </div>
+    </section>
+
+    <!-- Section 02: Hardware -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">02</div>
+      <div class="a-body">
+        <div class="a-kicker">Hardware</div>
+        <h2 class="a-h">Commodity NVMe, <span class="em">no exotic silicon</span>.</h2>
+        <p class="a-lede">We deliberately picked the most boring infrastructure the cloud has to offer. If the numbers required Optane or custom FPGAs, they wouldn't be reproducible — and they wouldn't be cheap.</p>
+        <p>The cluster runs on <b>Google Cloud N2 instances with local NVMe SSDs</b>. Local NVMe is the only storage class we recommend for production VeltrixDB — EBS, Azure managed disks, and any other network-attached storage will break the latency model entirely. That's not us being precious; it's physics.</p>
+
+        <div class="spec">
+          <table>
+            <tr><td>Instance type</td><td><b>n2-standard-64-lssd</b> · 64 vCPU, 256 GB RAM, 8 × 375 GB local NVMe</td></tr>
+            <tr><td>Cluster topology</td><td><b>3 nodes</b>, single region (us-central1), three availability zones, anti-affinity enforced</td></tr>
+            <tr><td>Storage layout</td><td>8 NVMe drives per node, <code>mdadm</code> RAID-0 striped, <code>ext4</code> with <code>noatime,nodiratime,discard=async</code></td></tr>
+            <tr><td>Kernel</td><td>Linux <b>6.1.0-21-cloud-amd64</b> · io_uring SQPOLL · AVX2 · transparent hugepages set to <code>madvise</code></td></tr>
+            <tr><td>Network</td><td>gVNIC · 100 Gbps placement group · jumbo frames enabled (MTU 8896)</td></tr>
+            <tr><td>VeltrixDB build</td><td><b>v0.9.4-beta</b> · commit <code>cb44a1f</code> · 1024 shards, 256 GB LIRS cache, group-commit WAL fsync</td></tr>
+            <tr><td>Workload host</td><td><b>4 × n2-standard-32</b> instances generating load in parallel, same region, same placement group</td></tr>
+          </table>
+        </div>
+
+        <p>Total cluster spend at on-demand pricing: <b>~$5,800/month</b>. For comparison, DynamoDB at the same blended ops rate would have invoiced around <b>$28,500/month</b> for the same 30-day window — and that's before storage and egress.</p>
+      </div>
+    </section>
+
+    <!-- Section 03: Workload -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">03</div>
+      <div class="a-body">
+        <div class="a-kicker">Workload</div>
+        <h2 class="a-h">Realistic, <span class="em">not flattering</span>.</h2>
+        <p class="a-lede">A benchmark that runs only point reads against a fully-cached working set will lie to you. Ours doesn't — we keep the writes coming, the cache pressure real, and the key distribution Zipfian.</p>
+        <p>We use a <b>70/30 read/write mix</b> with Zipfian key access (α = 0.99) — the same distribution you see in production session stores, ad-tech profile lookups, and rate-limiter buckets. About 6% of reads miss the cache and fall through to NVMe, which is the worst case we care about.</p>
+
+        <h3>Workload profile</h3>
+        <ul>
+          <li><b>Key space</b> · 1,000,000,000 unique 16-byte keys</li>
+          <li><b>Value size</b> · 128 bytes (Zipfian P95: 256 B) — representative of session/profile blobs</li>
+          <li><b>Read/write mix</b> · 70% GET, 25% SET, 5% DEL</li>
+          <li><b>Access distribution</b> · Zipfian α = 0.99 (heavy tail, realistic)</li>
+          <li><b>Concurrency</b> · 1024 client connections per load host × 4 hosts = 4,096 total</li>
+          <li><b>Protocol</b> · TCP binary, pipelined, no batching tricks</li>
+          <li><b>Warm-up</b> · 30 minutes — long enough for the LIRS cache to converge</li>
+          <li><b>Measurement window</b> · 60 minutes of steady state, sampled at 1Hz</li>
+        </ul>
+
+        <div class="callout">
+          <div class="ico">!</div>
+          <p><b>What we did <i>not</i> do.</b> We did not pre-warm the cache with a "perfect" hit pattern, we did not pin clients to specific shards, and we did not disable background GC for the measurement window. The numbers below are with compaction and garbage collection running at full throttle, exactly as they would in production.</p>
+        </div>
+
+        <h3>Load generator</h3>
+        <p>The harness is a Rust-based generator that talks the VeltrixDB binary protocol natively. It records every operation's wall-clock latency, the kernel's <code>tcp_rtt</code> at submission, and the cache-hit flag returned by the server. Histograms are HdrHistogram-based and merged across all four load hosts every 10 seconds.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">load-gen.toml · harness config</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c"># 1B-key benchmark · 70/30 mix · Zipfian α=0.99</span>
+<span class="k">[cluster]</span>
+endpoints  = <span class="s">["10.142.0.11:7100", "10.142.0.12:7100", "10.142.0.13:7100"]</span>
+protocol   = <span class="s">"binary"</span>
+keepalive  = <span class="n">true</span>
+
+<span class="k">[workload]</span>
+key_space     = <span class="n">1_000_000_000</span>
+value_size_b  = <span class="n">128</span>
+distribution  = <span class="s">"zipfian"</span>
+zipf_alpha    = <span class="n">0.99</span>
+read_pct      = <span class="n">70</span>
+write_pct     = <span class="n">25</span>
+delete_pct    = <span class="n">5</span>
+
+<span class="k">[concurrency]</span>
+connections   = <span class="n">1024</span>
+pipeline_depth = <span class="n">16</span>
+
+<span class="k">[run]</span>
+warmup_min    = <span class="n">30</span>
+measure_min   = <span class="n">60</span>
+sample_hz     = <span class="n">1</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 04: Results -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">04</div>
+      <div class="a-body">
+        <div class="a-kicker">Results</div>
+        <h2 class="a-h">The full <span class="em">percentile distribution</span>.</h2>
+        <p class="a-lede">We don't publish an average. Averages hide tail latency, and tail latency is where databases earn — or lose — their keep.</p>
+        <p>Every number below is the merged percentile across the full 60-minute measurement window, sampled at 1Hz, with both load generators running. P99 is the headline. P99.9 is the number your SREs will actually page on.</p>
+
+        <div class="pcts">
+          <div class="pcts-h">
+            <span class="ttl">VeltrixDB · 70/30 mix · 1B keys · cache-miss path</span>
+            <span class="meta">Lower is better · ms</span>
+          </div>
+          <div class="pct-row"><span class="l">P50</span><div class="t"><div class="f" style="width:8%"></div></div><span class="v">0.42 ms</span></div>
+          <div class="pct-row"><span class="l">P90</span><div class="t"><div class="f" style="width:22%"></div></div><span class="v">1.12 ms</span></div>
+          <div class="pct-row"><span class="l">P95</span><div class="t"><div class="f" style="width:38%"></div></div><span class="v">1.94 ms</span></div>
+          <div class="pct-row"><span class="l">P99</span><div class="t"><div class="f" style="width:96%"></div></div><span class="v">4.9 ms</span></div>
+          <div class="pct-row"><span class="l">P99.9</span><div class="t"><div class="f" style="width:99%"></div></div><span class="v">8.7 ms</span></div>
+          <div class="pct-row"><span class="l">P99.99</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">14.2 ms</span></div>
+          <div class="pct-row"><span class="l">Max</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">22.8 ms</span></div>
+        </div>
+
+        <div class="a-pull">
+          <div class="pull"><div class="pl">Sustained throughput</div><div class="pv"><span class="red">6.2M</span> ops/s</div><div class="pd">across 3 nodes · 70/30 mix</div></div>
+          <div class="pull"><div class="pl">Cache hit rate</div><div class="pv">94.2%</div><div class="pd">post-warmup · steady state</div></div>
+          <div class="pull"><div class="pl">Write amplification</div><div class="pv"><span class="red">1.0×</span></div><div class="pd">measured, not estimated</div></div>
+        </div>
+
+        <h3>Cache-hit reads — the easy case</h3>
+        <p>About 94% of reads in steady state never touch NVMe. They're served from the LIRS cache in <b>under 0.3 ms</b> end-to-end. The CDF is so steep here it's almost not worth charting — P99 cache-hit latency is <code>0.31 ms</code>, P99.9 is <code>0.42 ms</code>.</p>
+
+        <h3>Cache-miss reads — the only number that matters</h3>
+        <p>The interesting number is what happens when the LIRS cache misses and we have to go to disk. <code>io_uring</code> SQPOLL + <code>O_DIRECT</code> + <b>1024 dedicated NVMe submission queues</b> keep P99 at <b>4.9 ms</b> even when 6% of reads fall through and compaction is actively churning in the background.</p>
+
+        <h3>Writes — the durability path</h3>
+        <p>Group-commit WAL fsync amortizes the cost of durability across concurrent writers. P99 write latency was <code>0.21 ms</code>, of which roughly <b>~80 µs</b> is the actual fsync. Disk fsync latency is the floor — we just made sure not to add anything on top of it.</p>
+      </div>
+    </section>
+
+    <!-- Section 05: How to reproduce -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">05</div>
+      <div class="a-body">
+        <div class="a-kicker">How to reproduce</div>
+        <h2 class="a-h">Set up your own rig <span class="em">in an afternoon</span>.</h2>
+        <p class="a-lede">Every detail you need to validate these numbers on your own hardware — the Helm values, the load generator, the kernel sysctls. Email us and we'll ship the binaries.</p>
+        <p>You'll need a cloud account, three n2-standard-64-lssd instances, a Linux ≥ 5.10 kernel, and about three hours of patience. The full harness lives in a private repo today — drop us a note and we'll add you to it.</p>
+
+        <h3>Step 1 — bring up the cluster</h3>
+        <p>The Helm chart sets up the StorageClass, StatefulSet, anti-affinity rules, and ServiceMonitor in a single command. With the right values file, you're 94 seconds from a healthy 3-node cluster:</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">~/veltrixdb · zsh</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c">$</span> helm repo add veltrixdb https://charts.veltrixdb.com
+<span class="n">"veltrixdb" has been added to your repositories</span>
+
+<span class="c">$</span> helm install bench veltrixdb/veltrixdb \
+    --namespace veltrixdb --create-namespace \
+    -f bench-values.yaml
+
+<span class="n">✓</span> StorageClass · veltrixdb-nvme
+<span class="n">✓</span> StatefulSet · 3 replicas, anti-affinity
+<span class="n">✓</span> ServiceMonitor · 50+ metrics
+<span class="n">✓</span> PodDisruptionBudget · minAvailable 2
+<span class="n">✓</span> Ready in <span class="s">94s</span></pre>
+        </div>
+
+        <h3>Step 2 — tune the host</h3>
+        <p>VeltrixDB needs a few host-level tunings to deliver these numbers. The Helm chart applies the pod-level pieces automatically; the node-level ones you have to set yourself:</p>
+        <ul>
+          <li><b>Transparent hugepages</b> · <code>echo madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled</code></li>
+          <li><b>Swap</b> · off · the ART index lives in RAM and must not be paged</li>
+          <li><b>CPU governor</b> · <code>performance</code> on all cores — don't let the kernel race-to-idle on tail latency</li>
+          <li><b>NUMA</b> · pin the VeltrixDB pod to a single NUMA node when possible</li>
+          <li><b>Kernel</b> · ≥ 5.10 for full io_uring SQPOLL support</li>
+        </ul>
+
+        <h3>Step 3 — load 1 billion keys</h3>
+        <p>The harness ships with a populator that streams 1B keys at ~3M writes/sec sustained. Total fill time is around <b>5.5 minutes</b> on our reference cluster — well under coffee break.</p>
+
+        <h3>Step 4 — measure</h3>
+        <p>Run the workload for 30 minutes warm-up, then 60 minutes measurement. The harness prints the merged HdrHistogram at every 10-second tick. If your P99 is more than 5% off from <code>4.9 ms</code>, something is wrong — open the Grafana dashboard the chart installs at <code>/grafana</code> and check the per-shard tail latency.</p>
+
+        <div class="callout">
+          <div class="ico">✓</div>
+          <p><b>We'll help.</b> If you set this up and the numbers don't match, that's a bug we want to fix. Email us with your hardware spec and the histogram output — we will turn around a root-cause analysis within 48 hours.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Article foot -->
+    <div class="a-foot reveal">
+      <div class="cite">
+        Harness: <b>veltrixdb/bench-harness</b> (private) · Hardware: <b>GCP n2-standard-64-lssd × 3</b> · Snapshot: <b>May 21, 2026 · 14:42 UTC</b>
+      </div>
+      <div class="links">
+        <a href="VeltrixDB Aerospike.html#performance">See the chart</a>
+        <a href="whitepaper.html">Read the architecture</a>
+        <a href="mailto:guptaakanksha1297@gmail.com?subject=Benchmark%20harness%20access&body=Hi%20—%20please%20add%20me%20to%20the%20bench-harness%20repo.%0A%0AName%3A%0ACompany%3A%0AHardware%3A">Request harness access</a>
+      </div>
+    </div>
+
+    <!-- Next up -->
+    <section class="next-up reveal">
+      <h4>Continue reading</h4>
+      <div class="next-grid">
+        <a class="next" href="blog-architecture.html">
+          <span class="kind">Architecture deep-dive</span>
+          <h5>Key-value separation &amp; why compaction shouldn't touch values</h5>
+          <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+          <div class="m"><span>Engineering blog · 18 min</span><span>Read →</span></div>
+        </a>
+        <a class="next" href="blog-migration.html">
+          <span class="kind">Migration guide</span>
+          <h5>Moving from DynamoDB to VeltrixDB in two sprints</h5>
+          <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan — with copy-pasteable Terraform.</p>
+          <div class="m"><span>Guide · 12 min</span><span>Read →</span></div>
+        </a>
+      </div>
+
+      <div class="cta-mini">
+        <div>
+          <h3>Want the full <span class="em">benchmark PDF</span> on your desk?</h3>
+          <p>32 pages — every histogram bucket, the flamegraphs, and the cost analysis vs DynamoDB, Redis Enterprise, and Cassandra at 1B keys.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=Send%20me%20the%20VeltrixDB%20benchmark%20report&body=Hi%20—%20please%20share%20the%20full%20benchmark%20methodology%20PDF.%0A%0AName%3A%0ACompany%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
+          <a class="btn" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a 30-min demo</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="VeltrixDB Aerospike.html">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#why">Platform</a></li>
+          <li><a href="VeltrixDB Aerospike.html#performance">Benchmark</a></li>
+          <li><a href="VeltrixDB Aerospike.html#compare">Comparison</a></li>
+          <li><a href="VeltrixDB Aerospike.html#how">Architecture</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="blog-benchmark.html">Benchmark report</a></li>
+          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
+          <li><a href="blog-migration.html">Migration guide</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="VeltrixDB Aerospike.html#pricing">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v0.9.4-beta · build cb44a1f</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* reveal on scroll */
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  },{threshold:.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+
+/* animate percentile bars when in view */
+(function(){
+  const w = document.querySelector('.pcts');
+  if (!w) return;
+  const targets = [...document.querySelectorAll('.pct-row .f')].map(el => el.style.width);
+  document.querySelectorAll('.pct-row .f').forEach(el => el.style.width = '0%');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting){
+        document.querySelectorAll('.pct-row .f').forEach((el,i)=>{
+          setTimeout(()=>{ el.style.width = targets[i]; }, i*120);
+        });
+        io.disconnect();
+      }
+    });
+  },{threshold:.3});
+  io.observe(w);
+})();
+</script>
+</body>
+</html>

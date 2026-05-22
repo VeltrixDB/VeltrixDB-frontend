@@ -895,8 +895,22 @@
   .globe-stats .gs .v .red{color:var(--red)}
   .globe-stats .gs .l{margin-top:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
 
+  /* ============ WHITEPAPER CALLOUT ============ */
+  .wp-callout{margin-top:48px;border:1px solid var(--line);border-radius:14px;padding:32px 36px;background:linear-gradient(135deg,rgba(229,18,28,.10),rgba(255,255,255,.02));display:grid;grid-template-columns:1.4fr 1fr;gap:32px;align-items:center;position:relative;overflow:hidden}
+  .wp-callout::before{content:"";position:absolute;right:-160px;top:-80px;width:380px;height:380px;background:radial-gradient(circle,rgba(229,18,28,.18),transparent 60%);filter:blur(40px);pointer-events:none}
+  .wp-callout-text{position:relative}
+  .wp-callout-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);margin-bottom:10px}
+  .wp-callout-text h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .wp-callout-text h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .wp-callout-text p{margin:12px 0 0;color:var(--ink-3);font-size:14.5px;line-height:1.6;max-width:560px}
+  .wp-callout-meta{margin-top:18px;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em;display:flex;gap:24px;flex-wrap:wrap}
+  .wp-callout-meta b{color:var(--ink-2);font-weight:500}
+  .wp-callout-actions{position:relative;display:flex;flex-direction:column;gap:10px}
+  .wp-callout-actions .btn{height:50px;justify-content:center;font-size:14.5px}
+
   /* ============ RESPONSIVE ============ */
   @media (max-width:1080px){
+    .wp-callout{grid-template-columns:1fr;padding:28px;gap:24px}
     .outcomes{grid-template-columns:repeat(2,1fr)}
     .outcome:nth-child(3n){border-right:1px solid var(--line)}
     .outcome:nth-child(2n){border-right:0}
@@ -1033,7 +1047,7 @@
       <a href="#compare">Compare</a>
       <a href="#pricing">Pricing</a>
       <a href="#calc">Cost</a>
-      <a href="#whitepaper">Whitepaper</a>
+      <a href="whitepaper.html">Whitepaper</a>
       <a href="#how">Architecture</a>
     </div>
     <div class="nav-cta">
@@ -1568,6 +1582,24 @@
     <h2 class="sh">Not a wrapper. <span class="em">A storage engine</span>, rebuilt.</h2>
     <p class="sh-sub">We didn't put a faster cache in front of a slow database. We re-engineered the storage layer at the kernel boundary — two technical bets explain everything.</p>
 
+    <!-- Whitepaper callout -->
+    <div class="wp-callout">
+      <div class="wp-callout-text">
+        <div class="wp-callout-kicker">Technical whitepaper · 42 pages</div>
+        <h3>Want the <span class="em">full architectural document</span>?</h3>
+        <p>Block-by-block diagrams of the write/read paths, the durability proof behind the 99.999% SLA, the sharding model, the LIRS cache internals, and the chaos-engineering failure matrix — all in one PDF. Written for the engineer who'll be on call for this in production.</p>
+        <div class="wp-callout-meta">
+          <span><b>9 chapters</b></span>
+          <span><b>18 diagrams</b></span>
+          <span><b>v0.9.4 · May 2026</b></span>
+        </div>
+      </div>
+      <div class="wp-callout-actions">
+        <a class="btn primary" href="whitepaper.html">Read the whitepaper <span class="arrow">↗</span></a>
+        <a class="btn" href="mailto:guptaakanksha1297@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0A">Email me the PDF</a>
+      </div>
+    </div>
+
     <div class="deep">
       <article class="article">
         <div class="article-num">01</div>
@@ -1601,7 +1633,7 @@
           <h3 class="article-h"><span class="em">io_uring</span> with SQPOLL. Zero syscalls on the hot path.</h3>
           <p class="article-lede">Traditional databases pay a syscall and context-switch tax on every read. We bypass it entirely — the kernel polls our submission queue, and read latency collapses.</p>
           <p>In <code>io_uring SQPOLL</code> mode, a kernel thread polls a shared ring buffer for I/O submissions. Our hot path issues reads with <b>zero syscalls per operation</b>. <code>O_DIRECT</code> sidesteps the page cache for deterministic NVMe latency — no eviction noise, no surprise jitter from another tenant.</p>
-          <p>Each of our <b>1024 shards</b> owns a dedicated submission queue. At the kernel boundary it looks less like a database and more like a 1024-way parallel storage controller. The architecture is laid out in our whitepaper, and you can see the result live <a class="inline" href="#transparency">on the cluster dashboard</a>.</p>
+          <p>Each of our <b>1024 shards</b> owns a dedicated submission queue. At the kernel boundary it looks less like a database and more like a 1024-way parallel storage controller. The architecture is laid out in our <a class="inline" href="whitepaper.html">technical whitepaper</a>, and you can see the result live <a class="inline" href="#transparency">on the cluster dashboard</a>.</p>
 
           <div class="article-pull">
             <div class="pull"><div class="pl">Syscalls / read</div><div class="pv"><span class="red">0</span></div><div class="pd">SQPOLL kernel thread</div></div>
@@ -1612,7 +1644,7 @@
           <div class="article-foot">
             <div class="article-cite">Closed source. The architecture is fully documented — happy to walk a security-review team through every component.</div>
             <div class="article-links">
-              <a class="primary" href="mailto:guptaakanksha1297@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0A">Get the whitepaper</a>
+              <a class="primary" href="whitepaper.html">Get the whitepaper</a>
               <a href="#transparency">Live cluster metrics</a>
             </div>
           </div>
@@ -1818,19 +1850,19 @@
     <h2 class="sh">Built for teams who <span class="em">read the docs</span>.</h2>
     <p class="sh-sub">Every claim on this page has a benchmark, a paper, or a config file behind it. Go deep before you commit.</p>
     <div class="resources">
-      <a class="res" href="#">
+      <a class="res" href="blog-benchmark.html">
         <span class="kind">Benchmark report</span>
         <h4>The 1B-Key Benchmark — methodology &amp; raw data</h4>
         <p>Hardware specs, workload generator config, percentile distributions, and replayable harness. 32 pages.</p>
-        <div class="meta"><span>PDF · 4.2 MB</span><span>Download</span></div>
+        <div class="meta"><span>PDF · 4.2 MB</span><span>Read →</span></div>
       </a>
-      <a class="res" href="#">
+      <a class="res" href="blog-architecture.html">
         <span class="kind">Architecture deep-dive</span>
         <h4>Key-value separation &amp; why compaction shouldn't touch values</h4>
         <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
         <div class="meta"><span>Engineering blog · 18 min</span><span>Read →</span></div>
       </a>
-      <a class="res" href="#">
+      <a class="res" href="blog-migration.html">
         <span class="kind">Migration guide</span>
         <h4>Moving from DynamoDB to VeltrixDB in two sprints</h4>
         <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan — with copy-pasteable Terraform.</p>
