@@ -231,18 +231,18 @@
 
 <nav class="top">
   <div class="wrap nav-inner">
-    <a class="brand" href="VeltrixDB Aerospike.html">
+    <a class="brand" href="index.html">
       <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
       <b>Veltrix<i>DB</i></b>
     </a>
     <div class="nav-links">
-      <a href="VeltrixDB Aerospike.html#why">Platform</a>
-      <a href="VeltrixDB Aerospike.html#performance">Benchmark</a>
-      <a href="VeltrixDB Aerospike.html#compare">Compare</a>
-      <a href="VeltrixDB Aerospike.html#pricing">Pricing</a>
-      <a href="VeltrixDB Aerospike.html#calc">Cost</a>
+      <a href="index.html#why">Platform</a>
+      <a href="index.html#performance">Benchmark</a>
+      <a href="index.html#compare">Compare</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#calc">Cost</a>
       <a href="whitepaper.html">Whitepaper</a>
-      <a href="VeltrixDB Aerospike.html#how">Architecture</a>
+      <a href="index.html#how">Architecture</a>
     </div>
     <div class="nav-cta">
       <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
@@ -254,9 +254,9 @@
 <header class="article-hero">
   <div class="wrap">
     <div class="crumb">
-      <a href="VeltrixDB Aerospike.html">VeltrixDB</a>
+      <a href="index.html">VeltrixDB</a>
       <span class="sep">/</span>
-      <a href="VeltrixDB Aerospike.html#docs">Resources</a>
+      <a href="index.html#docs">Resources</a>
       <span class="sep">/</span>
       <span class="cur">Architecture deep-dive</span>
     </div>
@@ -308,7 +308,7 @@
           </table>
         </div>
 
-        <p>The benchmark we publish <a class="inline" href="VeltrixDB Aerospike.html#performance">on the performance page</a> measures write amplification of <code>1.0×</code> sustained over a 60-minute window. That's not theoretical — that's the actual ratio of <code>bytes_written_to_nvme</code> over <code>bytes_written_by_clients</code>, scraped from <code>/metrics</code>.</p>
+        <p>The benchmark we publish <a class="inline" href="index.html#performance">on the performance page</a> measures write amplification of <code>1.0×</code> sustained over a 60-minute window. That's not theoretical — that's the actual ratio of <code>bytes_written_to_nvme</code> over <code>bytes_written_by_clients</code>, scraped from <code>/metrics</code>.</p>
       </div>
     </section>
 
@@ -350,7 +350,7 @@
           </div>
         </div>
 
-        <p>An ART of 24-byte pointers for 1 billion keys consumes <b>~24 GB of RAM per shard set</b> — which is why the <a class="inline" href="VeltrixDB Aerospike.html#requirements">honest fit check</a> is honest about the RAM budget. The trade-off is that compaction never has to do anything other than merge these tiny, fixed-size pointer records. That's why our compaction is cheap and our P99 stays flat.</p>
+        <p>An ART of 24-byte pointers for 1 billion keys consumes <b>~24 GB of RAM per shard set</b> — which is why the <a class="inline" href="index.html#requirements">honest fit check</a> is honest about the RAM budget. The trade-off is that compaction never has to do anything other than merge these tiny, fixed-size pointer records. That's why our compaction is cheap and our P99 stays flat.</p>
       </div>
     </section>
 
@@ -455,7 +455,7 @@
 
         <div class="callout">
           <div class="ico">!</div>
-          <p>This is the single biggest difference between our P99 graph and an LSM-based engine's. RocksDB compaction shares the same I/O scheduler as the read path — when it kicks off, reads queue behind it. VeltrixDB GC literally cannot interfere with reads. Watch a 60-minute window on the <a class="inline" href="VeltrixDB Aerospike.html#transparency">cluster dashboard</a> and look for the missing sawtooth.</p>
+          <p>This is the single biggest difference between our P99 graph and an LSM-based engine's. RocksDB compaction shares the same I/O scheduler as the read path — when it kicks off, reads queue behind it. VeltrixDB GC literally cannot interfere with reads. Watch a 60-minute window on the <a class="inline" href="index.html#transparency">cluster dashboard</a> and look for the missing sawtooth.</p>
         </div>
       </div>
     </section>
@@ -485,7 +485,7 @@
       <div class="links">
         <a href="blog-benchmark.html">See the benchmark</a>
         <a href="whitepaper.html">Read the whitepaper</a>
-        <a href="VeltrixDB Aerospike.html#transparency">Live cluster metrics</a>
+        <a href="index.html#transparency">Live cluster metrics</a>
       </div>
     </div>
 
@@ -525,7 +525,7 @@
   <div class="wrap">
     <div class="ft">
       <div class="brand-block">
-        <a class="brand" href="VeltrixDB Aerospike.html">
+        <a class="brand" href="index.html">
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
@@ -534,10 +534,10 @@
       <div>
         <h5>Product</h5>
         <ul>
-          <li><a href="VeltrixDB Aerospike.html#why">Platform</a></li>
-          <li><a href="VeltrixDB Aerospike.html#performance">Benchmark</a></li>
-          <li><a href="VeltrixDB Aerospike.html#compare">Comparison</a></li>
-          <li><a href="VeltrixDB Aerospike.html#how">Architecture</a></li>
+          <li><a href="index.html#why">Platform</a></li>
+          <li><a href="index.html#performance">Benchmark</a></li>
+          <li><a href="index.html#compare">Comparison</a></li>
+          <li><a href="index.html#how">Architecture</a></li>
         </ul>
       </div>
       <div>
@@ -552,7 +552,7 @@
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="VeltrixDB Aerospike.html#pricing">Pricing</a></li>
+          <li><a href="index.html#pricing">Pricing</a></li>
           <li><a href="tel:+919817463648">+91 98174 63648</a></li>
           <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
           <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
