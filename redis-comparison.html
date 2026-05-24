@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VeltrixDB vs Redis — Honest Comparison, Benchmarks &amp; Migration Guide</title>
+<meta name="description" content="When should you use VeltrixDB instead of Redis? An honest, data-driven comparison of latency, storage cost, write amplification, and workloads where each wins." />
+<meta property="og:title" content="VeltrixDB vs Redis — Honest Comparison" />
+<meta property="og:description" content="P99 latency, storage cost, write amplification, and the GC problem Redis never fully solved." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
+    --surface:#15151E; --surface-2:#1B1B26;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
+    --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
+    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --warm:#F4A65A; --good:#46D391;
+    --grid:1280px;
+    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:'Newsreader', 'Times New Roman', serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),
+      var(--bg);
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--red);color:#FFFFFF}
+  .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+  .mono{font-family:var(--mono);letter-spacing:-.01em}
+
+  /* NAV */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark svg{width:14px;height:14px}
+  .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
+  .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
+  .nav-links{display:flex;gap:28px}
+  .nav-links a{font-size:13.5px;color:var(--ink-2);transition:color .15s;font-weight:500;position:relative}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--red);transition:right .25s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  .btn{height:38px;padding:0 16px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-.005em;border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:all .2s ease;font-family:var(--sans);text-decoration:none}
+  .btn:hover{background:rgba(255,255,255,.04);border-color:var(--line-strong)}
+  .btn.primary{background:var(--red);color:#FFFFFF;border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -8px var(--red-glow);position:relative;overflow:hidden}
+  .btn.primary:hover{background:var(--red-2);transform:translateY(-1px)}
+  .btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+  .btn.primary:hover::after{transform:translateX(120%)}
+  .btn .arrow{transition:transform .2s}
+  .btn:hover .arrow{transform:translate(2px,-2px)}
+  .phone{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+  .phone:hover{color:var(--ink)}
+
+  /* ARTICLE HERO */
+  .article-hero{position:relative;padding:96px 0 64px;border-bottom:1px solid var(--line);overflow:hidden}
+  .article-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px);background-size:84px 84px;mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);pointer-events:none}
+  .article-hero::after{content:"";position:absolute;right:-300px;top:-200px;width:900px;height:900px;background:radial-gradient(circle, rgba(229,18,28,.14) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
+  .crumb{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .crumb a{color:var(--ink-3);transition:color .15s}
+  .crumb a:hover{color:var(--red)}
+  .crumb .sep{color:var(--ink-4)}
+  .crumb .cur{color:var(--red)}
+  .ah-kind{margin-top:18px;display:inline-flex;align-items:center;gap:14px;padding:6px 14px;border:1px solid rgba(229,18,28,.30);border-radius:999px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);background:rgba(229,18,28,.06)}
+  h1.ah-title{margin:24px 0 0;font-size:clamp(36px,4.6vw,64px);line-height:1.04;letter-spacing:-.035em;font-weight:600;color:var(--ink);max-width:22ch}
+  h1.ah-title .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .ah-sub{margin:24px 0 0;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:680px;font-weight:400}
+  .ah-meta{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px}
+  .ah-author{display:flex;align-items:center;gap:14px}
+  .ah-author .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1B1B26,#0A0A12);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red)}
+  .ah-author .am{display:flex;flex-direction:column;gap:2px}
+  .ah-author .nm{font-size:14px;font-weight:600;color:var(--ink);line-height:1.2}
+  .ah-author .role{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r{display:flex;align-items:center;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+  .ah-meta-r b{color:var(--ink-2);font-weight:500}
+
+  /* ARTICLE BODY */
+  .a-wrap{padding:64px 0 96px;max-width:1080px;margin:0 auto}
+  .a-wrap .wrap{padding:0 28px}
+  .a-grid{display:grid;grid-template-columns:140px 1fr;gap:48px;align-items:start}
+  .a-num{font-family:var(--serif);font-style:italic;font-size:96px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:sticky;top:96px}
+  .a-body{max-width:680px}
+  .a-section + .a-section{margin-top:80px;padding-top:48px;border-top:1px solid var(--line-2)}
+  .a-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:14px}
+  .a-kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:80px}
+  .a-h{margin:18px 0 0;font-size:clamp(24px,2.6vw,34px);font-weight:500;letter-spacing:-.025em;line-height:1.15;color:var(--ink)}
+  .a-h .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .a-lede{margin:24px 0 0;font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-2);font-weight:400;font-style:normal;border-left:2px solid var(--red);padding:4px 0 4px 18px}
+  .a-body p{margin:22px 0 0;color:var(--ink-2);font-size:16px;line-height:1.75;font-weight:300}
+  .a-body p b{color:var(--ink);font-weight:600}
+  .a-body p code,.a-body li code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 7px;border-radius:4px;font-size:13.5px;letter-spacing:-.005em}
+  .a-body a.inline{color:var(--ink);border-bottom:1px solid var(--red);transition:color .15s,background .15s;padding:1px 3px;border-radius:2px}
+  .a-body a.inline:hover{color:var(--red);background:rgba(229,18,28,.08)}
+  .a-body h3{margin:42px 0 0;font-size:22px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink)}
+  .a-body ul{margin:18px 0 0;padding:0;list-style:none}
+  .a-body ul li{padding:8px 0 8px 24px;position:relative;color:var(--ink-2);font-size:15.5px;line-height:1.65;font-weight:300}
+  .a-body ul li::before{content:"";position:absolute;left:0;top:18px;width:8px;height:1px;background:var(--red)}
+  .a-body ul li b{color:var(--ink);font-weight:600}
+
+  /* pull stats */
+  .a-pull{margin:36px 0;padding:24px 28px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.04),transparent);display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+  .a-pull .pull{padding:0 18px;border-right:1px solid var(--line)}
+  .a-pull .pull:first-child{padding-left:0}
+  .a-pull .pull:last-child{border-right:0}
+  .a-pull .pl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+  .a-pull .pv{margin-top:6px;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+  .a-pull .pv .red{color:var(--red)}
+  .a-pull .pd{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.02em}
+
+  /* code block */
+  .a-code{margin:32px 0;border:1px solid var(--line-2);border-radius:10px;background:#0A0A12;overflow:hidden}
+  .a-code-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .a-code-head .ttl{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .a-code-head .lights{display:flex;gap:6px}
+  .a-code-head .lights i{display:block;width:9px;height:9px;border-radius:50%}
+  .a-code-head .lights i:nth-child(1){background:#FF5F56}
+  .a-code-head .lights i:nth-child(2){background:#FFBD2E}
+  .a-code-head .lights i:nth-child(3){background:#27C93F}
+  .a-code pre{margin:0;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--ink-2)}
+  .a-code .c{color:var(--ink-4)}
+  .a-code .k{color:#FF6B73}
+  .a-code .s{color:var(--warm)}
+  .a-code .n{color:var(--good)}
+
+  /* spec table */
+  .spec{margin:32px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .spec table{width:100%;border-collapse:collapse;font-size:14px}
+  .spec td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2);line-height:1.5}
+  .spec tr:last-child td{border-bottom:0}
+  .spec td:first-child{font-family:var(--mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--ink-4);width:38%;background:rgba(255,255,255,.018)}
+  .spec td b{color:var(--ink);font-weight:600}
+  .spec td code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 6px;border-radius:4px;font-size:12.5px}
+  .spec td .good{color:var(--good);font-weight:600}
+  .spec td .warn{color:var(--warm);font-weight:600}
+  .spec td .bad{color:#FF6B73;font-weight:600}
+
+  /* callout */
+  .callout{margin:32px 0;padding:24px 28px;border:1px solid rgba(229,18,28,.28);border-radius:10px;background:linear-gradient(180deg,rgba(229,18,28,.06),rgba(229,18,28,.02));display:flex;gap:18px;align-items:flex-start}
+  .callout .ico{flex:0 0 32px;width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.16);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .callout p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.65;font-weight:300}
+  .callout p b{color:var(--ink);font-weight:600}
+  .callout.good{border-color:rgba(70,211,145,.28);background:linear-gradient(180deg,rgba(70,211,145,.06),rgba(70,211,145,.02))}
+  .callout.good .ico{background:rgba(70,211,145,.16);border-color:rgba(70,211,145,.30);color:var(--good)}
+
+  /* latency compare table */
+  .lat-table{margin:32px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .lat-table table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .lat-table th{padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line-2);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:500;text-align:left}
+  .lat-table th:not(:first-child){text-align:center}
+  .lat-table td{padding:13px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);line-height:1.4;font-family:var(--mono);font-size:12.5px}
+  .lat-table tr:last-child td{border-bottom:0}
+  .lat-table td:first-child{color:var(--ink-3);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  .lat-table td:not(:first-child){text-align:center}
+  .lat-table .vdb{color:var(--good);font-weight:600}
+  .lat-table .redis{color:var(--warm)}
+  .lat-table .warn{color:var(--warm)}
+  .lat-table .highlight{background:rgba(70,211,145,.04)}
+
+  /* feature matrix */
+  .matrix{margin:32px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .matrix table{width:100%;border-collapse:collapse;font-size:14px}
+  .matrix th{padding:12px 18px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line-2);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:500;text-align:left}
+  .matrix th:not(:first-child){text-align:center}
+  .matrix td{padding:13px 18px;border-bottom:1px solid var(--line);color:var(--ink-2);line-height:1.5;font-size:13.5px}
+  .matrix tr:last-child td{border-bottom:0}
+  .matrix td:not(:first-child){text-align:center;font-family:var(--mono);font-size:13px}
+  .matrix tr:hover td{background:rgba(255,255,255,.015)}
+  .matrix .yes{color:var(--good)}
+  .matrix .no{color:var(--ink-4)}
+  .matrix .warn{color:var(--warm)}
+  .matrix .roadmap{color:var(--ink-4);font-size:11px;letter-spacing:.04em}
+
+  /* article footer */
+  .a-foot{margin-top:64px;padding-top:32px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;align-items:center}
+  .a-foot .cite{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .a-foot .cite b{color:var(--ink-2);font-weight:600}
+  .a-foot .links{display:flex;gap:14px;flex-wrap:wrap}
+  .a-foot .links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;transition:color .15s}
+  .a-foot .links a::after{content:" →";color:var(--red)}
+  .a-foot .links a:hover{color:var(--red)}
+
+  /* next-read */
+  .next-up{margin-top:80px;padding:48px 0 64px;border-top:1px solid var(--line)}
+  .next-up h4{margin:0 0 28px;font-family:var(--mono);font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:var(--ink-3)}
+  .next-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .next{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent);transition:border-color .2s,transform .2s;display:flex;flex-direction:column;gap:14px}
+  .next:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .next .kind{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+  .next h5{margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;color:var(--ink)}
+  .next p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.55}
+  .next .m{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-4);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+
+  /* CTA mini */
+  .cta-mini{margin-top:24px;padding:48px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(135deg,rgba(229,18,28,.08),rgba(255,255,255,.02));display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center}
+  .cta-mini h3{margin:0;font-size:26px;font-weight:600;letter-spacing:-.022em;line-height:1.2;color:var(--ink)}
+  .cta-mini h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
+  .cta-mini p{margin:12px 0 0;color:var(--ink-3);font-size:14px;line-height:1.6}
+  .cta-mini .actions{display:flex;flex-direction:column;gap:10px}
+  .cta-mini .btn{justify-content:center;height:48px}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:56px 0 36px;background:#0A0A12}
+  .ft{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;align-items:start}
+  .ft .brand-block{max-width:320px}
+  .ft .brand-block p{margin:14px 0 0;color:var(--ink-3);font-size:13px;line-height:1.6}
+  .ft h5{margin:0 0 14px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .ft ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ft ul a{font-size:13.5px;color:var(--ink-2);transition:color .15s}
+  .ft ul a:hover{color:var(--red)}
+  .ft-bar{margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--ink-4);letter-spacing:.04em}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+
+  /* responsive */
+  @media (max-width:1080px){
+    .a-grid{grid-template-columns:1fr;gap:18px}
+    .a-num{position:static;font-size:64px;text-align:left}
+    .a-pull{grid-template-columns:1fr;gap:14px}
+    .a-pull .pull{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px}
+    .a-pull .pull:last-child{border-bottom:0;padding-bottom:0}
+    .next-grid{grid-template-columns:1fr}
+    .cta-mini{grid-template-columns:1fr;padding:32px}
+    .ft{grid-template-columns:1fr 1fr;gap:32px}
+  }
+  @media (max-width:760px){
+    .nav-links{display:none}
+    .phone{display:none}
+    .wrap{padding:0 20px}
+    .nav-inner{height:58px}
+    .nav-cta .btn{height:36px;padding:0 14px;font-size:12.5px}
+    .article-hero{padding:48px 0 36px}
+    h1.ah-title{font-size:32px;letter-spacing:-.025em}
+    .ah-sub{font-size:16px}
+    .ah-meta{flex-direction:column;align-items:flex-start}
+    .a-wrap{padding:36px 0 56px}
+    .a-h{font-size:22px}
+    .a-body p{font-size:15px}
+    .ft{grid-template-columns:1fr;gap:24px}
+    .ft-bar{flex-direction:column;gap:10px;align-items:flex-start}
+    .lat-table{overflow-x:auto}
+    .matrix{overflow-x:auto}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="index.html#why">Platform</a>
+      <a href="index.html#performance">Benchmark</a>
+      <a href="index.html#compare">Compare</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#calc">Cost</a>
+      <a href="whitepaper.html">Whitepaper</a>
+      <a href="index.html#how">Architecture</a>
+    </div>
+    <div class="nav-cta">
+      <a class="phone" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">↗</span></a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="article-hero">
+  <div class="wrap">
+    <div class="crumb">
+      <a href="index.html">VeltrixDB</a>
+      <span class="sep">/</span>
+      <a href="index.html#docs">Resources</a>
+      <span class="sep">/</span>
+      <span class="cur">VeltrixDB vs Redis</span>
+    </div>
+    <span class="ah-kind">Comparison guide · Honest &amp; data-driven</span>
+    <h1 class="ah-title">VeltrixDB vs Redis — <span class="em">when the spiral breaks you</span>.</h1>
+    <p class="ah-sub">Redis is excellent software. But at scale, its P99 latency spikes, its memory cost compounds, and its GC death spiral has no exit. Here is where each one wins — with real numbers.</p>
+    <div class="ah-meta">
+      <div class="ah-author">
+        <div class="av">SS</div>
+        <div class="am">
+          <div class="nm">Shubham Sharma</div>
+          <div class="role">Founder · VeltrixDB</div>
+        </div>
+      </div>
+      <div class="ah-meta-r">
+        <span><b>Published</b> · May 2026</span>
+        <span><b>Read time</b> · 12 minutes</span>
+        <span><b>Updated</b> · v1.3</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- BODY -->
+<main class="a-wrap">
+  <div class="wrap">
+
+    <!-- 01: The fundamental difference -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">01</div>
+      <div class="a-body">
+        <div class="a-kicker">The core difference</div>
+        <h2 class="a-h">Redis keeps everything <span class="em">in RAM</span>. VeltrixDB doesn't have to.</h2>
+        <p class="a-lede">Redis's speed comes from one thing: all data lives in memory. That's a real advantage — and a real cost ceiling. VeltrixDB stores values on NVMe with a DRAM index and LIRS cache, so hot data is still sub-millisecond and cold data doesn't cost you $18/GB-month.</p>
+        <p>This is not a "Redis killer" comparison. Redis is the right choice for millions of workloads. But there is a specific class of problem — <b>large keyspaces under sustained write pressure</b> — where Redis's architecture produces a problem it cannot solve cleanly: the GC death spiral.</p>
+        <p>When Redis is under heavy write load, background rewriting of AOF or RDB pauses cause P99 to spike. Engineers work around this with replica reads, manual fork tuning, and alert rules. VeltrixDB was designed so the spiral can't start — not worked around after the fact.</p>
+
+        <div class="a-pull">
+          <div class="pull">
+            <div class="pl">VeltrixDB P50 read</div>
+            <div class="pv"><span class="red">220</span> ns</div>
+            <div class="pd">LIRS cache hit · pure DRAM</div>
+          </div>
+          <div class="pull">
+            <div class="pl">Write amplification</div>
+            <div class="pv"><span class="red">~1.0</span>×</div>
+            <div class="pd">vs 2–30× in LSM / AOF rewrite</div>
+          </div>
+          <div class="pull">
+            <div class="pl">Storage at 1B keys</div>
+            <div class="pv"><span class="red">160</span> GB</div>
+            <div class="pd">NVMe · vs ~250 GB RAM for Redis</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02: Latency -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">02</div>
+      <div class="a-body">
+        <div class="a-kicker">Latency</div>
+        <h2 class="a-h">The P50 is similar. <span class="em">The P99 shape is not.</span></h2>
+        <p class="a-lede">Both databases are fast. The difference is in the tail — and what happens to that tail under sustained write load over 30 minutes, not 30 seconds.</p>
+
+        <div class="lat-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Percentile</th>
+                <th>Redis (AOF on)</th>
+                <th>VeltrixDB</th>
+                <th>What's happening</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>P50 read</td>
+                <td class="redis">~100–200 µs</td>
+                <td class="vdb">~220 ns</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB: LIRS DRAM hit, no network round-trip overhead at local access</td>
+              </tr>
+              <tr class="highlight">
+                <td>P99 read (sustained)</td>
+                <td class="warn">1–50 ms (spikes)</td>
+                <td class="vdb">~510 µs</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">Redis: AOF rewrite / fork pauses cause periodic spikes. VeltrixDB: bounded by three-tier GC ceiling</td>
+              </tr>
+              <tr>
+                <td>P50 write</td>
+                <td class="redis">~200–400 µs</td>
+                <td class="vdb">~17 µs</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB: group-commit WAL amortizes fdatasync across 1024-entry batch</td>
+              </tr>
+              <tr>
+                <td>P99 write</td>
+                <td class="warn">varies with AOF</td>
+                <td class="vdb">~42 µs (stable)</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB P99 does not drift over 30 min sustained load — GC tiering absorbs pressure</td>
+              </tr>
+              <tr>
+                <td>P99 under GC pressure</td>
+                <td class="warn">unpredictable</td>
+                <td class="vdb">&lt; 1 ms ceiling</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB: RT-class I/O priority means reads preempt GC at NVMe hardware queue level</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Redis P99 numbers above reflect production reports from teams running AOF with <code>appendfsync everysec</code> under mixed read/write load. Your numbers depend on instance size, fork latency, and background save frequency.</p>
+
+        <div class="callout">
+          <div class="ico">!</div>
+          <p><b>The GC death spiral.</b> When read latency rises, Redis GC pauses to protect reads. Garbage accumulates. Cache miss rate rises. Reads stay slow. GC stays paused. The spiral has no exit without operator intervention. VeltrixDB's three-tier GC has an emergency threshold at 65% garbage where it bypasses read-pressure signals unconditionally — the spiral cannot form.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03: Storage cost -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">03</div>
+      <div class="a-body">
+        <div class="a-kicker">Storage cost</div>
+        <h2 class="a-h">RAM is 15× more expensive <span class="em">per gigabyte than NVMe</span>.</h2>
+        <p class="a-lede">This math doesn't change. At small scale it doesn't matter. At 100M+ keys, it's the difference between a $400/month database and a $4,000/month one.</p>
+
+        <div class="spec">
+          <table>
+            <tr>
+              <td>10M keys · 128B values</td>
+              <td>
+                Redis: <b>~2.5 GB RAM</b> → r6g.xlarge ~$150/mo<br>
+                VeltrixDB: <b>~1.5 GB NVMe</b> → fits on any local-SSD instance
+              </td>
+            </tr>
+            <tr>
+              <td>100M keys · 128B values</td>
+              <td>
+                Redis: <b>~25 GB RAM</b> → r6g.4xlarge ~$1,100/mo<br>
+                VeltrixDB: <b>~15 GB NVMe</b> → n2-standard-8-lssd ~$280/mo
+              </td>
+            </tr>
+            <tr>
+              <td>1B keys · 128B values</td>
+              <td>
+                Redis: <b>~250 GB RAM</b> → r6g.metal cluster ~$6,000–8,000/mo<br>
+                VeltrixDB: <b>160 GB NVMe</b> across 3 nodes → ~<b>$900/mo</b>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <p>VeltrixDB's block packing puts <b>26 records into a single 4 KB NVMe block</b> for 128-byte values. Legacy one-record-per-block wastes 96% of every sector. At 1 billion keys this is the difference between 160 GB and 4,096 GB of storage required.</p>
+        <p>If your dataset fits comfortably in RAM and you're not cost-constrained — Redis is the simpler choice. If your keyspace is growing and the RAM bill is growing with it, that's the signal to benchmark VeltrixDB against your workload.</p>
+      </div>
+    </section>
+
+    <!-- 04: Write amplification -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">04</div>
+      <div class="a-body">
+        <div class="a-kicker">Write amplification &amp; SSD wear</div>
+        <h2 class="a-h">Every byte should land on NVMe <span class="em">exactly once</span>.</h2>
+        <p class="a-lede">Write amplification is how many times a byte gets written to storage for every one byte of user data. At 1× you're paying for your data once. At 30× you're paying thirty times — in SSD wear, in NVMe IOPS, and in latency tail.</p>
+
+        <div class="spec">
+          <table>
+            <tr>
+              <td>Redis (AOF rewrite)</td>
+              <td><span class="warn">2–5×</span> — AOF rewrite rewrites the full dataset to a new file</td>
+            </tr>
+            <tr>
+              <td>RocksDB / LevelDB</td>
+              <td><span class="bad">10–30×</span> — LSM compaction sorts and rewrites every key multiple times across levels</td>
+            </tr>
+            <tr>
+              <td>VeltrixDB</td>
+              <td><span class="good">~1.0×</span> — Values append-once to Value Log, never sorted, never rewritten. GC only reclaims dead space.</td>
+            </tr>
+          </table>
+        </div>
+
+        <p>VeltrixDB uses <b>WiscKey key-value separation</b>: the in-memory ART index holds only key metadata (offset + disk index + value size). Values go directly to an append-only Value Log on NVMe. Compaction never touches live data — it only punches holes in dead space. Write amplification drops to approximately 1.0× regardless of write rate or dataset size.</p>
+
+        <div class="callout good">
+          <div class="ico">✓</div>
+          <p><b>What this means for SSDs.</b> At 100K writes/sec sustained, 1.0× write amp writes 12.8 MB/s to NVMe. At 10× write amp (RocksDB default workload) that's 128 MB/s — you'll wear out your SSDs 10× faster, pay for more IOPS provisioning, and see your P99 spike during every compaction cycle.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05: When Redis wins -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">05</div>
+      <div class="a-body">
+        <div class="a-kicker">When Redis wins</div>
+        <h2 class="a-h">Redis is the right choice <span class="em">in these situations</span>.</h2>
+        <p class="a-lede">This is not a takedown of Redis. It is the right tool for a large number of workloads. Knowing when not to migrate is as important as knowing when to.</p>
+        <ul>
+          <li><b>Your full dataset fits comfortably in RAM</b> — if you have 5M keys at 256 bytes, Redis's DRAM-only path has zero NVMe latency on any read. The advantage of VeltrixDB's cache tier disappears.</li>
+          <li><b>You need pub/sub, streams, sorted sets, or Lua scripting</b> — Redis has a rich data structure model built over decades. VeltrixDB is a key-value store. If your application relies on <code>ZRANGEBYSCORE</code>, <code>XREAD</code>, or Lua, stay on Redis.</li>
+          <li><b>Your team already runs Redis and has no latency complaints</b> — operational familiarity is real value. Don't fix what isn't broken.</li>
+          <li><b>You need a fully-managed hosted service today</b> — Redis Cloud, ElastiCache, Upstash, and Momento all exist and are production-hardened. VeltrixDB's managed offering is on the roadmap.</li>
+          <li><b>Your workload is write-once, read-many with no GC pressure</b> — if you never overwrite keys, Redis GC never runs, and the death spiral never starts.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 06: When VeltrixDB wins -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">06</div>
+      <div class="a-body">
+        <div class="a-kicker">When VeltrixDB wins</div>
+        <h2 class="a-h">The specific problems <span class="em">VeltrixDB was built to solve</span>.</h2>
+        <p class="a-lede">VeltrixDB earns its place when your dataset is outgrowing your RAM budget, when your production dashboards show Redis P99 spikes you can't explain, or when you're running on Kubernetes with local NVMe and want first-class tooling.</p>
+        <ul>
+          <li><b>Your dataset doesn't fit in RAM — or fitting it costs too much</b> — VeltrixDB's LIRS cache keeps hot keys in DRAM and cold keys spill to NVMe transparently. The cache hit rate at 1 billion keys is ≥98% under Zipfian access.</li>
+          <li><b>Unpredictable P99 under sustained write pressure</b> — if your Redis P99 spikes during AOF rewrite, keyspace expiry, or background save, VeltrixDB's three-tier GC and RT-priority NVMe queue enforce a hard P99 ceiling that doesn't drift.</li>
+          <li><b>High-concurrency bulk writes</b> — MultiPut with 1024-entry batches achieves ~446K batch ops/s per node. The lock-free VLog append path (atomic offset reservation, no mutex) means throughput ceiling is NVMe IOPS, not lock contention.</li>
+          <li><b>Kubernetes with local NVMe SSDs</b> — first-class Kubernetes Operator, Helm chart, and GKE local SSD auto-detection. The nvme-prep DaemonSet handles hugepages, scheduler tuning, and NUMA pinning automatically.</li>
+          <li><b>Write amplification and SSD cost matter</b> — if you're watching your NVMe wear counter on cloud SSDs, 1.0× vs 10–30× is the difference between replacing SSDs annually vs quarterly.</li>
+          <li><b>You need predictable latency at scale — not just at P50</b> — the benchmark goal was zero GC emergency runs across 30 minutes at 9M ops/sec combined. That's the guarantee the architecture is built around.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 07: Feature matrix -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">07</div>
+      <div class="a-body">
+        <div class="a-kicker">Feature matrix</div>
+        <h2 class="a-h">Everything side by side, <span class="em">nothing hidden</span>.</h2>
+        <p class="a-lede">An honest matrix. We've marked items we're still building as roadmap rather than pretending they exist.</p>
+
+        <div class="matrix">
+          <table>
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Redis</th>
+                <th>VeltrixDB</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>In-memory P50 (&lt; 1 µs)</td><td class="yes">✓</td><td class="yes">✓ 220 ns</td></tr>
+              <tr><td>Predictable P99 under writes</td><td class="warn">⚠ spikes</td><td class="yes">✓ bounded</td></tr>
+              <tr><td>NVMe storage tier</td><td class="no">—</td><td class="yes">✓</td></tr>
+              <tr><td>Write amplification ~1×</td><td class="no">—</td><td class="yes">✓</td></tr>
+              <tr><td>GC cannot be permanently paused</td><td class="no">—</td><td class="yes">✓ three-tier</td></tr>
+              <tr><td>Pub/Sub</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Sorted sets / ZRANGEBYSCORE</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Streams (XREAD/XADD)</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Lua scripting</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Atomic CAS / INCR / DECR</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>TTL / key expiry</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>Encryption at rest (AES-256-GCM)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>TLS in transit</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>Multi-node replication</td><td class="yes">✓</td><td class="yes">✓ async/quorum/strong</td></tr>
+              <tr><td>Kubernetes Operator</td><td class="warn">⚠ third-party</td><td class="yes">✓ first-class</td></tr>
+              <tr><td>Prometheus metrics</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>Change data capture (CDC)</td><td class="no">—</td><td class="yes">✓ built-in</td></tr>
+              <tr><td>Go / Python / Node / Rust / C++ SDKs</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>RESP protocol compatibility</td><td class="yes">✓</td><td class="roadmap">roadmap</td></tr>
+              <tr><td>Managed cloud service</td><td class="yes">✓</td><td class="roadmap">roadmap</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08: Migration -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">08</div>
+      <div class="a-body">
+        <div class="a-kicker">Migration from Redis</div>
+        <h2 class="a-h">One connection string swap <span class="em">for most workloads</span>.</h2>
+        <p class="a-lede">VeltrixDB's text protocol maps directly to Redis's most common commands. For GET/SET/DEL workloads, switching is a client library change, not an application rewrite.</p>
+
+        <h3>Try it in 30 seconds</h3>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">shell — Docker quickstart</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c"># Linux / Windows</span>
+docker run -p <span class="n">9000</span>:<span class="n">9000</span> shubham1993/veltrixdb:v1.3
+
+<span class="c"># Mac (Apple Silicon)</span>
+docker run --platform linux/amd64 -p <span class="n">9000</span>:<span class="n">9000</span> shubham1993/veltrixdb:v1.3
+
+<span class="c"># Test — same semantics as Redis SET/GET</span>
+echo -e <span class="s">"PUT hello world\nGET hello\nPING"</span> | nc localhost <span class="n">9000</span></pre>
+        </div>
+
+        <h3>SDK migration</h3>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">Python — before and after</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c"># Before (redis-py)</span>
+<span class="k">import</span> redis
+r = redis.Redis(host=<span class="s">'localhost'</span>, port=<span class="n">6379</span>)
+r.set(<span class="s">'key'</span>, <span class="s">'value'</span>)
+val = r.get(<span class="s">'key'</span>)
+
+<span class="c"># After (veltrixdb-python)</span>
+<span class="k">import</span> veltrixdb
+r = veltrixdb.Client(host=<span class="s">'localhost'</span>, port=<span class="n">9000</span>)
+r.put(<span class="s">'key'</span>, <span class="s">'value'</span>)
+val = r.get(<span class="s">'key'</span>)</pre>
+        </div>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">Node.js — before and after</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c">// Before (ioredis)</span>
+<span class="k">const</span> Redis = require(<span class="s">'ioredis'</span>)
+<span class="k">const</span> r = new Redis({ host: <span class="s">'localhost'</span>, port: <span class="n">6379</span> })
+<span class="k">await</span> r.set(<span class="s">'key'</span>, <span class="s">'value'</span>)
+
+<span class="c">// After (veltrixdb-client)</span>
+<span class="k">const</span> VeltrixDB = require(<span class="s">'veltrixdb-client'</span>)
+<span class="k">const</span> r = new VeltrixDB({ host: <span class="s">'localhost'</span>, port: <span class="n">9000</span> })
+<span class="k">await</span> r.put(<span class="s">'key'</span>, <span class="s">'value'</span>)</pre>
+        </div>
+
+        <p>RESP protocol compatibility (so <code>redis-cli</code> works against VeltrixDB unchanged) is on the roadmap. Once available, the migration path becomes a single connection string update with zero code changes.</p>
+
+        <div class="callout good">
+          <div class="ico">✓</div>
+          <p><b>Recommended migration strategy.</b> Run VeltrixDB in shadow mode — dual-write to both Redis and VeltrixDB for two weeks, compare read results, validate latency numbers against your actual key distribution. Cutover when the shadow reads match. This is zero-risk and gives you real-world latency data before you commit.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Article foot -->
+    <div class="a-foot reveal">
+      <div class="cite">
+        Benchmark: <b>3 × GKE n2-highmem-64</b> · <b>8 × 375 GB NVMe/node</b> · <b>Linux 6.6</b> · 30 min sustained 80R/20W · May 2026
+      </div>
+      <div class="links">
+        <a href="blog-benchmark.html">Full benchmark report</a>
+        <a href="blog-architecture.html">Architecture deep-dive</a>
+        <a href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20vs%20Redis%20question">Ask a question</a>
+      </div>
+    </div>
+
+    <!-- Next up -->
+    <section class="next-up reveal">
+      <h4>Continue reading</h4>
+      <div class="next-grid">
+        <a class="next" href="blog-architecture.html">
+          <span class="kind">Architecture deep-dive</span>
+          <h5>Key-value separation &amp; why GC can never permanently pause</h5>
+          <p>How WiscKey, the three-tier GC, and io_uring SQPOLL combine to keep P99 stable at any write load.</p>
+          <div class="m"><span>Engineering blog · 18 min</span><span>Read →</span></div>
+        </a>
+        <a class="next" href="blog-benchmark.html">
+          <span class="kind">Benchmark report</span>
+          <h5>1B-key benchmark — full methodology &amp; raw data</h5>
+          <p>Every histogram bucket, the flamegraphs, and the cost analysis from the 3-node GKE cluster run.</p>
+          <div class="m"><span>Benchmark · 32 pages</span><span>Read →</span></div>
+        </a>
+      </div>
+
+      <div class="cta-mini">
+        <div>
+          <h3>See if VeltrixDB fits <span class="em">your workload</span>.</h3>
+          <p>Bring your current Redis key count, value size, and read/write ratio. We'll run a cost and latency projection against your specific numbers in 30 minutes.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20vs%20Redis%20evaluation&body=Hi%20%E2%80%94%20I%27d%20like%20to%20evaluate%20VeltrixDB%20vs%20Redis%20for%20my%20workload.%0A%0AKey%20count%3A%0AValue%20size%3A%0ARead%2Fwrite%20ratio%3A%0ACurrent%20P99%20pain%3A">Get a workload analysis <span class="arrow">↗</span></a>
+          <a class="btn" href="mailto:guptaakanksha1297@gmail.com?subject=VeltrixDB%20Demo">Book a 30-min demo</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="index.html">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-millisecond reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="index.html#why">Platform</a></li>
+          <li><a href="index.html#performance">Benchmark</a></li>
+          <li><a href="index.html#compare">Comparison</a></li>
+          <li><a href="index.html#how">Architecture</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="blog-benchmark.html">Benchmark report</a></li>
+          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
+          <li><a href="blog-migration.html">Migration guide</a></li>
+          <li><a href="redis-comparison.html">VeltrixDB vs Redis</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="index.html#pricing">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:guptaakanksha1297@gmail.com">Book a demo</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v1.3 · Apache 2.0</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
+    });
+  },{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>
