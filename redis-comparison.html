@@ -575,10 +575,10 @@
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
 <pre><span class="c"># Linux / Windows</span>
-docker run -p <span class="n">9000</span>:<span class="n">9000</span> shubham1993/veltrixdb:v1.3
+docker run -p <span class="n">9000</span>:<span class="n">9000</span> ghcr.io/veltrixdb/veltrixdb:latest
 
 <span class="c"># Mac (Apple Silicon)</span>
-docker run --platform linux/amd64 -p <span class="n">9000</span>:<span class="n">9000</span> shubham1993/veltrixdb:v1.3
+docker run --platform linux/amd64 -p <span class="n">9000</span>:<span class="n">9000</span> ghcr.io/veltrixdb/veltrixdb:latest
 
 <span class="c"># Test — same semantics as Redis SET/GET</span>
 echo -e <span class="s">"PUT hello world\nGET hello\nPING"</span> | nc localhost <span class="n">9000</span></pre>
