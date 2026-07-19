@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Helm Chart — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Helm Chart" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="active">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Kubernetes<span class="sep">/</span>Helm Chart</div>
+    <h1>Helm Chart</h1>
+<p class="page-lede">The VeltrixDB Helm chart deploys a production-ready cluster on Kubernetes with per-pod local NVMe storage, Prometheus monitoring, and safe rolling updates — optimized for GKE but portable to any cloud with local NVMe instance types.</p>
+
+<h2 id="prerequisites">Prerequisites</h2>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>Detail</th></tr></thead><tbody>
+<tr><td>Kubernetes</td><td>1.27+</td></tr>
+<tr><td>Helm</td><td>3.x</td></tr>
+<tr><td>Prometheus Operator</td><td>0.65+ (only required if <code>serviceMonitor.enabled</code>)</td></tr>
+<tr><td>GKE node pools</td><td>Created with <code>--local-ssd-interface=NVME</code></td></tr>
+</tbody></table></div>
+
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">GKE requirement</span> Create node pools with <code>--local-ssd-interface=NVME</code>. Without it, GKE merges all local SSDs into a single RAID-0 device and you lose the parallel I/O benefit.</span></div>
+
+<pre class="code-block"><code>gcloud container node-pools create veltrixdb-pool \
+  --cluster=my-cluster \
+  --zone=us-central1-a \
+  --machine-type=n2-highmem-64 \
+  --num-nodes=3 \
+  --local-ssd-count=8 \
+  --local-ssd-interface=NVME \
+  --disk-size=100GB</code></pre>
+
+<h2 id="installation">Installation</h2>
+<pre class="code-block"><code># Add the chart repo
+helm repo add veltrixdb https://charts.veltrixdb.io
+helm repo update
+
+# Install with defaults
+helm install veltrixdb veltrixdb/veltrixdb \
+  --namespace veltrixdb \
+  --create-namespace
+
+# Install with custom values
+helm install veltrixdb veltrixdb/veltrixdb \
+  --namespace veltrixdb \
+  --create-namespace \
+  --values my-values.yaml</code></pre>
+
+<h3>Verify the deployment</h3>
+<pre class="code-block"><code># Wait for PVs (3 nodes x 8 disks = 24 volumes)
+kubectl get pv | grep local-nvme
+
+# Check pods are running
+kubectl get pods -n veltrixdb -l app.kubernetes.io/name=veltrixdb
+
+# Test connectivity
+kubectl exec -n veltrixdb veltrixdb-0 -- \
+  sh -c 'echo PING | nc 127.0.0.1 9000'
+# Expected: PONG</code></pre>
+
+<h2 id="what-the-chart-deploys">What the chart deploys</h2>
+<p>Confirmed against the templates in <code>VeltrixDB-Helm-Chart/templates/</code>: <code>statefulset.yaml</code>, <code>service.yaml</code>, <code>service-headless.yaml</code>, <code>servicemonitor.yaml</code>, <code>pdb.yaml</code>, <code>prometheusrule.yaml</code>, <code>configmap.yaml</code>, <code>secret.yaml</code>, <code>rbac.yaml</code>, and <code>_helpers.tpl</code>.</p>
+<ul>
+<li><strong>StatefulSet</strong> — VeltrixDB pods with stable per-pod hostnames (<code>podManagementPolicy: Parallel</code>, one volume-claim template per NVMe disk).</li>
+<li><strong>Headless + client Services</strong> — the headless service backs gossip/StatefulSet DNS (<code>publishNotReadyAddresses: true</code> so bootstrap peers are reachable pre-readiness); the client service fronts application traffic.</li>
+<li><strong>ServiceMonitor</strong> — Prometheus Operator scrape config, one target per pod.</li>
+<li><strong>PodDisruptionBudget</strong> — bounds voluntary disruptions during node drains and upgrades.</li>
+<li><strong>PrometheusRule</strong> — a bundled Prometheus alerting ruleset (see below).</li>
+<li><strong>ConfigMap / Secret</strong> — engine configuration env vars and the cluster bootstrap token.</li>
+<li><strong>RBAC</strong> — ServiceAccount plus any Role/RoleBinding the pods need.</li>
+</ul>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">NVMe provisioning is not a static chart template</span> Unlike the StatefulSet and PrometheusRule, there is no <code>daemonset.yaml</code> in this chart's <code>templates/</code> directory. Disk formatting (XFS) and the kubelet mount-namespace workaround for GKE/EKS/AKS are handled by the <code>nvme-prep</code> / mount-keeper DaemonSets that the <a class="inline-link" href="operator.html">Kubernetes Operator</a> provisions dynamically per <code>VeltrixCluster</code>, or that you apply directly from <code>VeltrixDB-Kubernetes-Operator/config/manager/nvme-mount-keeper.yaml</code> if running the Helm chart without the operator. Deploy it before <code>helm install</code> — see <a class="inline-link" href="../operations/nvme-provisioning.html">NVMe Disk Provisioning</a>.</span></div>
+
+<h2 id="pdb">Pod Disruption Budget</h2>
+<p>The chart's default <code>values.yaml</code> sets <code>podDisruptionBudget.maxUnavailable: 1</code> — at most one pod may be voluntarily disrupted at a time, which for a 3-node, RF-3 cluster keeps at least 2 nodes available during drains and rolling upgrades.</p>
+<pre class="code-block"><code>podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1</code></pre>
+
+<h2 id="prometheus-alerts">PrometheusRule alerts</h2>
+<p>The bundled <code>PrometheusRule</code> (rendered when <code>serviceMonitor.enabled: true</code>) ships 24 alert rules grouped into 10 rule groups, spanning write/read/delete latency, VLog GC health, cluster membership, replication, per-disk health, background scrubbing, and Bloom filter efficiency.</p>
+<div class="table-wrap"><table><thead><tr><th>Rule group</th><th>Alerts</th><th>Covers</th></tr></thead><tbody>
+<tr><td><code>veltrixdb.write</code></td><td>2</td><td><code>VeltrixHighWriteLatency</code> (P99 &gt; 50ms), <code>VeltrixWALFlushStalled</code></td></tr>
+<tr><td><code>veltrixdb.read</code></td><td>2</td><td><code>VeltrixHighReadLatency</code> (P99 &gt; 5ms), <code>VeltrixLowCacheHitRate</code> (&lt; 50%)</td></tr>
+<tr><td><code>veltrixdb.delete</code></td><td>2</td><td><code>VeltrixHighDeleteLatency</code>, <code>VeltrixTombstoneBacklogGrowing</code></td></tr>
+<tr><td><code>veltrixdb.vlog</code></td><td>5</td><td><code>VeltrixVLogHighGarbageRatio</code>, <code>VeltrixVLogGCStalled</code>, <code>VeltrixVLogGCPermanentlyPaused</code>, <code>VeltrixVLogGCReadErrors</code>, <code>VeltrixVLogFileSizeGrowing</code></td></tr>
+<tr><td><code>veltrixdb.cluster</code></td><td>4</td><td><code>VeltrixNodeDown</code>, <code>VeltrixClusterSizeLow</code>, <code>VeltrixFrequentRebalances</code>, <code>VeltrixNodeFailed</code></td></tr>
+<tr><td><code>veltrixdb.replication</code></td><td>2</td><td><code>VeltrixHighReplicationLag</code> (&gt; 100ms), <code>VeltrixReplicationFailures</code></td></tr>
+<tr><td><code>veltrixdb.disk</code></td><td>2</td><td><code>VeltrixSlowDisk</code> (per-disk latency EWMA ≥ 5x cluster median), <code>VeltrixDiskWriteLatencyHigh</code> (&gt; 20ms)</td></tr>
+<tr><td><code>veltrixdb.scrub</code></td><td>2</td><td><code>VeltrixCorruptionDetected</code> (CRC32C/magic mismatch), <code>VeltrixScrubReadErrors</code></td></tr>
+<tr><td><code>veltrixdb.bloom</code></td><td>1</td><td><code>VeltrixBloomFalsePositiveRateHigh</code> (&gt; 10%, design point ~1%)</td></tr>
+<tr><td><code>veltrixdb.gc</code></td><td>2</td><td><code>VeltrixGCEmergencyRunsSustained</code> (garbage ≥ 65% for 30 min), <code>VeltrixWriteAdmissionThrottling</code></td></tr>
+</tbody></table></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Alert count</span> The chart and operator READMEs describe "22 alerts." Counting <code>- alert:</code> entries directly in <code>templates/prometheusrule.yaml</code> gives 24 across the 10 groups above — use the table as the current source of truth.</span></div>
+<p>The most operationally important two: <code>VeltrixCorruptionDetected</code> fires the moment the background scrubber finds a CRC32C or magic mismatch (severity <code>critical</code>, <code>for: 0m</code>) — treat as an immediate SMART-check-and-resync trigger. <code>VeltrixGCEmergencyRunsSustained</code> fires when VLog garbage has sat above the emergency threshold (65%) for 30 minutes and GC is bypassing admission control just to keep up — it means sustained write rate is exceeding GC throughput and you need to reduce load or add disks.</p>
+
+<h2 id="configuration">Configuration reference</h2>
+<p>Key settings from <code>values.yaml</code>. Full defaults are tuned for GKE <code>n2-highmem-96</code> nodes (480 GB RAM, 96 vCPU, 8 x 375 GiB local NVMe SSDs).</p>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>replicaCount</code></td><td><code>3</code></td><td>Number of VeltrixDB pods; must match node pool size for correct anti-affinity placement.</td></tr>
+<tr><td><code>image.tag</code></td><td><code>v1.0</code></td><td>VeltrixDB container image tag.</td></tr>
+<tr><td><code>storage.disksPerNode</code></td><td><code>8</code></td><td>NVMe disks per pod; must match <code>--local-ssd-count</code> on GKE.</td></tr>
+<tr><td><code>storage.diskSizeGi</code></td><td><code>375</code></td><td>Capacity per NVMe disk (GKE local SSD = 375 GiB).</td></tr>
+<tr><td><code>storage.storageClassName</code></td><td><code>local-nvme</code></td><td>StorageClass created by the infra provisioner.</td></tr>
+<tr><td><code>storage.numShards</code></td><td><code>1024</code></td><td>Index shard count; must be a power of 2 matching the compiled C++ constant.</td></tr>
+<tr><td><code>storage.keyValueSeparation</code></td><td><code>true</code></td><td>WiscKey-style KV separation — keys in SSTables, values in per-disk VLog.</td></tr>
+<tr><td><code>storage.vlogGCThreshold</code></td><td><code>0.30</code></td><td>VLog garbage fraction that triggers defragmentation.</td></tr>
+<tr><td><code>storage.walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit window (ms). Must equal <code>vlogFlushWindowMs</code>.</td></tr>
+<tr><td><code>storage.vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms).</td></tr>
+<tr><td><code>storage.walMaxBatchEntries</code></td><td><code>4096</code></td><td>Max WAL entries per group-commit flush before early timer fire.</td></tr>
+<tr><td><code>storage.rawVlog.enabled</code></td><td><code>false</code></td><td>Write VLog directly to <code>/dev/nvmeXnY</code>, bypassing XFS. Saves ~25 µs P99 read tail / ~70 µs P99 write tail. Adds <code>SYS_RAWIO</code> capability and a <code>/dev</code> hostPath mount.</td></tr>
+<tr><td><code>storage.rawVlog.devices</code></td><td><code>[]</code></td><td>Explicit block-device paths; when empty, inferred as <code>/dev/nvme0n1</code> ... <code>/dev/nvme(N-1)n1</code> from <code>disksPerNode</code>.</td></tr>
+<tr><td><code>cache.maxSizeMB</code></td><td><code>262144</code></td><td>LIRS cache size in MiB — 256 GiB, sized for 480 GiB nodes (80% rule).</td></tr>
+<tr><td><code>cache.lirRatio</code></td><td><code>0.90</code></td><td>Fraction of cache reserved for the high-locality (LIR) resident set.</td></tr>
+<tr><td><code>server.port</code></td><td><code>9000</code></td><td>Plain TCP protocol port.</td></tr>
+<tr><td><code>server.tlsPort</code></td><td><code>9443</code></td><td>TLS port, active only when <code>tls.enabled</code>.</td></tr>
+<tr><td><code>server.metricsPort</code></td><td><code>2112</code></td><td>Prometheus metrics + <code>/healthz</code> + <code>/readyz</code>.</td></tr>
+<tr><td><code>cluster.gossipPort</code></td><td><code>7946</code></td><td>UDP gossip failure-detector port.</td></tr>
+<tr><td><code>cluster.replicationFactor</code></td><td><code>3</code></td><td>Desired replica count per shard.</td></tr>
+<tr><td><code>resources.requests.memory</code></td><td><code>480Gi</code></td><td>Memory request per pod.</td></tr>
+<tr><td><code>resources.requests.cpu</code></td><td><code>64</code></td><td>CPU request per pod.</td></tr>
+<tr><td><code>resources.requests.hugepages-2Mi</code></td><td><code>2Gi</code></td><td>Hugepages for the C++ allocator and io_uring SQPOLL fixed buffers. Requires <code>vm.nr_hugepages &gt;= 1024</code> on the host.</td></tr>
+<tr><td><code>autoTune.enabled</code></td><td><code>false</code></td><td>Auto-detect hardware and self-size cache/shards/compaction threads.</td></tr>
+<tr><td><code>autoTune.sysTune</code></td><td><code>true</code></td><td>Apply sysctl/hugepages/scheduler tuning; requires <code>CAP_SYS_ADMIN</code> or root.</td></tr>
+<tr><td><code>auth.enabled</code></td><td><code>false</code></td><td>Enable RBAC authentication.</td></tr>
+<tr><td><code>auth.configSecret</code></td><td><code>""</code></td><td>Secret name with key <code>auth-config.json</code>.</td></tr>
+<tr><td><code>tls.enabled</code></td><td><code>false</code></td><td>Enable TLS 1.3 on the server port.</td></tr>
+<tr><td><code>tls.existingSecret</code></td><td><code>""</code></td><td>Secret with <code>tls.crt</code>/<code>tls.key</code>.</td></tr>
+<tr><td><code>tls.caSecret</code></td><td><code>""</code></td><td>Secret with <code>ca.crt</code>; when set, enables mTLS.</td></tr>
+<tr><td><code>serviceMonitor.enabled</code></td><td><code>true</code></td><td>Create the ServiceMonitor + PrometheusRule.</td></tr>
+<tr><td><code>serviceMonitor.interval</code></td><td><code>15s</code></td><td>Prometheus scrape interval.</td></tr>
+<tr><td><code>podDisruptionBudget.enabled</code></td><td><code>true</code></td><td>Create the PDB.</td></tr>
+<tr><td><code>podDisruptionBudget.maxUnavailable</code></td><td><code>1</code></td><td>Max pods voluntarily disrupted at once.</td></tr>
+<tr><td><code>livenessProbe</code> / <code>readinessProbe</code></td><td><code>/healthz</code> @ 30s+10s x3 / <code>/readyz</code> @ 15s+5s x6</td><td>HTTP probes on <code>metricsPort</code>.</td></tr>
+<tr><td><code>terminationGracePeriodSeconds</code></td><td><code>60</code></td><td>Grace period before SIGKILL, giving the WAL time to flush.</td></tr>
+<tr><td><code>affinity.podAntiAffinity</code></td><td>required, <code>kubernetes.io/hostname</code></td><td>One VeltrixDB pod per physical host (NVMe disks are node-local).</td></tr>
+<tr><td><code>topologySpreadConstraints</code></td><td><code>maxSkew: 1</code>, zone</td><td>Spreads pods evenly across zones.</td></tr>
+</tbody></table></div>
+
+<h2 id="performance-tuning">Performance tuning</h2>
+<p>For 100K+ writes/s, lower the flush windows (both must stay equal):</p>
+<pre class="code-block"><code>storage:
+  walFlushWindowMs: 5
+  vlogFlushWindowMs: 5</code></pre>
+<p>For maximum cache hit rate, size the cache to roughly 85% of node RAM:</p>
+<pre class="code-block"><code>cache:
+  maxSizeMB: 409600  # 400 GB on a 512 GB node</code></pre>
+
+<h2 id="security-features">Security, audit, and data-integrity features</h2>
+<h3>TLS and RBAC auth</h3>
+<pre class="code-block"><code>auth:
+  enabled: true
+  configSecret: veltrixdb-auth
+
+tls:
+  enabled: true
+  existingSecret: veltrixdb-tls</code></pre>
+
+<h3>At-rest encryption (AES-256-GCM)</h3>
+<pre class="code-block"><code>kubectl create secret generic veltrixdb-encryption \
+  -n veltrixdb \
+  --from-literal=key=$(openssl rand 32 | base64)</code></pre>
+<pre class="code-block"><code>security:
+  encryptionAtRest: true
+  encryptionSecretName: veltrixdb-encryption</code></pre>
+<p>Each pod loads the key from the <code>VELTRIXDB_ENCRYPTION_KEY</code> env var at startup; without the secret, startup fails when <code>security.encryptionAtRest</code> is true. Key rotation is offline-only.</p>
+
+<h3>Background scrubber</h3>
+<pre class="code-block"><code>scrubber:
+  enabled: true
+  mbPerSec: 50</code></pre>
+<p>CRC32C re-validation of every VLog record at a controlled rate; default 50 MB/s/disk gives roughly a 2-hour full pass on a 375 GB SSD. Mismatches surface via the <code>VeltrixCorruptionDetected</code> alert.</p>
+
+<h2 id="storageclass">Raw NVMe block-device VLog</h2>
+<p>For latency-critical clusters, enable <code>storage.rawVlog.enabled</code> to write the VLog directly to block devices instead of XFS files. WAL and segment files continue to live on the XFS PVCs.</p>
+<pre class="code-block"><code>storage:
+  rawVlog:
+    enabled: true
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme1n1
+      - /dev/nvme2n1
+      - /dev/nvme3n1
+      - /dev/nvme4n1
+      - /dev/nvme5n1
+      - /dev/nvme6n1
+      - /dev/nvme7n1</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>File-based VLog (default)</th><th>Raw block VLog</th></tr></thead><tbody>
+<tr><td>P99 random read</td><td>~80 µs</td><td>~55 µs</td></tr>
+<tr><td>P99 4 KB write + sync</td><td>~250 µs</td><td>~180 µs</td></tr>
+<tr><td>P99.99 spike under sustained writes</td><td>XFS journal blip every ~30 s</td><td>Flat</td></tr>
+</tbody></table></div>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Do not format raw VLog devices</span> The nvme-prep provisioner (or your own) must not run <code>mkfs.xfs</code> on devices destined for raw VLog use. WAL/segment XFS partitions must live on a separate slice of each disk or on the boot disk.</span></div>
+
+<h2 id="production-example">Production values.yaml example</h2>
+<pre class="code-block"><code>replicaCount: 3
+
+image:
+  tag: "1.0.0"
+
+storage:
+  disksPerNode: 8
+  diskSizeGi: 375
+
+cache:
+  maxSizeMB: 262144  # 256 GiB - recommended for 480 GiB nodes
+
+storage:
+  walFlushWindowMs: 10
+  vlogFlushWindowMs: 10
+
+resources:
+  requests:
+    memory: 480Gi
+    cpu: "60"
+  limits:
+    hugepages-2Mi: 2Gi
+
+autoTune:
+  enabled: false
+
+cluster:
+  gossipPort: 7946
+  replicationFactor: 3
+
+auth:
+  enabled: true
+  configSecret: veltrixdb-auth
+
+tls:
+  existingSecret: veltrixdb-tls
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+
+podDisruptionBudget:
+  maxUnavailable: 1</code></pre>
+
+<h2 id="upgrading">Upgrading</h2>
+<pre class="code-block"><code>helm upgrade veltrixdb veltrixdb/veltrixdb \
+  --namespace veltrixdb \
+  --values my-values.yaml</code></pre>
+<p>The StatefulSet uses <code>RollingUpdate</code> with <code>maxUnavailable: 1</code>, so pods are replaced one at a time. The PodDisruptionBudget bounds voluntary disruptions from node drains that happen concurrently with the rollout.</p>
+
+<h2 id="validating">Validating a deployment</h2>
+<p>After install or upgrade, validate the cluster end-to-end with the <code>bench.sh</code> harness shipped in the main VeltrixDB repository. It checks two hard gates: packing density (must stay at or below roughly 152 B/record at 128 B values) and GC emergency runs (must stay at 0 under sustained write stress).</p>
+<pre class="code-block"><code>kubectl port-forward -n veltrixdb veltrixdb-0 9000:9000 2112:2112 &
+
+git clone https://github.com/VeltrixDB/veltrixdb.git
+cd veltrixdb
+ADDR=127.0.0.1:9000 METRICS_ADDR=127.0.0.1:2112 \
+NUM_KEYS=10000000 \
+BULK_DUR=120 STRESS_DUR=300 \
+./scripts/bench.sh</code></pre>
+<p>Exit 0 means both gates passed; exit 1 means investigate <code>/tmp/veltrixbench-out/run.log</code>. Re-run after every upgrade that bumps <code>image.tag</code>.</p>
+
+<h2 id="uninstalling">Uninstalling</h2>
+<pre class="code-block"><code>helm uninstall veltrixdb --namespace veltrixdb</code></pre>
+<p>PVCs are <strong>not</strong> deleted automatically, to protect your data:</p>
+<pre class="code-block"><code>kubectl delete pvc -n veltrixdb -l app.kubernetes.io/name=veltrixdb</code></pre>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead><tbody>
+<tr><td>Pods stuck in <code>Pending</code></td><td>Check PVs are <code>Available</code>; verify the nvme-prep DaemonSet pods are <code>Running</code>; confirm <code>--local-ssd-interface=NVME</code> was set on the node pool.</td></tr>
+<tr><td>Write throughput lower than expected on macOS / dev environments</td><td><code>F_FULLFSYNC</code> costs ~7-10 ms on macOS — a hardware limitation, not a bug. Use Linux NVMe in production.</td></tr>
+<tr><td>WAL batch size is 1 (no amortisation)</td><td>Compare <code>veltrixdb_wal_flushes_total</code> to <code>veltrixdb_writes_total</code>; if roughly equal, raise <code>storage.walFlushWindowMs</code> and <code>storage.vlogFlushWindowMs</code> together.</td></tr>
+<tr><td><code>io_uring</code> buffer registration fails at startup</td><td>Needs <code>RLIMIT_MEMLOCK</code> or <code>CAP_IPC_LOCK</code>; add <code>IPC_LOCK</code> to the pod's <code>securityContext.capabilities.add</code>.</td></tr>
+<tr><td>VLog not being compacted</td><td>Check <code>vlog_gc</code> metrics via <code>curl localhost:2112/metrics</code> inside a pod.</td></tr>
+</tbody></table></div>
+
+<h2 id="related">Related pages</h2>
+<div class="card-grid">
+<a class="card" href="operator.html"><div class="card-title">Kubernetes Operator →</div><div class="card-desc">CRD-driven cluster management as an alternative to the Helm chart.</div></a>
+<a class="card" href="../operations/nvme-provisioning.html"><div class="card-title">NVMe Disk Provisioning →</div><div class="card-desc">How the mount-keeper/nvme-prep DaemonSets format and mount local NVMe disks.</div></a>
+<a class="card" href="../operations/monitoring.html"><div class="card-title">Monitoring →</div><div class="card-desc">Prometheus metrics reference and dashboard guidance.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../kubernetes/operator.html"><span class="dir">&larr; Previous</span><span>Kubernetes Operator</span></a>
+<a class="next" href="../resources/redis-comparison.html"><span class="dir">Next &rarr;</span><span>VeltrixDB vs Redis</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

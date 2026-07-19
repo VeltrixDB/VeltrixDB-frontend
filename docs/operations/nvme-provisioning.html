@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NVMe Disk Provisioning — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: NVMe Disk Provisioning" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="active">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>NVMe Disk Provisioning</div>
+    <h1>NVMe Disk Provisioning</h1>
+<p class="page-lede">Why VeltrixDB needs raw access to local NVMe disks in Kubernetes, and how the mount-keeper / nvme-prep DaemonSets get real XFS filesystems in front of each pod before the engine starts.</p>
+
+<div class="callout warn">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">GKE requirement</span> Create node pools with <code>--local-ssd-interface=NVME</code>. Without it, GKE merges all local SSDs into a single RAID-0 device and you lose the parallel per-disk I/O that VeltrixDB's WAL/VLog layout depends on.</span>
+</div>
+
+<h2 id="why-this-exists">Why this exists</h2>
+<p>VeltrixDB's storage engine (see <a class="inline-link" href="../architecture/storage-engine.html">Storage Engine</a>) opens one WAL and one VLog file per physical disk and expects them to sit on real, independently-addressable NVMe devices — not a filesystem abstraction shared across disks. On several managed Kubernetes platforms, the kubelet mounts local-SSD-backed PersistentVolumes into a pod's mount namespace before anything has formatted them, or formats them in a way that collapses several physical disks into one logical device. Both cases silently defeat the parallel-disk design.</p>
+<p>The <strong>mount-keeper</strong> / <strong>nvme-prep</strong> DaemonSet exists to run on the host, format each local NVMe device as XFS (or leave it raw — see below), and bind-mount it at the exact path the PersistentVolume expects <em>before</em> kubelet performs its own bind-mount into the VeltrixDB pod.</p>
+
+<h2 id="per-cloud-notes">Per-cloud notes</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Cloud</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>GKE</td><td>Node pool created with <code>--local-ssd-interface=NVME</code> (see the warning above). GKE's Container-Optimized OS (COS) runs kubelet inside its own mount namespace, which is the main reason the mount-keeper pattern is needed at all.</td></tr>
+<tr><td>AWS</td><td>Instance types with local NVMe instance storage: i3, i3en, i4i, im4gn, is4gen. Similar bind-mount timing issues occur on Bottlerocket.</td></tr>
+<tr><td>Azure</td><td>Lsv2/Lsv3 series with local NVMe storage.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="what-gets-installed">What gets installed</h2>
+<p>Depending on how you deploy VeltrixDB, the DaemonSet is provisioned one of two ways:</p>
+<ul>
+<li><strong>Kubernetes Operator</strong> — the Operator provisions the NVMe-provisioner DaemonSet dynamically for each <code>VeltrixCluster</code> as part of its normal reconcile loop. See <a class="inline-link" href="../kubernetes/operator.html">Kubernetes Operator</a>.</li>
+<li><strong>Helm chart alone</strong> — the chart does not ship a static <code>daemonset.yaml</code> template for this. Apply it directly before <code>helm install</code>:
+<pre class="code-block"><code>kubectl apply -f VeltrixDB-Kubernetes-Operator/config/manager/nvme-mount-keeper.yaml
+kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
+</li>
+</ul>
+
+<h2 id="xfs-vs-raw">XFS-backed vs. raw block-device VLog</h2>
+<p>By default, each NVMe disk is formatted XFS and both the WAL and the VLog live as regular files on it. For latency-critical clusters, VeltrixDB can write the VLog directly to the raw block device (<code>/dev/nvmeXnY</code>), skipping the filesystem entirely for the value-bytes path — the WAL and segment metadata still live on an XFS partition.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Mode</th><th>Trade-off</th></tr></thead>
+<tbody>
+<tr><td>XFS-backed VLog (default)</td><td>Simpler operationally; periodic XFS journal commits can introduce a small P99.99 latency blip (roughly every 30s under sustained writes).</td></tr>
+<tr><td>Raw block-device VLog (<code>rawVLog.enabled</code> / <code>storage.rawVlog.enabled</code>)</td><td>Flat tail latency (no journal blips); saves roughly 25 µs off P99 read and 70 µs off P99 write. Requires the <code>SYS_RAWIO</code> capability, a <code>/dev</code> hostPath mount, and (on GKE COS) a privileged, root container to pass the cgroup device allowlist.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout danger">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">Do not format raw VLog devices</span> The provisioner must not run <code>mkfs.xfs</code> on any device designated for raw VLog use. WAL/segment XFS partitions belong on a separate slice of the disk (<code>xfsPartitionPercent</code>, typically 20% in production) or on the boot disk.</span>
+</div>
+<p>When device paths aren't explicitly configured, both the Operator and the Helm chart infer them as <code>/dev/nvme0n1</code> … <code>/dev/nvme(disksPerNode-1)n1</code> — the standard GKE local-NVMe naming convention.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead>
+<tbody>
+<tr><td><code>write /mnt/nvmeN/wal.log: no space left on device</code></td><td>The pod started before the mount-keeper bound real XFS at the PV source path, so kubelet bind-mounted a small tmpfs placeholder instead. Confirm the DaemonSet is <code>Running</code>, then delete the pod so kubelet re-creates the bind mount against the now-formatted disk.</td></tr>
+<tr><td>Pods stuck in <code>Pending</code></td><td>Check that PVs are <code>Available</code>, the provisioner DaemonSet pods are <code>Running</code>, and (on GKE) that the node pool was created with <code>--local-ssd-interface=NVME</code>.</td></tr>
+<tr><td>Cluster provisions but write throughput is far below benchmark numbers</td><td>Verify GKE didn't collapse local SSDs into a single RAID-0 device — this happens automatically if the node pool omits <code>--local-ssd-interface=NVME</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="related">Related pages</h2>
+<div class="card-grid">
+  <a class="card" href="../kubernetes/operator.html"><div class="card-title">Kubernetes Operator →</div><div class="card-desc">CRD spec, reconcile behavior, and the raw NVMe VLog CR fields.</div></a>
+  <a class="card" href="../kubernetes/helm-chart.html"><div class="card-title">Helm Chart →</div><div class="card-desc">values.yaml settings for storage, disks, and raw VLog.</div></a>
+  <a class="card" href="../architecture/storage-engine.html"><div class="card-title">Storage Engine →</div><div class="card-desc">Why VeltrixDB needs per-disk WAL/VLog files in the first place.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../operations/monitoring.html"><span class="dir">&larr; Previous</span><span>Monitoring & Observability</span></a>
+<a class="next" href="../operations/performance-tuning.html"><span class="dir">Next &rarr;</span><span>Performance Tuning</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

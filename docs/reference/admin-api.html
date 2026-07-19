@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin API Reference — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Admin API Reference" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="active">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Reference<span class="sep">/</span>Admin API</div>
+    <h1>Admin API Reference</h1>
+<p class="page-lede">The full HTTP surface exposed on <code>-metrics-addr</code> (default <code>:2112</code>): health probes, Prometheus metrics, and the <code>/admin/*</code> operational endpoints implemented in <code>adminapi/admin.go</code> and <code>cmd/server/admin_cluster.go</code>.</p>
+
+<div class="callout danger">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Access control (v1.1.0)</span> <code>/admin/*</code> is guarded. With no token configured, admin endpoints accept loopback connections only — a non-loopback request gets <code>403</code>. Starting the server with <code>-admin-token &lt;token&gt;</code> (or the <code>VELTRIX_ADMIN_TOKEN</code> environment variable) requires every <code>/admin/*</code> request, loopback included, to send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code>; anything else gets <code>401</code>. The comparison is constant-time. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are not guarded, so Prometheus scrapes and Kubernetes probes need no configuration. Several endpoints still mutate live state (<code>/admin/quotas</code> mutates live limits, <code>/admin/migrate</code> mutates on-disk schema), so treat the token as a second layer: on untrusted networks, keep the port behind a network policy / firewall, and preferably mTLS via a sidecar proxy (Envoy or nginx).</span>
+</div>
+
+<h2 id="health-and-metrics">Health and metrics endpoints</h2>
+<p>These are registered directly in <code>cmd/server/main.go</code>, before the storage engine finishes initializing, so liveness checks never time out during a slow WAL replay.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge">GET</span></td><td><code>/healthz</code></td><td>Liveness probe. Always returns <code>200 ok</code> once the HTTP listener is up &mdash; it does not depend on the storage engine being ready. Suitable for a Kubernetes <code>livenessProbe</code>.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/readyz</code></td><td>Readiness probe. Returns <code>503 initializing</code> until the storage engine has finished startup (WAL replay, VLog device open, etc.), then <code>200 ready</code>. Suitable for a Kubernetes <code>readinessProbe</code>.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/metrics</code></td><td>Prometheus exposition endpoint (OpenMetrics-enabled). Backed by <code>veltrixmetrics.NewVeltrixCollector</code>, registered on a dedicated <code>prometheus.Registry</code>. Exposes 60+ metrics covering storage, cache, WAL, VLog GC, replication, and cluster state.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/traces</code></td><td>Recent OpenTelemetry-compatible spans from the in-process ring buffer (default retains 2048 spans). Only slow operations (&ge;50&nbsp;ms) and errors are guaranteed to appear regardless of the 1% trace sampler. Returned as newline-delimited JSON.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>curl http://localhost:2112/healthz
+curl http://localhost:2112/readyz
+curl http://localhost:2112/metrics | head -30
+curl http://localhost:2112/traces</code></pre>
+
+<h2 id="admin-stats">GET /admin/stats</h2>
+<p>Returns a full JSON snapshot of engine state: index size, cumulative op counters, cache stats, WAL totals, CDC counters, per-disk VLog stats, and namespace list. This is the endpoint the <code>veltrix status</code>, <code>veltrix compaction</code>, <code>veltrix cache</code>, and <code>veltrix top</code> subcommands poll.</p>
+
+<pre class="code-block"><code>curl http://localhost:2112/admin/stats</code></pre>
+
+<p>Response shape (fields read directly from <code>handleStats</code> in <code>adminapi/admin.go</code>):</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>index_keys</code></td><td>int</td><td>Live key count in the in-memory index.</td></tr>
+<tr><td><code>writes_total</code></td><td>uint64</td><td>Cumulative write count.</td></tr>
+<tr><td><code>reads_total</code></td><td>uint64</td><td>Cumulative read count.</td></tr>
+<tr><td><code>deletes_total</code></td><td>uint64</td><td>Cumulative delete count.</td></tr>
+<tr><td><code>atomic_ops_total</code></td><td>uint64</td><td>Cumulative CAS/INCR/DECR/SETNX count.</td></tr>
+<tr><td><code>audit_dropped_total</code></td><td>uint64</td><td>Audit log entries dropped (e.g., due to a full write queue).</td></tr>
+<tr><td><code>cache</code></td><td>object</td><td><code>storage.CacheStats</code> &mdash; LIRS cache size, capacity, hits, misses, evictions.</td></tr>
+<tr><td><code>wal_bytes</code></td><td>uint64</td><td>Total bytes written to the WAL across all disks.</td></tr>
+<tr><td><code>wal_entries</code></td><td>uint64</td><td>Total WAL entry count across all disks.</td></tr>
+<tr><td><code>cdc_broadcast_total</code></td><td>uint64</td><td>Total CDC events broadcast to subscribers.</td></tr>
+<tr><td><code>cdc_dropped_total</code></td><td>uint64</td><td>CDC events dropped due to slow consumers.</td></tr>
+<tr><td><code>cdc_subscribers</code></td><td>int</td><td>Current active CDC subscriber count.</td></tr>
+<tr><td><code>vlogs</code></td><td>array</td><td>Per-disk <code>storage.VLogStats</code> &mdash; size, live bytes, GC ratio, one entry per disk.</td></tr>
+<tr><td><code>namespaces</code></td><td>array</td><td><code>storage.NSInfo</code> list &mdash; namespace name and key count, one entry per namespace.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="admin-version">GET /admin/version</h2>
+<p>Returns the on-disk schema version and whether at-rest encryption is enabled.</p>
+<pre class="code-block"><code>curl http://localhost:2112/admin/version</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>current_schema_version</code></td><td>int</td><td><code>storage.CurrentSchemaVersion</code> &mdash; the schema version this binary writes.</td></tr>
+<tr><td><code>encryption_enabled</code></td><td>bool</td><td>Whether AES-256-GCM at-rest encryption is active on this node.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="admin-checkpoint">POST /admin/checkpoint</h2>
+<p>Forces an immediate WAL checkpoint across all disks. Synchronous &mdash; the HTTP response is delayed until the checkpoint completes.</p>
+<pre class="code-block"><code>curl -X POST http://localhost:2112/admin/checkpoint</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>status</code></td><td>string</td><td><code>"ok"</code> on success.</td></tr>
+<tr><td><code>duration_ms</code></td><td>int64</td><td>Wall-clock time the checkpoint took.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Non-<code>POST</code> requests receive <code>405 GET or POST</code> is not accepted here &mdash; only <code>POST</code> is allowed.</p>
+
+<h2 id="admin-quotas">GET / POST /admin/quotas</h2>
+<p>Reads or mutates per-namespace rate-limit and key-count quotas (token-bucket write throttling plus a hard key-count cap).</p>
+
+<h3>GET &mdash; list current quotas</h3>
+<pre class="code-block"><code>curl http://localhost:2112/admin/quotas</code></pre>
+<p>Returns a JSON array of <code>storage.QuotaSnapshot</code> objects, one per namespace with a configured limit.</p>
+
+<h3>POST &mdash; set a namespace quota</h3>
+<p>Accepts form-encoded parameters (not JSON):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Form field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ns</code></td><td>Namespace name to configure.</td></tr>
+<tr><td><code>writes_per_sec</code></td><td>Sustained write-rate limit (token bucket refill rate).</td></tr>
+<tr><td><code>burst</code></td><td>Token bucket burst capacity.</td></tr>
+<tr><td><code>max_keys</code></td><td>Hard cap on key count in the namespace (int64).</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>curl -X POST http://localhost:2112/admin/quotas \
+  -d "ns=tenant_42&writes_per_sec=5000&burst=10000&max_keys=1000000"</code></pre>
+<p>Response: <code>{"status": "ok", "ns": "tenant_42"}</code>.</p>
+
+<h2 id="admin-migrate">POST /admin/migrate</h2>
+<p>Runs schema migrations across all keys currently below <code>current_schema_version</code>.</p>
+<pre class="code-block"><code>curl -X POST http://localhost:2112/admin/migrate</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>migrated</code></td><td>int</td><td>Number of records successfully migrated.</td></tr>
+<tr><td><code>errors</code></td><td>int</td><td>Number of records that failed migration.</td></tr>
+<tr><td><code>target_schema</code></td><td>int</td><td>The schema version records were migrated to.</td></tr>
+</tbody>
+</table>
+</div>
+<p>This is also the endpoint <code>kubectl veltrix migrate</code> calls (see <a class="inline-link" href="cli-reference.html#kubectl-veltrix">CLI Reference</a>).</p>
+
+<h2 id="admin-cdc">GET /admin/cdc</h2>
+<p>Streams live change-data-capture events as newline-delimited JSON (<code>application/x-ndjson</code>) until the client disconnects, an optional duration elapses, or the subscription is evicted for being a slow consumer.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Query param</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>prefix</code></td><td><em>(all keys)</em></td><td>Only stream events for keys matching this prefix.</td></tr>
+<tr><td><code>duration_seconds</code></td><td><code>0</code> (unlimited)</td><td>Automatically close the stream after N seconds.</td></tr>
+<tr><td><code>buffer</code></td><td><code>1024</code></td><td>Per-subscriber channel buffer size; slow consumers that fall behind this buffer are evicted.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>curl "http://localhost:2112/admin/cdc?prefix=orders/&duration_seconds=60"</code></pre>
+
+<p>Each streamed line is one JSON-encoded <code>storage.CDCEvent</code> (operation type, key, and related metadata &mdash; consumed directly by <code>veltrix cdc-tail</code> and by the <code>repl-ship</code> cross-region shipper).</p>
+
+<div class="callout limitation">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">The live CDC stream is in-process only</span> Events are held in an in-memory channel per subscriber, so a consumer (e.g. <code>repl-ship</code>) that is down when an event fires misses it on this stream. As of v1.1.0, the durable <a class="inline-link" href="#admin-changes"><code>/admin/changes</code></a> catch-up feed closes that gap: <code>repl-ship --checkpoint</code> replays exactly the delta it missed before rejoining the live stream.</span>
+</div>
+
+<h2 id="admin-changes">GET /admin/changes</h2>
+<p><span class="badge">v1.1.0</span> The durable catch-up feed backing cross-region replication (<code>storage.ChangesSince</code>). Where <code>/admin/cdc</code> streams live events, <code>/admin/changes</code> scans the index for entries written <em>at or after</em> a microsecond cursor — so a shipper that persists its "last shipped timestamp" can replay the delta it missed while down, then rejoin the live stream. This is what <code>repl-ship --checkpoint</code> calls on restart.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Query param</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>since</code></td><td><code>0</code></td><td>Microsecond timestamp cursor (<code>WriteTimestampUs</code>). The boundary is <strong>inclusive</strong> (<code>&gt;= since</code>).</td></tr>
+<tr><td><code>limit</code></td><td><code>10000</code></td><td>Maximum events per page; values &le; 0 or &gt; 100,000 are reset to 10,000.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>curl "http://localhost:2112/admin/changes?since=1752800000000000&amp;limit=1000"</code></pre>
+
+<p>The response is newline-delimited JSON (<code>application/x-ndjson</code>): one <code>storage.CDCEvent</code> per line (<code>Op</code> <code>"PUT"</code> or <code>"DEL"</code>, <code>Key</code>, <code>Value</code> — empty for deletes — and <code>Timestamp</code> in µs), ordered by write timestamp, followed by a single trailer line:</p>
+
+<pre class="code-block"><code>{"Op":"PUT","Key":"orders/1042","Value":"...","Timestamp":1752800000123456}
+{"Op":"DEL","Key":"orders/0999","Timestamp":1752800000234567}
+{"cursor":1752800000234567,"more":false}</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Trailer field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cursor</code></td><td>int64 (µs)</td><td>Resume point for the next page — the timestamp of the last event returned (or the request's <code>since</code> when no events matched). Pass it back as the next request's <code>since</code>.</td></tr>
+<tr><td><code>more</code></td><td>bool</td><td>Whether entries beyond this page matched the scan.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Semantics worth knowing before building on it:</p>
+<ul>
+<li><strong>The boundary is inclusive</strong> (<code>&gt;= since</code>), and pagination resumes from the last returned event's timestamp — so events sharing the checkpoint's exact microsecond <em>re-ship</em> rather than being lost. Destination applies are last-write-wins Puts/Deletes, so replays are harmless; consumers must be idempotent.</li>
+<li><strong>Tombstones are included</strong> (<code>Op:"DEL"</code>) — deletes made during shipper downtime reach the remote region too. Expired-TTL entries are skipped (they expire remotely on their own).</li>
+<li>The cursor is the single node's clock (<code>WriteTimestampUs</code>, monotone in practice); the same value is carried as <code>Timestamp</code> on the live <code>/admin/cdc</code> path, so the two feeds share one checkpoint.</li>
+</ul>
+
+<h2 id="admin-backup">POST /admin/backup</h2>
+<p>Triggers a full or incremental backup from a live engine, writing to a local destination directory on the server's filesystem. Only registered when the server is started with a non-nil <code>BackupEngine</code> (always true for <code>cmd/server</code>).</p>
+
+<p>Request body (JSON):</p>
+<pre class="code-block"><code>{
+  "type": "full",
+  "dest_dir": "/backup/2026-07-05",
+  "base_dir": ""
+}</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>type</code></td><td>No</td><td><code>"full"</code> (default) or <code>"incremental"</code>.</td></tr>
+<tr><td><code>dest_dir</code></td><td>Yes</td><td>Local destination directory on the server host.</td></tr>
+<tr><td><code>base_dir</code></td><td>Only for incremental</td><td>Path to the base backup's manifest, used to compute the delta.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>curl -X POST http://localhost:2112/admin/backup \
+  -H "Content-Type: application/json" \
+  -d '{"type":"full","dest_dir":"/backup/2026-07-05"}'</code></pre>
+
+<p>Response includes <code>status</code>, <code>type</code>, <code>backup_id</code>, <code>dest_dir</code>, <code>num_disks</code>, <code>duration_ms</code>, and the full <code>manifest</code> object. This is what <code>veltrix backup DEST_DIR</code> calls under the hood.</p>
+
+<h2 id="admin-cluster">GET /admin/cluster (alias: /admin/topology)</h2>
+<p>Returns the live distributed-layer topology: node role, Raft term/leader (in <code>raft</code> mode), replication lag (in <code>replicated</code> mode), partition count, and fencing epoch. Registered separately from the rest of the admin API, in <code>cmd/server/admin_cluster.go</code>, via <code>registerClusterAdmin</code>.</p>
+
+<pre class="code-block"><code>curl http://localhost:2112/admin/cluster</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>node_id</code></td><td>string</td><td>This node's ID.</td></tr>
+<tr><td><code>mode</code></td><td>string</td><td><code>standalone</code>, <code>raft</code>, or <code>replicated</code>.</td></tr>
+<tr><td><code>epoch</code></td><td>uint64</td><td>Partition-map fencing epoch.</td></tr>
+<tr><td><code>partition_count</code></td><td>uint32</td><td>Number of partitions in the consistent-hash ring.</td></tr>
+<tr><td><code>consistency</code></td><td>string</td><td>Present only in <code>replicated</code> mode &mdash; <code>eventual</code>/<code>quorum</code>/<code>strong</code>.</td></tr>
+<tr><td><code>raft</code></td><td>object</td><td>Present only in <code>raft</code> mode: <code>role</code>, <code>term</code>, <code>leader_id</code>, <code>is_leader</code>.</td></tr>
+<tr><td><code>replication</code></td><td>array</td><td>Present only in <code>replicated</code> mode: per-replica <code>node_id</code>, <code>state</code>, <code>last_ack_seq</code>, <code>lag_bytes</code>, <code>lag_ns</code>.</td></tr>
+<tr><td><code>nodes</code></td><td>array</td><td>Every known node: <code>node_id</code>, <code>address</code>, <code>port</code>, <code>state</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>This is the endpoint the bundled cluster-aware client (<code>client.NewClient</code>) calls to bootstrap consistent-hash routing and discover the current Raft leader, and it is what <code>veltrix nodes</code> renders as a table.</p>
+
+<h2 id="admin-ui">GET /admin/ui</h2>
+<p>Serves the built-in HTML/JS web dashboard (implemented in <code>adminapi/ui.go</code>). Also mounted as the catch-all at <code>/admin/</code>, so any unmatched path under <code>/admin/</code> falls through to the dashboard.</p>
+<pre class="code-block"><code>open http://localhost:2112/admin/ui</code></pre>
+
+<h2 id="endpoint-summary">Endpoint summary</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><span class="badge">GET</span></td><td><code>/healthz</code></td><td><span class="badge red">none</span></td><td>Liveness probe</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/readyz</code></td><td><span class="badge red">none</span></td><td>Readiness probe</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/metrics</code></td><td><span class="badge red">none</span></td><td>Prometheus scrape endpoint</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/traces</code></td><td><span class="badge red">none</span></td><td>Recent slow/error OTel spans</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/stats</code></td><td><span class="badge good">loopback / token</span></td><td>Full engine snapshot</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/version</code></td><td><span class="badge good">loopback / token</span></td><td>Schema version + encryption flag</td></tr>
+<tr><td><span class="badge">POST</span></td><td><code>/admin/checkpoint</code></td><td><span class="badge good">loopback / token</span></td><td>Force WAL checkpoint</td></tr>
+<tr><td><span class="badge">GET</span>/<span class="badge">POST</span></td><td><code>/admin/quotas</code></td><td><span class="badge good">loopback / token</span></td><td>Read or set per-namespace quotas</td></tr>
+<tr><td><span class="badge">POST</span></td><td><code>/admin/migrate</code></td><td><span class="badge good">loopback / token</span></td><td>Run schema migrations</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/cdc</code></td><td><span class="badge good">loopback / token</span></td><td>Stream CDC events (NDJSON)</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/changes</code></td><td><span class="badge good">loopback / token</span></td><td>Durable change-feed catch-up (NDJSON + cursor trailer)</td></tr>
+<tr><td><span class="badge">POST</span></td><td><code>/admin/backup</code></td><td><span class="badge good">loopback / token</span></td><td>Trigger full/incremental backup</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/cluster</code>, <code>/admin/topology</code></td><td><span class="badge good">loopback / token</span></td><td>Cluster topology, Raft/replication state</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/admin/ui</code>, <code>/admin/*</code> (catch-all)</td><td><span class="badge good">loopback / token</span></td><td>Web dashboard</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card-grid">
+<a class="card" href="server-configuration.html"><div class="card-title">Server Configuration Reference →</div><div class="card-desc">Every -metrics-addr, -tls-*, and -cluster-* flag that shapes this API's behavior.</div></a>
+<a class="card" href="cli-reference.html"><div class="card-title">CLI Reference →</div><div class="card-desc">veltrix, veltrixdb-backup, and kubectl-veltrix all wrap these endpoints.</div></a>
+<a class="card" href="../operations/monitoring.html"><div class="card-title">Monitoring →</div><div class="card-desc">Key Prometheus metrics to alert on, exposed via /metrics.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../reference/server-configuration.html"><span class="dir">&larr; Previous</span><span>Server Configuration</span></a>
+<a class="next" href="../reference/cli-reference.html"><span class="dir">Next &rarr;</span><span>CLI Reference</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

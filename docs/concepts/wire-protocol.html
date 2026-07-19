@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wire Protocol — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Wire Protocol" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="active">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Core Concepts<span class="sep">/</span>Wire Protocol</div>
+    <h1>Wire Protocol</h1>
+<p class="page-lede">VeltrixDB speaks two protocols over the same TCP port: a human-readable text protocol for ad-hoc use with <code>nc</code> or <code>telnet</code>, and a compact binary protocol that every official SDK uses by default. The server auto-detects which one a connection is speaking from the first byte.</p>
+
+<h2 id="text-protocol">Text protocol</h2>
+<p>The text protocol is line-oriented — one command per line, a plain-text response per line — which makes it usable directly from <code>nc</code>, <code>telnet</code>, or any tool that can write to a TCP socket. It's the fastest way to sanity-check a running server.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td><code>PUT key value</code></td><td><code>OK</code></td></tr>
+<tr><td><code>GET key</code></td><td><code>value</code> (or <code>ERR</code> if not found)</td></tr>
+<tr><td><code>DEL key</code></td><td><code>OK</code></td></tr>
+<tr><td><code>PING</code></td><td><code>PONG</code></td></tr>
+<tr><td><code>INFO</code></td><td><code>keys=N writes=N reads=N ...</code></td></tr>
+<tr><td><code>AUTH user pass</code></td><td><code>OK</code></td></tr>
+<tr><td><code>QUIT</code></td><td><code>BYE</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="text-commands-1-1-0">Text commands added in v1.1.0</h3>
+<p>v1.1.0 brings the text protocol to parity with operations that were previously binary-only (TTL writes, atomics, batch get) and adds the new list and set data types. The usage lines below are exactly what the server prints on a malformed invocation (<code>ERR usage: ...</code>):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td><code>PUTEX &lt;key&gt; &lt;ttl-seconds&gt; &lt;value&gt;</code></td><td><code>OK</code> — a <code>PUT</code> with expiration (the text-protocol counterpart of the binary <code>PUT</code>'s TTL field). TTL must be &ge; 1; <code>ERR bad ttl</code> otherwise.</td></tr>
+<tr><td><code>INCR &lt;key&gt; [delta]</code> / <code>DECR &lt;key&gt; [delta]</code></td><td>The new integer value, as a decimal line. <code>delta</code> defaults to <code>1</code>; a missing key counts from zero.</td></tr>
+<tr><td><code>SETNX &lt;key&gt; &lt;value&gt;</code></td><td><code>1</code> (created) or <code>0</code> (key already exists).</td></tr>
+<tr><td><code>CAS &lt;key&gt; &lt;expected&gt; &lt;new&gt;</code></td><td><code>OK</code> (swapped), <code>MISMATCH</code> (current value differed), or <code>NOTFOUND</code> (key absent).</td></tr>
+<tr><td><code>MGET &lt;key&gt; [key ...]</code></td><td>One <code>&lt;key&gt; &lt;value&gt;</code> line per <em>found</em> key (missing keys are silently omitted), terminated by <code>END</code>.</td></tr>
+<tr><td><code>LPUSH &lt;key&gt; &lt;value&gt;</code> / <code>RPUSH &lt;key&gt; &lt;value&gt;</code></td><td>The new list length.</td></tr>
+<tr><td><code>LPOP &lt;key&gt;</code> / <code>RPOP &lt;key&gt;</code></td><td>The popped value, or <code>NIL</code> when the list is empty.</td></tr>
+<tr><td><code>LLEN &lt;key&gt;</code></td><td>The element count.</td></tr>
+<tr><td><code>LRANGE &lt;key&gt; &lt;start&gt; &lt;stop&gt;</code></td><td>One element per line, then <code>END</code>. Redis semantics: <code>stop</code> inclusive, negative indices count from the end.</td></tr>
+<tr><td><code>SADD &lt;key&gt; &lt;member&gt;</code> / <code>SREM &lt;key&gt; &lt;member&gt;</code></td><td><code>1</code> when added/removed, <code>0</code> otherwise.</td></tr>
+<tr><td><code>SISMEMBER &lt;key&gt; &lt;member&gt;</code></td><td><code>1</code> or <code>0</code>.</td></tr>
+<tr><td><code>SMEMBERS &lt;key&gt;</code></td><td>One member per line (unordered), then <code>END</code>.</td></tr>
+<tr><td><code>SCARD &lt;key&gt;</code></td><td>The member count.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Token-delimited arguments</span> <code>CAS</code> parses <code>&lt;expected&gt;</code> as a single space-delimited token — use the binary protocol for values containing spaces. Semantics of every command (per-key TTL, atomic RMW guarantees, list/set encoding) are covered in the <a class="inline-link" href="data-model.html">Data Model</a>, which also documents the <code>VSET</code>/<code>VSEARCH</code> vector commands.</span></div>
+
+<h3>Worked example</h3>
+<p>Start a server and drive it with <code>nc</code>:</p>
+<pre class="code-block"><code>$ docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb:latest
+
+$ nc localhost 9000
+PUT hello world
+OK
+GET hello
+world
+PUT counter 41
+OK
+GET counter
+41
+DEL hello
+OK
+GET hello
+ERR
+PING
+PONG
+INFO
+keys=1 writes=3 reads=3 ...
+QUIT
+BYE</code></pre>
+<p>Or pipe a whole session in one shot, as shown in the project's own quick-start:</p>
+<pre class="code-block"><code>echo -e "PUT hello world\nGET hello\nPING" | nc localhost 9000</code></pre>
+
+<h2 id="binary-protocol">Binary protocol</h2>
+<p>The binary protocol is what every official SDK (Go, Python, Node.js, Java, Rust, C++) speaks by default, and it's what the server assumes once it sees a leading byte that matches a known opcode rather than ASCII command text — no handshake or negotiation is required, the server simply auto-detects the framing per connection.</p>
+
+<h3>Frame layout</h3>
+<pre class="code-block"><code>Request:  [1B cmd][2B keyLen][4B valLen][key][value]
+Response: [1B status][4B payloadLen][payload]</code></pre>
+
+<h3>Opcodes</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Category</th><th>Opcode</th><th>Command</th></tr></thead>
+<tbody>
+<tr><td rowspan="5">Single-key</td><td><code>0x01</code></td><td><code>PUT</code></td></tr>
+<tr><td><code>0x02</code></td><td><code>GET</code></td></tr>
+<tr><td><code>0x03</code></td><td><code>DEL</code></td></tr>
+<tr><td><code>0x04</code></td><td><code>PING</code></td></tr>
+<tr><td><code>0x05</code></td><td><code>INFO</code></td></tr>
+<tr><td rowspan="2">Batch</td><td><code>0x06</code></td><td><code>MPUT</code> (vectorized multi-put)</td></tr>
+<tr><td><code>0x07</code></td><td><code>MGET</code> (vectorized multi-get)</td></tr>
+<tr><td rowspan="4">Atomic</td><td><code>0x18</code></td><td><code>CAS</code> (compare-and-swap)</td></tr>
+<tr><td><code>0x19</code></td><td><code>INCR</code></td></tr>
+<tr><td><code>0x1A</code></td><td><code>DECR</code></td></tr>
+<tr><td><code>0x1B</code></td><td><code>SETNX</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The atomic opcodes <code>0x18</code>–<code>0x1B</code> use extended frames that carry the extra operands (expected value, delta, TTL) — as of v1.1.0 the same four operations are also available as text commands (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>, above) and in every official SDK:</p>
+<pre class="code-block"><code>CAS:   [1B 0x18][2B keyLen][4B expectedLen] + [4B newLen][4B ttl] + key + expected + new
+INCR:  [1B 0x19][2B keyLen][4B 0]           + [8B delta int64] + [4B ttl] + key
+DECR:  [1B 0x1A][2B keyLen][4B 0]           + [8B delta int64] + [4B ttl] + key
+SETNX: [1B 0x1B][2B keyLen][4B valLen]      + [4B ttl] + key + value</code></pre>
+
+<h3>Status codes</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Code</th><th>Status</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>0x00</code></td><td><code>OK</code></td><td>Request succeeded; <code>payload</code> holds the result, if any.</td></tr>
+<tr><td><code>0x01</code></td><td><code>ERR</code></td><td>Request failed; <code>payload</code> holds an error message.</td></tr>
+<tr><td><code>0x02</code></td><td><code>NOT_FOUND</code></td><td>Key does not exist or is expired/tombstoned.</td></tr>
+<tr><td><code>0x03</code></td><td><code>EXISTS</code></td><td><code>SETNX</code>: the key already existed; nothing was written.</td></tr>
+<tr><td><code>0x04</code></td><td><code>MISMATCH</code></td><td><code>CAS</code>: the expected value did not match the current value; nothing was written.</td></tr>
+<tr><td><code>0x05</code></td><td><code>CONFLICT</code></td><td><code>TXN</code>: an optimistic version check failed — re-read and retry.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Prefer batches</span> <code>MPUT</code>/<code>MGET</code> batches are roughly <strong>50× faster</strong> than issuing the same number of individual <code>PUT</code>/<code>GET</code> calls, because a batch amortizes one round trip and one group-commit window across many keys instead of paying that cost per key. All official SDKs expose batch methods (for example, <code>db.mput(...)</code> / <code>db.mget(...)</code>) — reach for them whenever you're writing or reading more than a handful of keys at once.</span></div>
+
+<h2 id="protocol-auto-detection">Protocol auto-detection</h2>
+<p>Both protocols share the same TCP listener (<code>-addr</code>, default <code>:9000</code>). A single connection is either all-text or all-binary — the server determines this from the leading byte of the first request and does not switch mid-connection. You never need to configure which protocol to use; connecting with <code>nc</code>/<code>telnet</code> naturally speaks text, and every official SDK's connection pool speaks binary.</p>
+
+<div class="card-grid">
+<a class="card" href="data-model.html"><div class="card-title">Data Model →</div><div class="card-desc">The keys, TTLs, hash fields, namespaces, and atomic ops these commands operate on.</div></a>
+<a class="card" href="deployment-modes.html"><div class="card-title">Deployment Modes →</div><div class="card-desc">How writes made over this protocol are routed in cluster modes.</div></a>
+<a class="card" href="../client-sdks/index.html"><div class="card-title">Client SDKs →</div><div class="card-desc">Go, Python, Node.js, Java, Rust, and C++ clients that speak the binary protocol.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../concepts/data-model.html"><span class="dir">&larr; Previous</span><span>Data Model</span></a>
+<a class="next" href="../concepts/deployment-modes.html"><span class="dir">Next &rarr;</span><span>Deployment Modes</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://veltrixdb.com/sitemap.xml

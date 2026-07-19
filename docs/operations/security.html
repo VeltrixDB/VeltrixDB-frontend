@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Security — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Security" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="active">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Security</div>
+    <h1>Security</h1>
+<p class="page-lede">VeltrixDB provides encryption at rest, TLS for both client and inter-node traffic, role-based access control, admin API access control, and an append-only audit log. This page covers how to enable each control and what it does and does not guarantee.</p>
+
+<h2 id="encryption-at-rest">Encryption at rest</h2>
+<p>VeltrixDB encrypts stored values with <strong>AES-256-GCM</strong>. Encryption is off by default and is enabled per-node with a server flag:</p>
+<pre class="code-block"><code>veltrixdb -addr :9000 -data-dirs /mnt/nvme0,/mnt/nvme1 \
+  -encrypt-at-rest</code></pre>
+<p>The encryption key is not passed on the command line. It is read from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable at startup:</p>
+<pre class="code-block"><code>export VELTRIXDB_ENCRYPTION_KEY=$(openssl rand 32 | base64)
+veltrixdb -encrypt-at-rest -data-dirs /mnt/nvme0,/mnt/nvme1</code></pre>
+<div class="callout warn">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">Key rotation is offline.</span> VeltrixDB does not support online re-keying. Rotating the encryption key requires stopping every node, generating a new key, and forcing a full rewrite of stored data at the new key (<code>veltrix migrate</code>). See the <a class="inline-link" href="disaster-recovery.html">Disaster Recovery</a> runbook for the exact sequence.</span>
+</div>
+<p>On Kubernetes, supply the key through a Secret rather than a plain environment value baked into a manifest:</p>
+<pre class="code-block"><code>kubectl create secret generic veltrixdb-enc \
+  --from-literal=key=BASE64_32B</code></pre>
+<p>If the encryption key is missing at startup, nodes fail to open the VLog with an error resembling <code>encryption: no key in VELTRIXDB_ENCRYPTION_KEY</code>. For HSM/KMS-backed key sourcing, mount the secret through a CSI driver (for example the AWS Secrets Manager CSI driver) so the raw key material is never stored in cluster state at rest.</p>
+
+<h2 id="tls-client-connections">TLS for client connections</h2>
+<p>The TCP data server can require TLS for client connections using a server certificate and key:</p>
+<pre class="code-block"><code>veltrixdb -addr :9000 \
+  -tls-cert /etc/veltrixdb/tls/server.crt \
+  -tls-key  /etc/veltrixdb/tls/server.key</code></pre>
+<p>VeltrixDB negotiates <strong>TLS 1.3</strong> and falls back to a restricted TLS 1.2 cipher suite list (<code>TLS_AES_256_GCM_SHA384</code>, <code>TLS_CHACHA20_POLY1305_SHA256</code>, <code>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</code>) — older ciphers are rejected. Without <code>-tls-cert</code>/<code>-tls-key</code>, the listener serves plaintext.</p>
+
+<h2 id="cluster-mtls">Inter-node TLS and mutual TLS</h2>
+<p>Client-facing TLS and inter-node (Raft / replication) TLS are configured independently, because they usually terminate at different network boundaries. Use the <code>-cluster-tls-*</code> flags to secure Raft, replication, and gossip traffic between nodes:</p>
+<pre class="code-block"><code>veltrixdb -mode raft -node-id n1 -addr 127.0.0.1:9000 \
+  -peers n1@127.0.0.1:9000,n2@127.0.0.1:9100,n3@127.0.0.1:9200 \
+  -cluster-tls-cert /etc/veltrixdb/tls/cluster.crt \
+  -cluster-tls-key  /etc/veltrixdb/tls/cluster.key \
+  -cluster-tls-ca   /etc/veltrixdb/tls/cluster-ca.crt \
+  -cluster-mtls</code></pre>
+<p>Setting <code>-cluster-mtls</code> switches the inter-node listener into mutual-TLS mode: every peer connection must present a certificate signed by <code>-cluster-tls-ca</code>, and connections without a valid client certificate are rejected outright. Without <code>-cluster-mtls</code>, <code>-cluster-tls-ca</code> still enables server-side TLS, but peer identity is not verified.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Flag</th><th>Applies to</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>-tls-cert</code> / <code>-tls-key</code></td><td>Client-facing TCP data port</td><td>Server-side TLS for application connections</td></tr>
+<tr><td><code>-cluster-tls-cert</code> / <code>-cluster-tls-key</code> / <code>-cluster-tls-ca</code></td><td>Raft / replication / gossip listeners</td><td>TLS between nodes; CA enables client-cert verification</td></tr>
+<tr><td><code>-cluster-mtls</code></td><td>Raft / replication / gossip listeners</td><td>Requires and verifies peer certificates (mutual TLS)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="rbac">Role-based access control</h2>
+<p>Authentication and authorization are driven by a JSON config file passed via <code>-auth-config</code>. Each entry maps a username to a password hash and a role:</p>
+<pre class="code-block"><code>{
+  "users": [
+    { "username": "alice", "password_hash": "pbkdf2$sha256$210000$&lt;salt-b64&gt;$&lt;dk-b64&gt;", "role": "admin" }
+  ]
+}</code></pre>
+<p>Hashes are generated with <code>veltrix-admin hash-password</code> — see <a class="inline-link" href="#password-hashing">Password hashing</a> below for the hash format and the legacy-hash migration path.</p>
+<p>Three built-in roles are supported:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Role</th><th>Permissions</th></tr></thead>
+<tbody>
+<tr><td><code>admin</code></td><td>read + write + delete + admin (full access)</td></tr>
+<tr><td><code>readwrite</code></td><td>read + write + delete</td></tr>
+<tr><td><code>readonly</code></td><td>read only (<code>GET</code>, <code>PING</code>, <code>INFO</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Clients authenticate over the text protocol with:</p>
+<pre class="code-block"><code>AUTH alice secretpassword
+OK</code></pre>
+<p>The binary protocol carries the same operation as command <code>0x09</code> with a length-prefixed username and password. Password hashes are compared with a constant-time comparison, and lookups against unknown usernames run a dummy constant-time comparison as well, to reduce user-enumeration via timing. When <code>-auth-config</code> is not supplied, authentication is disabled and every connection is granted full permissions — do not expose an unauthenticated data port to an untrusted network.</p>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">Loading an auth config with zero users is rejected.</span> VeltrixDB refuses to enable auth enforcement from an empty user list, to avoid silently locking out (or silently permitting) every connection.</span>
+</div>
+
+<h2 id="password-hashing">Password hashing</h2>
+<p>Password hashes in the auth config use <strong>PBKDF2-HMAC-SHA256</strong> with <strong>210,000 iterations</strong>, a random per-user 16-byte salt, and a 32-byte derived key. The stored value is self-describing:</p>
+<pre class="code-block"><code>pbkdf2$sha256$&lt;iterations&gt;$&lt;salt-base64&gt;$&lt;derived-key-base64&gt;</code></pre>
+<p>Because the iteration count and salt are embedded in each hash, entries generated at different work factors verify correctly side by side. Generate a hash — together with a ready-to-paste auth config snippet — using the admin CLI:</p>
+<pre class="code-block"><code>veltrix-admin hash-password --user alice --password secret</code></pre>
+<p><strong>Legacy hashes still work.</strong> The previous scheme — a bare 64-character hex digest of SHA-256(password + username) — is still verified for backward compatibility, so existing config files keep working. However, the server logs a deprecation warning for every legacy entry when the auth config is loaded. Re-hash those users with <code>veltrix-admin hash-password</code> and update the config file. Both schemes are compared in constant time.</p>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">Emitting the deprecated format.</span> <code>veltrix-admin hash-password</code> accepts a <code>--legacy-sha256</code> flag that emits the old SHA-256(password + username) hash instead of PBKDF2. Use it only when a config must be consumed by a pre-upgrade server; new deployments should always use the default PBKDF2 output.</span>
+</div>
+
+<h2 id="admin-api-access-control">Admin API access control</h2>
+<p>As of v1.1.0 the <code>/admin/*</code> endpoints on the admin/metrics HTTP port (<code>-metrics-addr</code>, default <code>:2112</code>) are guarded. With no token configured, they accept <strong>loopback connections only</strong> — a request from any non-loopback address receives <code>403</code>. To allow remote admin access, start the server with a bearer token:</p>
+<pre class="code-block"><code>veltrixdb -admin-token "$(openssl rand -hex 32)"
+# or via the environment:
+export VELTRIX_ADMIN_TOKEN=...</code></pre>
+<p>Once a token is set, <strong>every</strong> <code>/admin/*</code> request — including from loopback — must present it in either header, or it receives <code>401</code>:</p>
+<pre class="code-block"><code>curl -H "Authorization: Bearer $VELTRIX_ADMIN_TOKEN" http://localhost:2112/admin/stats
+curl -H "X-Admin-Token: $VELTRIX_ADMIN_TOKEN"        http://localhost:2112/admin/stats</code></pre>
+<p>Token comparison is constant-time. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are deliberately <em>not</em> guarded, so Prometheus scrapes and Kubernetes probes work with no configuration. The <code>repl-ship</code> tool authenticates against a guarded source with <code>--src-token</code> (or <code>VELTRIX_ADMIN_TOKEN</code>) — see <a class="inline-link" href="replication-and-cdc.html">Replication &amp; CDC</a>.</p>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">The token is a second layer, not a substitute for isolation.</span> On untrusted networks, keep <code>-metrics-addr</code> behind a network policy / firewall as before — the bearer token protects the admin surface, but the port also serves unauthenticated metrics and probe endpoints.</span>
+</div>
+
+<h2 id="audit-log">Audit log</h2>
+<p>VeltrixDB can record every authenticated mutating operation to an append-only, newline-delimited JSON (JSONL) file:</p>
+<pre class="code-block"><code>veltrixdb -audit-log /var/log/veltrixdb/audit.jsonl</code></pre>
+<p>Each line is a single JSON object:</p>
+<pre class="code-block"><code>{"ts":"2026-05-10T11:35:55Z","op":"PUT","actor":"user-bob","key":"orders/4521","ns":"default","status":"ok"}</code></pre>
+<p>Fields: <code>ts</code> (RFC 3339 nanosecond UTC), <code>op</code> (<code>PUT</code>, <code>DEL</code>, <code>CAS</code>, <code>INCR</code>, …), <code>actor</code> (authenticated username, empty when auth is disabled), <code>key</code>, <code>ns</code> (namespace, when distinct), <code>status</code>, and <code>err</code> when the status is an error.</p>
+<p>Audit writes are asynchronous: records are enqueued to a buffered channel and a background goroutine appends them to disk with periodic <code>fsync</code>. The audit path is intentionally never allowed to block the data plane — if the channel fills up, records are dropped and the drop count is tracked internally rather than backpressuring writes.</p>
+<div class="callout limitation">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">The audit log is not tamper-evident.</span> Entries are appended locally in plain JSONL — they are not cryptographically chained. Value payloads are deliberately excluded from records (only operation, key, namespace, actor, and outcome are logged). If your compliance framework requires hash-chained or immutable audit trails, ship the log to an external, write-once backend (for example S3 Object Lock or a WORM-mounted volume).</span>
+</div>
+
+<h2 id="compliance">Compliance posture</h2>
+<p>VeltrixDB ships a control mapping document (<code>docs/SOC2_CONTROLS.md</code>) that maps its built-in capabilities — encryption at rest, RBAC, mTLS, the audit log, Prometheus-based monitoring, and backup/restore — to SOC 2 Trust Service Criteria (CC6.x, CC7.x, CC8.1, A1.x, C1.x, PI1.x).</p>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">This is a control mapping, not a certification.</span> VeltrixDB's own documentation is explicit that a SOC 2 attestation is a property of your <em>operating environment</em>, not of the database alone. The project provides the technical capabilities an auditor will look for; it does not claim SOC 2 certification for VeltrixDB itself, and there is no attestation report to hand to an auditor out of the box.</span>
+</div>
+<p>The control-mapping document also lists gaps to disclose to an auditor rather than paper over: the audit log is not hash-chained, at-rest encryption applies to whole values (no per-field/column-level encryption), the master key is sourced from an environment variable rather than a built-in KMS/HSM integration, and there is no built-in PII detection or redaction scanner. Each gap has a documented mitigation (external immutable log storage, application-layer field encryption, CSI-based KMS secret injection, and external DLP scanning, respectively).</p>
+<p>Operators preparing for an audit should be able to produce, at minimum: proof the encryption secret exists, the current <code>auth-config</code> user/role list with sample login traces, a TLS/mTLS handshake trace, recent backup manifests or volume snapshots, a sample of the shipped audit log, and Grafana/alert history. See <a class="inline-link" href="monitoring.html">Monitoring &amp; Observability</a> for the metrics and alerting side of that evidence set.</p>
+
+<div class="card-grid">
+  <a class="card" href="backup-and-restore.html"><div class="card-title">Backup &amp; Restore →</div><div class="card-desc">Full/incremental backup chains and restore procedures.</div></a>
+  <a class="card" href="disaster-recovery.html"><div class="card-title">Disaster Recovery →</div><div class="card-desc">Runbook for key rotation, node loss, and cluster loss.</div></a>
+  <a class="card" href="../reference/server-configuration.html"><div class="card-title">Server Configuration →</div><div class="card-desc">Full server flag reference.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../client-sdks/cpp.html"><span class="dir">&larr; Previous</span><span>C++</span></a>
+<a class="next" href="../operations/backup-and-restore.html"><span class="dir">Next &rarr;</span><span>Backup & Restore</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

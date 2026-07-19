@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Client SDK Overview — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Client SDK Overview" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="active">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>SDK Overview</div>
+    <h1>Client SDK Overview</h1>
+<p class="page-lede">VeltrixDB ships official client libraries for six languages. Every SDK speaks the same auto-detected binary wire protocol, so behavior, performance characteristics, and error semantics are consistent no matter which one you pick.</p>
+
+<h2 id="available-sdks">Available SDKs</h2>
+<p>All clients connect over a single TCP port (<code>9000</code> by default) and negotiate the binary protocol automatically — the server also accepts a human-readable text protocol on the same port for quick <code>nc</code>/<code>telnet</code> testing, but the SDKs never use it.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Language</th><th>Install</th><th>Min version</th></tr></thead>
+<tbody>
+<tr><td>Go</td><td><code>go get github.com/VeltrixDB/veltrixdb-client-go</code></td><td>Go 1.19+</td></tr>
+<tr><td>Python</td><td><code>pip install veltrixdb</code></td><td>Python 3.8+</td></tr>
+<tr><td>Node.js</td><td><code>npm install veltrixdb-client</code></td><td>Node.js 16+</td></tr>
+<tr><td>Java</td><td><code>com.veltrixdb:veltrixdb-client:1.0.0</code> (Maven/Gradle)</td><td>Java 11+ (17+ to build from source)</td></tr>
+<tr><td>Rust</td><td><code>cargo add veltrixdb-client</code></td><td>Rust 2021 edition</td></tr>
+<tr><td>C++</td><td>header-only — copy <code>cpp/include/veltrixdb.hpp</code></td><td>C++17, POSIX sockets</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>None of the SDKs pull in third-party runtime dependencies — Go, Python, Node.js, and Java use only their standard networking libraries; Rust is pure stdlib; C++ depends only on POSIX sockets.</p>
+
+<h2 id="one-protocol-six-languages">One protocol, six languages</h2>
+<p>Every client dials a plain TCP (or TLS) socket and frames requests the same way: <code>[1B cmd][2B keyLen][4B valLen][key][value]</code>, with a <code>[1B status][4B payloadLen][payload]</code> response. Connection pooling is either built into the client (Go, Java, Python, Node.js all ship a pool type) or trivially composable (Rust and C++ are single-connection today — wrap them in your own pool, e.g. <code>r2d2</code> for Rust).</p>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Atomics in every SDK</span> As of v1.1.0, the atomic-op verbs <code>CAS</code>, <code>INCR</code>, <code>DECR</code>, and <code>SETNX</code> are implemented as typed methods in all six clients — Go, Python, Node.js, and Java gained them in v1.1.0; Rust and C++ had them from the start. See each language page's "Atomic operations" section for exact signatures, or the <a class="inline-link" href="../concepts/wire-protocol.html">Binary Protocol Reference</a> for the wire framing.</span>
+</div>
+
+<h2 id="use-batches">Use MPUT / MGET — they are dramatically faster</h2>
+<p>Every SDK exposes a batch write (<code>MultiPut</code> / <code>multi_put</code> / <code>multiPut</code>) and batch read (<code>MultiGet</code> / <code>multi_get</code> / <code>multiGet</code>) call. These send <strong>one</strong> request frame carrying N entries instead of N separate round trips, and the server fans the work out across its 8192 shards in parallel. Batches of 256–1024 entries are commonly <strong>up to 50&times; faster</strong> than issuing the same number of individual <code>Put</code>/<code>Get</code> calls — use them for bulk loads, cache warms, and any hot loop that touches more than a handful of keys.</p>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Disk density bonus</span> Server-side, batched writes pack multiple small records into each 4&nbsp;KB VLog block. For 128&nbsp;B values that's roughly a 25&times; disk-density gain over single-key <code>Put</code> calls, which each consume one full block. See the <a class="inline-link" href="../operations/performance-tuning.html">Performance Tuning</a> guide for the block-packing details.</span>
+</div>
+
+<h2 id="languages">Browse by language</h2>
+<div class="card-grid">
+<a class="card" href="go.html"><div class="card-title">Go →</div><div class="card-desc">Connection-pooled client with the full API surface: KV, batch, namespaces, hash fields, range scans, transactions, and vector search.</div></a>
+<a class="card" href="python.html"><div class="card-title">Python →</div><div class="card-desc">Pure stdlib client (socket + struct), single-connection and thread-safe pool variants.</div></a>
+<a class="card" href="nodejs.html"><div class="card-title">Node.js →</div><div class="card-desc">Promise-based async client built on the built-in net/tls modules, with an async connection pool.</div></a>
+<a class="card" href="java.html"><div class="card-title">Java →</div><div class="card-desc">Blocking Socket-based client plus a thread-safe VeltrixDBPool for concurrent servers.</div></a>
+<a class="card" href="rust.html"><div class="card-title">Rust →</div><div class="card-desc">Minimal blocking, stdlib-only client with the full atomic-op surface (CAS, INCR, DECR, SETNX).</div></a>
+<a class="card" href="cpp.html"><div class="card-title">C++ →</div><div class="card-desc">Header-only, POSIX-socket client — copy one file into your project, no build system integration required.</div></a>
+</div>
+
+<h2 id="cluster-aware-client">Cluster-aware client (Go, bundled with the server)</h2>
+<p>The SDKs above each talk to a single node. VeltrixDB's server repository also ships a separate, cluster-aware Go client (<code>client.NewClient</code>, package <code>github.com/VeltrixDB/veltrixdb/client</code>) for use against <code>raft</code> or <code>replicated</code> deployments. It fetches cluster topology, builds the same consistent-hash ring the server uses to route keys, and transparently follows <code>MOVED</code> redirects to the current Raft leader. This is a different package from <code>veltrixdb-client-go</code> covered on the <a class="inline-link" href="go.html">Go page</a> — reach for it specifically when you're running a multi-node cluster and want client-side routing. See <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a> for when each mode applies.</p>
+
+    <div class="page-nav">
+<a class="prev" href="../concepts/deployment-modes.html"><span class="dir">&larr; Previous</span><span>Deployment Modes</span></a>
+<a class="next" href="../client-sdks/go.html"><span class="dir">Next &rarr;</span><span>Go</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

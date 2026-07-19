@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VeltrixDB Documentation — VeltrixDB Docs</title>
+<meta name="description" content="Official documentation for VeltrixDB — the NVMe-native distributed key-value database." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="./index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="./resources/faq.html">FAQ</a>
+    <a class="btn primary" href="./getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="./getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="./getting-started/quickstart.html" class="">Quickstart</a>
+<a href="./getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="./architecture/overview.html" class="">Architecture Overview</a>
+<a href="./architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="./architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="./architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="./concepts/data-model.html" class="">Data Model</a>
+<a href="./concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="./concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="./client-sdks/index.html" class="">SDK Overview</a>
+<a href="./client-sdks/go.html" class="">Go</a>
+<a href="./client-sdks/python.html" class="">Python</a>
+<a href="./client-sdks/nodejs.html" class="">Node.js</a>
+<a href="./client-sdks/java.html" class="">Java</a>
+<a href="./client-sdks/rust.html" class="">Rust</a>
+<a href="./client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="./operations/security.html" class="">Security</a>
+<a href="./operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="./operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="./operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="./operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="./operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="./operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="./reference/server-configuration.html" class="">Server Configuration</a>
+<a href="./reference/admin-api.html" class="">Admin API</a>
+<a href="./reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="./kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="./kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="./resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="./resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="./resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="./resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    
+    <div style="padding:8px 0 12px">
+  <span class="badge red">NVMe-native</span><span class="badge">Key-value</span><span class="badge">Kubernetes-first</span><span class="badge good">Apache 2.0</span>
+  <h1 style="margin-top:16px">VeltrixDB Documentation</h1>
+  <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database. Values live on NVMe in an append-only log with ~1.0× write amplification (WiscKey KV-separation); the index and hot values stay in DRAM. This is the complete reference for building, deploying, and operating it.</p>
+</div>
+
+<div class="table-wrap" style="margin-bottom:28px">
+  <table>
+    <thead><tr><th>Benchmark</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Reads/s (measured — YCSB 0.17, single node, 4&times;NVMe)</td><td><strong>427,697</strong></td></tr>
+      <tr><td>Durable writes/s (fsync every write)</td><td><strong>18,064</strong></td></tr>
+      <tr><td>Read latency (avg, 200 threads)</td><td><strong>461 µs</strong></td></tr>
+      <tr><td>Write amplification</td><td><strong>~1.0×</strong></td></tr>
+      <tr><td>Storage density, 1B × 128 B values</td><td><strong>~160 GB</strong></td></tr>
+    </tbody>
+  </table>
+</div>
+<p style="margin:-16px 0 28px"><a class="inline-link" href="resources/benchmarking.html">Full benchmark methodology and hardware spec →</a></p>
+
+<h2 id="whats-new">What's new in 1.1.0</h2>
+<div class="card-grid">
+  <a class="card" href="concepts/data-model.html"><div class="card-title">Lists, sets &amp; HNSW vector search</div><div class="card-desc">Two new data types plus a built-in HNSW vector index (VSET / VSEARCH) — persisted, replicated, rebuilt on restart.</div></a>
+  <a class="card" href="concepts/deployment-modes.html"><div class="card-title">Linearizable reads &amp; auto-rebalance</div><div class="card-desc">Raft-mode GET behind a ReadIndex fence (--linearizable-reads), and node join/leave now migrates keys automatically.</div></a>
+  <a class="card" href="operations/replication-and-cdc.html"><div class="card-title">Durable cross-region catch-up</div><div class="card-desc">repl-ship checkpoints its cursor and replays exactly the writes it missed via /admin/changes — deletes included.</div></a>
+  <a class="card" href="operations/security.html"><div class="card-title">PBKDF2 password hashing</div><div class="card-desc">210k-iteration PBKDF2-HMAC-SHA256 with per-user salts; legacy hashes keep working with a deprecation warning.</div></a>
+  <a class="card" href="client-sdks/index.html"><div class="card-title">Atomics in every SDK</div><div class="card-desc">CAS / INCR / DECR / SETNX now ship in Go, Python, Node.js and Java — matching Rust and C++.</div></a>
+  <a class="card" href="operations/monitoring.html"><div class="card-title">Disk-failure auto-degrade</div><div class="card-desc">A per-disk breaker fails writes fast after repeated I/O errors and flips /readyz to degraded so orchestrators drain the node.</div></a>
+  <a class="card" href="architecture/cluster-and-consensus.html"><div class="card-title">Rack-aware replica placement</div><div class="card-desc">--rack-id keeps every copy of a partition in a distinct zone; labels propagate via gossip, rackless clusters are unchanged.</div></a>
+  <a class="card" href="operations/security.html"><div class="card-title">Admin API access control</div><div class="card-desc">/admin/* is loopback-only by default; --admin-token adds bearer-token auth. Metrics and probes stay unauthenticated.</div></a>
+</div>
+
+<h2 id="start-here">Start here</h2>
+<div class="card-grid">
+  <a class="card" href="getting-started/introduction.html"><div class="card-title">Introduction</div><div class="card-desc">What VeltrixDB is, how it compares to Redis and RocksDB-backed stores, and when to use it.</div></a>
+  <a class="card" href="getting-started/quickstart.html"><div class="card-title">Quickstart</div><div class="card-desc">Run VeltrixDB with Docker and issue your first PUT/GET in under 2 minutes.</div></a>
+  <a class="card" href="getting-started/installation.html"><div class="card-title">Installation</div><div class="card-desc">Binary, Docker, Helm, and Kubernetes Operator installs for every environment.</div></a>
+</div>
+
+<h2 id="explore-the-docs">Explore the docs</h2>
+<div class="card-grid">
+  <a class="card" href="architecture/overview.html"><div class="card-title">Architecture</div><div class="card-desc">Sharding, write/read paths, admission control, cluster and consensus.</div></a>
+  <a class="card" href="concepts/data-model.html"><div class="card-title">Core Concepts</div><div class="card-desc">Data model, wire protocol, and deployment modes.</div></a>
+  <a class="card" href="client-sdks/index.html"><div class="card-title">Client SDKs</div><div class="card-desc">Go, Python, Node.js, Java, Rust, and C++ — same binary protocol, connection pooling built in.</div></a>
+  <a class="card" href="operations/security.html"><div class="card-title">Operations</div><div class="card-desc">Security, backup &amp; restore, replication, monitoring, performance tuning, disaster recovery.</div></a>
+  <a class="card" href="reference/server-configuration.html"><div class="card-title">Reference</div><div class="card-desc">Every server flag, the Admin HTTP API, and CLI tools.</div></a>
+  <a class="card" href="kubernetes/operator.html"><div class="card-title">Kubernetes</div><div class="card-desc">CRD Operator and Helm chart for running VeltrixDB in production clusters.</div></a>
+</div>
+
+<h2 id="why-veltrixdb">Why VeltrixDB</h2>
+<p>Redis keeps everything in RAM — a billion 128-byte keys needs roughly 250 GB of memory, on the order of $3,000–5,000/month in cloud RAM. VeltrixDB keeps values on NVMe and only a 64-byte pointer per key in DRAM, so the same dataset fits in about 160 GB of NVMe for roughly $300–500/month. LSM-based stores like RocksDB typically see 10–30× write amplification from compaction; VeltrixDB's WiscKey-style KV-separation keeps that close to 1.0×.</p>
+<p>See the honest trade-offs in <a class="inline-link" href="resources/limitations-and-roadmap.html">Limitations &amp; Roadmap</a> and a feature-by-feature breakdown in <a class="inline-link" href="resources/redis-comparison.html">VeltrixDB vs. Redis</a>.</p>
+
+    
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="./assets/docs.js"></script>
+</body>
+</html>

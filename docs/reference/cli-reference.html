@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CLI Reference — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: CLI Reference" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="active">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Reference<span class="sep">/</span>CLI Reference</div>
+    <h1>CLI Reference</h1>
+<p class="page-lede">Every command-line tool that ships with VeltrixDB &mdash; the operator CLI, backup/restore tool, migration and chaos-testing utilities, load generator, and Kubernetes integrations &mdash; with real invocation syntax pulled from each tool's source.</p>
+
+<p>All tools live under <code>cmd/</code> in the VeltrixDB repository and build independently with <code>go build -o &lt;name&gt; ./cmd/&lt;dir&gt;</code>. None of them require the full server dependency tree at runtime; each talks to a running <code>veltrixdb</code> server over TCP and/or the <a class="inline-link" href="admin-api.html">admin HTTP API</a>, except where noted as an offline/file-based tool.</p>
+
+<h2 id="veltrix">veltrix &mdash; operator CLI</h2>
+<p>The primary day-to-day operator tool: cluster health, GC/compaction status, cache and WAL stats, live dashboards, and direct key read/write/delete via the text protocol. Think <code>redis-cli</code> merged with <code>kubectl top</code>.</p>
+
+<pre class="code-block"><code>go build -o veltrix ./cmd/veltrix</code></pre>
+
+<h3>Global flags</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>--addr</code></td><td><code>127.0.0.1:2112</code></td><td>Admin/metrics HTTP address.</td></tr>
+<tr><td><code>--tcp</code></td><td><code>127.0.0.1:9000</code></td><td>TCP data address (text protocol).</td></tr>
+<tr><td><code>--watch</code></td><td><code>0</code></td><td>Refresh interval in seconds for status/compaction/etc.; <code>0</code> runs once.</td></tr>
+<tr><td><code>--json</code></td><td><code>false</code></td><td>Print raw JSON instead of formatted tables.</td></tr>
+<tr><td><code>--no-color</code></td><td><code>false</code></td><td>Disable ANSI colors (auto-disabled when stdout is not a TTY).</td></tr>
+<tr><td><code>--prefix</code></td><td><em>(empty)</em></td><td>Key prefix filter, used by <code>cdc-tail</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Subcommands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Subcommand</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>status</code></td><td>Full node health + ops summary: health/readiness, index size, cache, WAL, CDC, per-disk VLog table, admission-control state.</td></tr>
+<tr><td><code>nodes</code></td><td>Cluster topology table &mdash; role (leader/follower), Raft term, health, address, replication lag. Backed by <code>/admin/cluster</code>.</td></tr>
+<tr><td><code>compaction</code> (alias <code>gc</code>)</td><td>Per-disk VLog GC status: size, live/dead bytes, GC ratio (color-coded), GC run counters, admission-control thresholds.</td></tr>
+<tr><td><code>replication</code> (alias <code>repl</code>)</td><td>Per-replica state, consistency level, lag, ACK watermark.</td></tr>
+<tr><td><code>cache</code></td><td>LIRS cache hit rate, fill bar, evictions, hot-key list.</td></tr>
+<tr><td><code>wal</code></td><td>WAL bytes written, entry count, flush count, average batch size.</td></tr>
+<tr><td><code>quotas</code> (alias <code>quota</code>)</td><td>Per-namespace quota usage table. Backed by <code>/admin/quotas</code>.</td></tr>
+<tr><td><code>cdc</code></td><td>CDC broker stats: events broadcast, dropped, active subscribers.</td></tr>
+<tr><td><code>cdc-tail</code></td><td>Streams live CDC events to stdout (Ctrl+C to stop). Supports <code>--prefix</code>.</td></tr>
+<tr><td><code>scrubber</code></td><td>Data-integrity scrubber status: records scanned, corruption count.</td></tr>
+<tr><td><code>metrics [filter]</code></td><td>Raw Prometheus metrics, optionally grep-filtered by substring.</td></tr>
+<tr><td><code>traces</code></td><td>Recent OTel spans (slow ops and errors) from the in-process ring buffer.</td></tr>
+<tr><td><code>top</code></td><td>Live full-screen dashboard, refreshing every <code>--watch</code> seconds (default 2 if <code>--watch</code> is unset for this subcommand).</td></tr>
+<tr><td><code>ping</code></td><td>Round-trip latency check &mdash; 5 TCP <code>PING</code>s plus one HTTP <code>/healthz</code> check.</td></tr>
+<tr><td><code>put KEY VALUE</code></td><td>Write a key via the text protocol.</td></tr>
+<tr><td><code>get KEY</code></td><td>Read a key via the text protocol.</td></tr>
+<tr><td><code>del KEY</code></td><td>Delete a key via the text protocol.</td></tr>
+<tr><td><code>checkpoint</code></td><td>Force a WAL checkpoint on all disks. Calls <code>POST /admin/checkpoint</code>.</td></tr>
+<tr><td><code>backup DEST_DIR</code></td><td>Trigger a full backup to <code>DEST_DIR</code> on the server host. Calls <code>POST /admin/backup</code>.</td></tr>
+<tr><td><code>version</code></td><td>Print engine schema version + encryption status.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Examples</h3>
+<pre class="code-block"><code>veltrix status
+veltrix top --watch 2
+veltrix compaction --watch 5
+veltrix cdc-tail --prefix orders/
+veltrix metrics vlog_gc
+veltrix put mykey "hello world"
+veltrix get mykey
+veltrix backup /mnt/backup/2026-07-05
+veltrix checkpoint
+veltrix --addr 10.0.0.5:2112 status</code></pre>
+
+<h2 id="veltrixdb-backup">veltrixdb-backup &mdash; backup and restore tool</h2>
+<p>Offline/online backup and restore, including point-in-time recovery (PITR) and direct cloud upload/download to S3, GCS, or Azure. The engine must be <strong>stopped</strong> before <code>restore</code> or <code>restore-pitr</code>; full and incremental backups are safe to run against a live engine.</p>
+
+<pre class="code-block"><code>go build -o veltrixdb-backup ./cmd/backup</code></pre>
+
+<h3>Local backup subcommands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Subcommand</th><th>Key flags</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>full</code></td><td><code>--data-dirs</code> (required), <code>--dest</code> (required), <code>--cache-mb</code> (default 64)</td><td>Create a full backup. Engine can be running.</td></tr>
+<tr><td><code>incremental</code></td><td><code>--data-dirs</code>, <code>--dest</code>, <code>--base</code> (all required), <code>--cache-mb</code></td><td>Create an incremental backup relative to a base backup's manifest.</td></tr>
+<tr><td><code>restore</code></td><td><code>--chain</code>, <code>--data-dirs</code> (both required)</td><td>Restore from a comma-separated backup chain (oldest first). Engine must be stopped.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Point-in-time recovery subcommands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Subcommand</th><th>Key flags</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>archive-status</code></td><td><code>--archive</code> (required)</td><td>Show WAL-archive segments, version range, and time coverage per disk.</td></tr>
+<tr><td><code>restore-pitr</code></td><td><code>--base-backup</code>, <code>--archive</code>, <code>--until</code>, <code>--data</code> (all required)</td><td>Restore a full base backup plus archived WAL up to an exact <code>version:N</code> or RFC3339 timestamp. Target data dirs must be fresh/empty.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Cloud subcommands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Subcommand</th><th>Key flags</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>upload</code></td><td><code>--src</code>, <code>--provider</code>, <code>--bucket</code>, plus provider auth flags</td><td>Upload a local backup directory to S3 / GCS / Azure.</td></tr>
+<tr><td><code>download</code></td><td><code>--cloud-path</code>, <code>--dest</code>, <code>--provider</code>, <code>--bucket</code></td><td>Download a cloud backup to a local directory.</td></tr>
+<tr><td><code>list-cloud</code></td><td><code>--provider</code>, <code>--bucket</code></td><td>List all backups stored in cloud storage.</td></tr>
+<tr><td><code>full-cloud</code></td><td><code>--data-dirs</code>, <code>--provider</code>, <code>--bucket</code>, <code>--cache-mb</code></td><td>Full local backup + upload to cloud in one step.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Shared cloud flags (from <code>cloudFlags</code>): <code>--provider</code> (<code>s3</code>|<code>gcs</code>|<code>azure</code>), <code>--bucket</code>, <code>--prefix</code> (default <code>veltrixdb-backups</code>), and provider-specific credentials: <code>--region</code>/<code>--aws-access-key</code>/<code>--aws-secret-key</code> for S3, <code>--gcs-token</code>/<code>--gcs-cred-file</code> for GCS, <code>--azure-account</code>/<code>--azure-key</code> for Azure. Each credential flag can instead be supplied via environment variable: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_SESSION_TOKEN</code>, <code>GOOGLE_APPLICATION_CREDENTIALS</code>, <code>GCS_ACCESS_TOKEN</code>, <code>AZURE_STORAGE_ACCOUNT</code>, <code>AZURE_STORAGE_KEY</code>, <code>AZURE_STORAGE_CONTAINER</code>.
+
+<h3>Examples</h3>
+<pre class="code-block"><code># Full local backup of a single-disk server
+veltrixdb-backup full --data-dirs=/data --dest=/backup/full-2026-07-05
+
+# Upload a local backup to S3
+veltrixdb-backup upload \
+    --src=/backup/full-2026-07-05 \
+    --provider=s3 --bucket=my-veltrix-backups --region=us-east-1
+
+# Full backup straight to GCS in one step
+veltrixdb-backup full-cloud \
+    --data-dirs=/data \
+    --provider=gcs --bucket=my-bucket --gcs-cred-file=/sa.json
+
+# Restore (engine must be stopped)
+veltrixdb-backup restore --chain=/backup/full,/backup/inc1 --data-dirs=/data-new
+
+# Inspect the PITR WAL archive
+veltrixdb-backup archive-status --archive=/backup/wal-archive
+
+# Point-in-time restore to an exact moment
+veltrixdb-backup restore-pitr \
+    --base-backup=/backup/full-2026-07-05 \
+    --archive=/backup/wal-archive \
+    --until=2026-07-05T14:30:00Z \
+    --data=/data-new
+# ...or exact to a single write:  --until=version:123456</code></pre>
+
+<p>See <a class="inline-link" href="../operations/backup-and-restore.html">Backup &amp; Restore</a> for the full disaster-recovery workflow.</p>
+
+<h2 id="veltrix-admin">veltrix-admin &mdash; low-level administrative CLI</h2>
+<p>A separate, lower-level admin tool (<code>cmd/admin</code>) for offline VLog integrity checks and direct text-protocol operations that don't go through the HTTP admin API.</p>
+
+<pre class="code-block"><code>go build -o veltrix-admin ./cmd/admin</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Subcommand</th><th>Key flags</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>scan</code></td><td><code>--addr</code>, <code>--user</code>, <code>--password</code></td><td>Prints server <code>INFO</code>, then attempts a <code>SCAN</code> over the text protocol (not currently implemented server-side &mdash; falls back to a note pointing at <code>stats</code> or offline <code>check</code>).</td></tr>
+<tr><td><code>stats</code></td><td><code>--addr</code>, <code>--user</code>, <code>--password</code></td><td>Prints the server's <code>INFO</code> response as a formatted key/value table.</td></tr>
+<tr><td><code>compact</code></td><td><code>--addr</code>, <code>--user</code>, <code>--password</code></td><td>Sends a <code>COMPACT</code> text command. <strong>Not currently wired server-side</strong> &mdash; the engine's GC runs automatically every 30s regardless; this subcommand is a documented no-op stub today.</td></tr>
+<tr><td><code>check</code></td><td><code>--data</code> or <code>--data-dirs</code></td><td>Offline CRC32C corruption scan &mdash; walks each disk's <code>vlog_active.dat</code> directly, verifying every record's stored checksum. No running server required.</td></tr>
+<tr><td><code>repair</code></td><td><code>--addr</code>, <code>--key</code>, <code>--user</code>, <code>--password</code></td><td>Tombstones (deletes) a specific key on a running server.</td></tr>
+<tr><td><code>hash-password</code></td><td><code>--user</code>, <code>--password</code></td><td>Generates a SHA-256 password hash and a ready-to-paste JSON snippet for the RBAC <code>--auth-config</code> file.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Examples</h3>
+<pre class="code-block"><code>veltrix-admin scan --addr :9000
+veltrix-admin stats --addr :9000 --user admin --password secret
+veltrix-admin check --data-dirs /mnt/nvme0,/mnt/nvme1
+veltrix-admin repair --addr :9000 --key corrupt-key-001 --user admin --password secret
+veltrix-admin hash-password --user alice --password secret</code></pre>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">veltrix vs. veltrix-admin</span> These are two distinct binaries. <code>veltrix</code> (<code>cmd/veltrix</code>) is the modern, richly-formatted operator CLI covered above and is the one referenced by the top-level README. <code>veltrix-admin</code> (<code>cmd/admin</code>) is an older, lower-level tool focused on offline VLog integrity checks and RBAC password hashing.</span>
+</div>
+
+<h2 id="veltrix-migrate">veltrix-migrate &mdash; bulk data movement</h2>
+<p>Exports keys to JSONL, imports JSONL into a cluster, or copies directly between two clusters, using only the binary protocol plus <code>/admin/stats</code> for progress reporting.</p>
+
+<pre class="code-block"><code>go build -o veltrix-migrate ./cmd/veltrix-migrate</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Mode</th><th>Flags</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>export</code></td><td><code>--src</code> (required), <code>--src-admin</code>, <code>--prefix</code>, <code>--progress-every</code></td><td>Reads every key from a cluster and emits JSONL (<code>{"k": "...", "v": "&lt;base64&gt;"}</code>) to stdout.</td></tr>
+<tr><td><code>import</code></td><td><code>--dst</code> (required), <code>--progress-every</code></td><td>Reads JSONL from stdin and <code>PUT</code>s each entry into the target cluster. Idempotent.</td></tr>
+<tr><td><code>migrate</code></td><td><code>--src</code>, <code>--dst</code> (both required), <code>--prefix</code>, <code>--progress-every</code></td><td>Combines export + import in one pass, copying directly from <code>--src</code> to <code>--dst</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>veltrix-migrate export --src 127.0.0.1:9000 --prefix orders/ > out.jsonl
+veltrix-migrate import --dst replica:9000 < out.jsonl
+veltrix-migrate migrate --src primary:9000 --dst replica:9000 --prefix orders/</code></pre>
+
+<div class="callout limitation">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Key enumeration is a known gap</span> Per an explicit <code>PRODUCTION GAP</code> comment in the source, there is no <code>/admin/scan-keys</code> endpoint yet, so <code>listKeys()</code> cannot actually enumerate keys from <code>/admin/stats</code> alone &mdash; it returns an empty list on stock builds. <code>export</code> and <code>migrate</code> are effectively non-functional for full-keyspace enumeration until that endpoint lands; <code>import</code> (reading pre-staged JSONL from stdin) works today.</span>
+</div>
+
+<h2 id="veltrix-chaos">veltrix-chaos &mdash; chaos-engineering harness</h2>
+<p>Inflicts controlled failures on running processes or Kubernetes pods to verify resilience claims: process kills, pause/resume (simulating GC pauses), network loss/delay, clock skew, and randomized soak testing.</p>
+
+<pre class="code-block"><code>go build -o veltrix-chaos ./cmd/veltrix-chaos</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Usage</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>kill</code></td><td><code>kill TARGET</code></td><td>SIGKILL the target (process or pod).</td></tr>
+<tr><td><code>pause</code></td><td><code>pause TARGET DURATION</code></td><td>SIGSTOP the target, sleep for <code>DURATION</code> (e.g. <code>5s</code>), then SIGCONT. Local targets only.</td></tr>
+<tr><td><code>network</code></td><td><code>network drop|delay TARGET PCT_OR_MS</code></td><td>Injects packet loss or delay via <code>tc</code>/<code>iptables</code>. Kubernetes targets only.</td></tr>
+<tr><td><code>slow-disk</code></td><td><code>slow-disk TARGET DURATION</code></td><td>Intended to inject artificial <code>fdatasync</code> delay via charybdefs. <strong>Currently a placeholder</strong> &mdash; warns if charybdefs isn't on <code>PATH</code> and performs no real fault injection.</td></tr>
+<tr><td><code>clock-skew</code></td><td><code>clock-skew TARGET &plusmn;SECONDS</code></td><td>Adjusts the system clock on a Kubernetes pod by the given signed seconds (requires <code>SYS_TIME</code>).</td></tr>
+<tr><td><code>soak</code></td><td><code>soak TARGET DURATION</code></td><td>Applies randomized faults (currently just <code>pause</code>) at random intervals across the given duration window.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Target descriptor syntax: <code>pid:NUMBER</code> (local process by PID), <code>process:NAME</code> (local process by exec name, first match via <code>pgrep -f</code>), or <code>k8s:NAMESPACE/POD</code> (Kubernetes pod, operated on via <code>kubectl</code>).</p>
+
+<pre class="code-block"><code>veltrix-chaos kill process:veltrixdb
+veltrix-chaos pause pid:4821 5s
+veltrix-chaos network drop k8s:veltrixdb/veltrixdb-0 10
+veltrix-chaos clock-skew k8s:veltrixdb/veltrixdb-1 +30
+veltrix-chaos soak k8s:veltrixdb/veltrixdb-0 10m</code></pre>
+
+<p>All faults assume root or <code>CAP_SYS_ADMIN</code> on the target host. Compared to Jepsen, the source notes this trades formal rigor for zero JVM/Clojure dependency and trivial embedding in Go test suites via <code>Inflict(...)</code>.</p>
+
+<h2 id="loadtest">loadtest &mdash; concurrent load generator</h2>
+<p>A read/write load tester supporting single-op and batched (MPut/MGet) modes, with live throughput reporting and P50&ndash;P99.9 latency percentiles.</p>
+
+<pre class="code-block"><code>go run ./cmd/loadtest [flags]</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>--addr</code></td><td><code>127.0.0.1:9000</code></td><td>VeltrixDB TCP address.</td></tr>
+<tr><td><code>--mode</code></td><td><code>mixed</code></td><td>Workload mode: <code>write</code> | <code>read</code> | <code>mixed</code>.</td></tr>
+<tr><td><code>--concurrency</code></td><td><code>50</code></td><td>Number of parallel worker goroutines.</td></tr>
+<tr><td><code>--duration</code></td><td><code>30</code></td><td>Test duration in seconds.</td></tr>
+<tr><td><code>--warmup</code></td><td><code>5</code></td><td>Warmup seconds before recording stats (write-only warmup phase).</td></tr>
+<tr><td><code>--num-keys</code></td><td><code>1000000</code></td><td>Keyspace size (<code>key:0</code> … <code>key:N-1</code>).</td></tr>
+<tr><td><code>--value-size</code></td><td><code>64</code></td><td>Value payload size in bytes.</td></tr>
+<tr><td><code>--read-ratio</code></td><td><code>0.7</code></td><td>Fraction of reads in <code>mixed</code> mode.</td></tr>
+<tr><td><code>--dial-timeout</code></td><td><code>5</code></td><td>TCP dial timeout in seconds.</td></tr>
+<tr><td><code>--report-every</code></td><td><code>1</code></td><td>Live stats interval in seconds.</td></tr>
+<tr><td><code>--safe-reads</code></td><td><code>false</code></td><td>Only read keys that have already been written (eliminates not-found errors during mixed ingestion).</td></tr>
+<tr><td><code>--key-offset</code></td><td><code>0</code></td><td>Start key index offset, for continuing a previous run without overlap.</td></tr>
+<tr><td><code>--batch-size</code></td><td><code>1</code></td><td>Entries per MPut/MGet batch. Values &gt;1 switch to the batched code path, engaging server-side block packing (up to ~25&times; disk density gain for tiny values). Latency is reported per-batch; per-key amortized = batch-P99 / batch-size.</td></tr>
+<tr><td><code>--log-errors</code></td><td><code>5</code></td><td>Log the first N distinct errors per worker to stderr. <code>0</code> = silent.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Examples</h3>
+<pre class="code-block"><code># 30-second mixed 70% reads / 30% writes, 64 workers, 1M keyspace
+go run ./cmd/loadtest --mode=mixed --read-ratio=0.7 --concurrency=64 --duration=30
+
+# Write-only warmup then read-only benchmark
+go run ./cmd/loadtest --mode=write --duration=10
+go run ./cmd/loadtest --mode=read  --duration=30
+
+# Batched writes via MPut-1024 (engages block packing)
+go run ./cmd/loadtest --mode=write --batch-size=1024 \
+                      --concurrency=8 --duration=30 --value-size=128
+
+# Batched reads via MGet-256
+go run ./cmd/loadtest --mode=read --batch-size=256 \
+                      --concurrency=64 --duration=30</code></pre>
+
+<h2 id="kubectl-veltrix">kubectl-veltrix &mdash; kubectl plugin</h2>
+<p>A dependency-free <code>kubectl</code> plugin that resolves a VeltrixDB pod by label selector, opens a <code>kubectl port-forward</code> to its admin port, and hits the HTTP admin API on localhost. No client-go or cobra dependency &mdash; it shells out to <code>kubectl</code> directly so auth and kubeconfig behavior always match the operator's normal workflow.</p>
+
+<pre class="code-block"><code>go build -o kubectl-veltrix ./cmd/kubectl-veltrix
+# install: place the binary on PATH; kubectl auto-discovers it by the
+# kubectl-PLUGIN naming convention.</code></pre>
+
+<h3>Flags</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>--namespace</code>, <code>-n</code></td><td><code>veltrixdb</code></td><td>Kubernetes namespace.</td></tr>
+<tr><td><code>--label-selector</code>, <code>-l</code></td><td><code>app.kubernetes.io/name=veltrixdb</code></td><td>Pod selector.</td></tr>
+<tr><td><code>--admin-port</code></td><td><code>2112</code></td><td>Admin HTTP port on the pod.</td></tr>
+<tr><td><code>--prefix</code></td><td><em>(empty)</em></td><td>Key prefix filter for <code>cdc-tail</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Commands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Backing endpoint</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>stats</code></td><td><code>GET /admin/stats</code></td><td>Print engine stats from the first matching pod.</td></tr>
+<tr><td><code>gc-status</code></td><td><code>GET /metrics</code> (filtered)</td><td>Print VLog GC + scrubber metric lines.</td></tr>
+<tr><td><code>checkpoint</code></td><td><code>POST /admin/checkpoint</code></td><td>Force a WAL checkpoint.</td></tr>
+<tr><td><code>migrate</code></td><td><code>POST /admin/migrate</code></td><td>Run schema migrations.</td></tr>
+<tr><td><code>quotas</code></td><td><code>GET /admin/quotas</code></td><td>List per-namespace quotas.</td></tr>
+<tr><td><code>quota-set NS WPS MAX</code></td><td><code>POST /admin/quotas</code></td><td>Set <code>writes_per_sec=WPS</code>, <code>max_keys=MAX</code> for namespace <code>NS</code>.</td></tr>
+<tr><td><code>cdc-tail [--prefix=]</code></td><td><code>GET /admin/cdc</code></td><td>Stream CDC events to stdout until interrupted.</td></tr>
+<tr><td><code>version</code></td><td><code>GET /admin/version</code></td><td>Print engine + schema version.</td></tr>
+</tbody>
+</table>
+</div>
+
+<pre class="code-block"><code>kubectl veltrix stats
+kubectl veltrix gc-status
+kubectl veltrix quota-set tenant_42 5000 1000000
+kubectl veltrix cdc tail --prefix orders/
+kubectl veltrix -n veltrixdb-prod -l app.kubernetes.io/name=veltrixdb stats</code></pre>
+
+<div class="callout limitation">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">backup subcommand not implemented</span> The plugin's usage banner lists <code>kubectl veltrix backup s3://...</code> as a one-shot backup command, but it is marked <code>TODO</code> in source and not wired into the command switch &mdash; only <code>stats</code>, <code>gc-status</code>, <code>checkpoint</code>, <code>migrate</code>, <code>quotas</code>, <code>quota-set</code>, <code>cdc-tail</code>, and <code>version</code> are functional today.</span>
+</div>
+
+<h2 id="repl-ship">repl-ship &mdash; cross-region replication shipper</h2>
+<p>Tails a local server's <code>/admin/cdc</code> stream and forwards each event to a remote VeltrixDB cluster's binary protocol &mdash; <code>PUT</code> events become a remote <code>MultiPut</code>, <code>DEL</code> events become a remote delete. Designed for asynchronous, eventually-consistent geo-replication, with exponential-backoff retries and a deadletter file for permanent failures.</p>
+
+<pre class="code-block"><code>go build -o repl-ship ./cmd/repl-ship
+
+repl-ship --src http://primary:2112 \
+          --src-token "$VELTRIX_ADMIN_TOKEN" \
+          --dst-tcp replica.us-east:9000 \
+          --batch 64 \
+          --checkpoint /var/lib/repl-ship/ckpt</code></pre>
+
+<div class="callout limitation">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Asynchronous by design</span> With <code>--checkpoint</code> (v1.1.0), a restarted shipper replays exactly the delta it missed via the durable <code>/admin/changes</code> feed &mdash; shipper downtime no longer loses events. The remaining limits: replication is async (writes committed at the source but not yet shipped are lost if the source region dies), conflict resolution is last-write-wins only, and there is no back-pressure signal to the source when the destination is degraded.</span>
+</div>
+
+<h2 id="admin-tool">admin (cmd/admin)</h2>
+<p>This is the same binary documented above as <a class="inline-link" href="#veltrix-admin"><code>veltrix-admin</code></a> &mdash; its source lives at <code>cmd/admin/main.go</code> and it is conventionally built with the output name <code>veltrix-admin</code>. See that section for its full subcommand table.</p>
+
+<h2 id="tool-index">Tool index</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Binary</th><th>Source directory</th><th>One-line purpose</th></tr></thead>
+<tbody>
+<tr><td><code>veltrix</code></td><td><code>cmd/veltrix</code></td><td>Primary operator CLI &mdash; status, compaction, nodes, top, put/get/del, backup.</td></tr>
+<tr><td><code>veltrixdb-backup</code></td><td><code>cmd/backup</code></td><td>Full/incremental backup, restore, PITR, and cloud upload/download.</td></tr>
+<tr><td><code>veltrix-admin</code></td><td><code>cmd/admin</code></td><td>Offline VLog integrity checks and low-level text-protocol admin.</td></tr>
+<tr><td><code>veltrix-migrate</code></td><td><code>cmd/veltrix-migrate</code></td><td>Bulk export/import/migrate of keys between clusters via JSONL.</td></tr>
+<tr><td><code>veltrix-chaos</code></td><td><code>cmd/veltrix-chaos</code></td><td>Chaos-engineering fault injection (kill, pause, network, clock-skew, soak).</td></tr>
+<tr><td><code>loadtest</code></td><td><code>cmd/loadtest</code></td><td>Concurrent read/write load generator with latency percentiles.</td></tr>
+<tr><td><code>kubectl-veltrix</code></td><td><code>cmd/kubectl-veltrix</code></td><td>kubectl plugin wrapping the admin HTTP API via port-forward.</td></tr>
+<tr><td><code>repl-ship</code></td><td><code>cmd/repl-ship</code></td><td>Cross-region CDC-based replication shipper.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card-grid">
+<a class="card" href="admin-api.html"><div class="card-title">Admin API Reference →</div><div class="card-desc">Every HTTP endpoint these CLIs call under the hood.</div></a>
+<a class="card" href="server-configuration.html"><div class="card-title">Server Configuration Reference →</div><div class="card-desc">The veltrixdb server flags these tools connect to.</div></a>
+<a class="card" href="../operations/backup-and-restore.html"><div class="card-title">Backup & Restore →</div><div class="card-desc">Full disaster-recovery workflow using veltrixdb-backup.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../reference/admin-api.html"><span class="dir">&larr; Previous</span><span>Admin API</span></a>
+<a class="next" href="../kubernetes/operator.html"><span class="dir">Next &rarr;</span><span>Kubernetes Operator</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

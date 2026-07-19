@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VeltrixDB vs. Redis — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: VeltrixDB vs. Redis" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="active">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Resources<span class="sep">/</span>VeltrixDB vs Redis</div>
+    <h1>VeltrixDB vs. Redis</h1>
+<p class="page-lede">An honest comparison. Redis is excellent software with a massive ecosystem — VeltrixDB solves a different set of problems. Use this page to decide which one fits your workload.</p>
+
+<h2 id="fundamental-difference">The fundamental difference</h2>
+<p><strong>Redis</strong> stores everything in RAM. It is fast by default, expensive at scale, and subject to GC pause spikes under write pressure.</p>
+<p><strong>VeltrixDB</strong> stores values on NVMe SSDs behind a DRAM index and an LIRS cache. It targets predictable P99 latency under sustained load, roughly 25&times; storage density versus an all-RAM layout, and a garbage collector that cannot be permanently paused.</p>
+
+<h2 id="latency-at-a-glance">Latency at a glance</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Percentile</th><th>Redis (cache hit)</th><th>VeltrixDB (cache hit)</th><th>VeltrixDB (NVMe miss)</th></tr></thead>
+<tbody>
+<tr><td>P50 read</td><td>~100 &micro;s (network)</td><td>~220 ns</td><td>~400 &micro;s</td></tr>
+<tr><td>P99 read</td><td>~1&ndash;50 ms (GC spikes)</td><td>~510 &micro;s</td><td>~1 ms</td></tr>
+<tr><td>P50 write</td><td>~200 &micro;s</td><td>~17 &micro;s per key</td><td>&mdash;</td></tr>
+<tr><td>P99 write</td><td>spikes during compaction</td><td>~42 &micro;s (stable)</td><td>&mdash;</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Source of these numbers</span> Redis P99 figures are from production reports under mixed read/write load with AOF enabled. VeltrixDB figures are from a 30-minute sustained 80R/20W benchmark on GKE <code>n2-highmem-64</code> (8&times; NVMe). See <a class="inline-link" href="benchmarking.html">Benchmarking Methodology</a> for the full harness.</span></div>
+<p>The key difference is the <strong>shape</strong> of P99 over time. Redis P99 is low until it isn&rsquo;t. VeltrixDB P99 does not drift &mdash; the three-tier GC and RT-priority NVMe queue enforce a ceiling.</p>
+
+<h2 id="storage-cost">Storage cost at scale</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Keys</th><th>Value size</th><th>Redis RAM</th><th>VeltrixDB NVMe</th></tr></thead>
+<tbody>
+<tr><td>10M</td><td>128 B</td><td>~2.5 GB RAM</td><td>~1.5 GB NVMe</td></tr>
+<tr><td>100M</td><td>128 B</td><td>~25 GB RAM</td><td>~15 GB NVMe</td></tr>
+<tr><td>1B</td><td>128 B</td><td>~250 GB RAM</td><td>~160 GB NVMe</td></tr>
+</tbody>
+</table>
+</div>
+<p>RAM costs roughly 15&ndash;20&times; more per GB than NVMe SSD in cloud pricing. At 1 billion keys with 128-byte values:</p>
+<ul>
+<li>Redis: ~$3,000&ndash;5,000/month for the memory (<code>r6g.16xlarge</code>-class territory)</li>
+<li>VeltrixDB: ~$300&ndash;500/month for NVMe (<code>n2-highmem-64</code> local SSD, 3 nodes)</li>
+</ul>
+
+<h2 id="write-amplification">Write amplification</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Engine</th><th>Write amplification</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Redis (AOF rewrite)</td><td>2&ndash;5&times;</td><td>AOF rewrite rewrites the full dataset</td></tr>
+<tr><td>RocksDB / LevelDB</td><td>10&ndash;30&times;</td><td>LSM compaction sorts and rewrites</td></tr>
+<tr><td><strong>VeltrixDB</strong></td><td><strong>~1.0&times;</strong></td><td>Values append once to the Value Log, never rewritten</td></tr>
+</tbody>
+</table>
+</div>
+<p>Write amplification maps directly to SSD wear and write latency. At 1.0&times;, every byte lands on NVMe exactly once.</p>
+
+<h2 id="when-redis-wins">When Redis wins</h2>
+<p>Use Redis when:</p>
+<ul>
+<li><strong>Your full dataset fits comfortably in RAM</strong> &mdash; at, say, 5M keys and 256 bytes each, Redis&rsquo;s DRAM-only path beats any disk-backed system at P50.</li>
+<li><strong>You need pub/sub, streams, sorted sets, or Lua scripting</strong> &mdash; Redis has a rich data-structure model; VeltrixDB is a key-value store.</li>
+<li><strong>Your team already runs Redis</strong> &mdash; operational familiarity has real value.</li>
+<li><strong>You need a managed hosted service today</strong> &mdash; Redis Cloud, ElastiCache, and Upstash all exist. VeltrixDB&rsquo;s managed offering is not yet available.</li>
+</ul>
+
+<h2 id="when-veltrixdb-wins">When VeltrixDB wins</h2>
+<p>Use VeltrixDB when:</p>
+<ul>
+<li><strong>Your dataset doesn&rsquo;t fit in RAM</strong> &mdash; or fitting it in RAM costs more than you want to pay. VeltrixDB&rsquo;s LIRS cache keeps hot keys in DRAM; cold keys spill to NVMe automatically.</li>
+<li><strong>You need predictable P99 under sustained write pressure</strong> &mdash; if production dashboards show Redis P99 spikes during AOF rewrite or keyspace expiry, VeltrixDB&rsquo;s three-tier GC is built for exactly this problem.</li>
+<li><strong>You&rsquo;re doing bulk writes at high concurrency</strong> &mdash; <code>MultiPut</code> with 1024-entry batches reaches ~446K batch ops/s per node, while Redis pipelining is bounded by single-threaded command processing.</li>
+<li><strong>You&rsquo;re running on Kubernetes with local NVMe</strong> &mdash; VeltrixDB ships a first-class Kubernetes Operator, Helm chart, and GKE local-SSD auto-detection.</li>
+<li><strong>Write amplification matters</strong> &mdash; if you&rsquo;re running on cloud SSDs and watching disk wear, 1.0&times; versus 10&ndash;30&times; is the difference between replacing SSDs yearly versus every few months.</li>
+</ul>
+
+<h2 id="migrating-from-redis">Migrating from Redis</h2>
+<p>VeltrixDB uses a simple text protocol compatible with <code>nc</code>:</p>
+<pre class="code-block"><code># Redis
+redis-cli SET mykey myvalue
+redis-cli GET mykey
+
+# VeltrixDB (same semantics)
+echo -e "PUT mykey myvalue\nGET mykey" | nc localhost 9000</code></pre>
+<p>For SDK migration, swap the client:</p>
+<pre class="code-block"><code># Before (redis-py)
+import redis
+r = redis.Redis(host='localhost', port=6379)
+r.set('key', 'value')
+val = r.get('key')
+
+# After (veltrixdb-python)
+import veltrixdb
+r = veltrixdb.Client(host='localhost', port=9000)
+r.put('key', 'value')
+val = r.get('key')</code></pre>
+<p>The API surface is intentionally close. <code>PUT</code>/<code>GET</code>/<code>DEL</code> map directly to <code>SET</code>/<code>GET</code>/<code>DEL</code>. <code>MultiPut</code>/<code>MultiGet</code> map to Redis pipelines. <code>SETNX</code>, <code>INCR</code>, <code>DECR</code>, and <code>CAS</code> are all supported.</p>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Roadmap</span> Redis protocol compatibility (RESP) is on the roadmap. Once available, zero code changes will be required &mdash; only a connection-string update. See <a class="inline-link" href="limitations-and-roadmap.html">Limitations &amp; Roadmap</a>.</span></div>
+
+<h2 id="feature-matrix">Feature matrix</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Feature</th><th>Redis</th><th>VeltrixDB</th></tr></thead>
+<tbody>
+<tr><td>In-memory speed (P50)</td><td><span class="badge good">~100 &micro;s</span></td><td><span class="badge good">~220 ns</span></td></tr>
+<tr><td>Predictable P99 under writes</td><td><span class="badge warn">spikes</span></td><td><span class="badge good">bounded</span></td></tr>
+<tr><td>NVMe storage tier</td><td><span class="badge red">no</span></td><td><span class="badge good">yes</span></td></tr>
+<tr><td>Write amplification</td><td><span class="badge warn">2&ndash;30&times;</span></td><td><span class="badge good">~1.0&times;</span></td></tr>
+<tr><td>Pub/Sub</td><td><span class="badge good">yes</span></td><td><span class="badge red">no</span></td></tr>
+<tr><td>Sorted sets</td><td><span class="badge good">yes</span></td><td><span class="badge red">no</span></td></tr>
+<tr><td>Lua scripting</td><td><span class="badge good">yes</span></td><td><span class="badge red">no</span></td></tr>
+<tr><td>Kubernetes Operator</td><td><span class="badge warn">third-party</span></td><td><span class="badge good">first-class</span></td></tr>
+<tr><td>Prometheus metrics</td><td><span class="badge good">yes</span></td><td><span class="badge good">yes</span></td></tr>
+<tr><td>Encryption at rest</td><td><span class="badge good">yes</span></td><td><span class="badge good">yes (AES-256-GCM)</span></td></tr>
+<tr><td>Multi-node replication</td><td><span class="badge good">yes</span></td><td><span class="badge good">yes (async/quorum/strong)</span></td></tr>
+<tr><td>Change data capture</td><td><span class="badge red">no built-in</span></td><td><span class="badge good">yes</span></td></tr>
+<tr><td>Atomic CAS / INCR</td><td><span class="badge good">yes</span></td><td><span class="badge good">yes</span></td></tr>
+<tr><td>SDKs (Go/Python/Node/Rust/C++)</td><td><span class="badge good">yes</span></td><td><span class="badge good">yes</span></td></tr>
+<tr><td>RESP protocol</td><td><span class="badge good">yes</span></td><td><span class="badge warn">roadmap</span></td></tr>
+<tr><td>Managed cloud offering</td><td><span class="badge good">yes</span></td><td><span class="badge warn">roadmap</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="benchmark-reference">Benchmark reference</h2>
+<p>All VeltrixDB numbers below are from a 3-node GKE cluster (<code>n2-highmem-64</code>, 8&times;375 GB NVMe per node, raw block device VLog, Linux 6.6, <code>--read-heavy</code> preset).</p>
+<pre class="code-block"><code>3-node cluster &middot; 80R/20W &middot; 1 billion keys (internal run — unverified;
+see the YCSB numbers for measured, reproducible results)
+
+Reads/s:         7,200,000
+Writes/s:        1,800,000
+P50 (blended):   ~220 ns
+P99 (blended):   ~510 &micro;s
+GC emergency:    0 events in 30 min
+Errors:          0</code></pre>
+<p>Full benchmark methodology: <a class="inline-link" href="benchmarking.html">Benchmarking Methodology</a>.</p>
+
+<h2 id="questions">Questions?</h2>
+<p>Open an issue on GitHub or start a discussion. If you&rsquo;re evaluating VeltrixDB for a production workload and want to talk through your specific requirements, the team is happy to help you benchmark against your actual data shape. See the <a class="inline-link" href="faq.html">FAQ</a> for common questions.</p>
+
+<div class="card-grid">
+<a class="card" href="benchmarking.html"><div class="card-title">Benchmarking Methodology &rarr;</div><div class="card-desc">The harness, hardware spec, and pass/fail gates behind these numbers.</div></a>
+<a class="card" href="limitations-and-roadmap.html"><div class="card-title">Limitations &amp; Roadmap &rarr;</div><div class="card-desc">Honest gaps, including RESP compatibility and managed cloud status.</div></a>
+<a class="card" href="../concepts/deployment-modes.html"><div class="card-title">Deployment Modes &rarr;</div><div class="card-desc">Standalone, raft, and replicated consistency models.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../kubernetes/helm-chart.html"><span class="dir">&larr; Previous</span><span>Helm Chart</span></a>
+<a class="next" href="../resources/benchmarking.html"><span class="dir">Next &rarr;</span><span>Benchmarking Methodology</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

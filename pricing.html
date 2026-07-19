@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pricing - VeltrixDB</title>
+<meta name="description" content="Predictable cluster pricing with a cost calculator against DynamoDB-class per-request billing." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="product.html">Product</a>
+      <a href="performance.html">Performance</a>
+      <a href="pricing.html" class="active">Pricing</a>
+      <a href="faq.html">FAQ</a>
+      <a href="docs/index.html">Documentation</a>
+    </div>
+    <div class="nav-cta">
+      <a class="nav-gh" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener" aria-label="VeltrixDB on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
+      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">&#8599;</span></a>
+      <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="product.html">Product</a>
+    <a href="performance.html">Performance</a>
+    <a href="pricing.html" class="active">Pricing</a>
+    <a href="faq.html">FAQ</a>
+    <a href="docs/index.html">Documentation</a>
+    <a class="mm-cta" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo &#8599;</a>
+  </div>
+</nav>
+
+
+<!-- ============ PRICING ============ -->
+<section id="pricing">
+  <div class="wrap">
+    <span class="eyebrow">Pricing</span>
+    <h2 class="sh">Predictable pricing, <span class="em">no surprise bills</span>.</h2>
+    <p class="sh-sub">Fixed per-cluster pricing. No charge per million ops. No egress surprises. Scale your data, not your invoice.</p>
+    <div class="pricing">
+      <div class="price">
+        <span class="tier">Starter</span>
+        <h3>For early-stage teams</h3>
+        <p class="for">Validate sub-5ms reads on your workload before committing.</p>
+        <div class="amt"><span class="v">$499</span><span class="u">/ month</span></div>
+        <ul>
+          <li>3-node cluster, single region</li>
+          <li>Up to 100M keys</li>
+          <li>64 GB cache · 1 TB NVMe per node</li>
+          <li>Community support · 8×5 response</li>
+          <li>50+ Prometheus metrics</li>
+        </ul>
+        <div class="pcta">
+          <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Starter">Start free 14-day trial</a>
+        </div>
+      </div>
+
+      <div class="price featured">
+        <span class="ribbon">Most popular</span>
+        <span class="tier">Growth</span>
+        <h3>For production workloads</h3>
+        <p class="for">Multi-region replication, SOC 2 controls, on-call support.</p>
+        <div class="amt"><span class="v">$2,490</span><span class="u">/ month</span></div>
+        <ul>
+          <li>3-node cluster, multi-region replication</li>
+          <li>Up to 1B keys</li>
+          <li>256 GB cache · 3 TB NVMe per node</li>
+          <li>24×7 priority support · 1h SLA</li>
+          <li>SOC 2 + ISO 27001 controls</li>
+          <li>Custom Grafana dashboards</li>
+        </ul>
+        <div class="pcta">
+          <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Growth">Book a demo <span class="arrow">↗</span></a>
+        </div>
+        <div class="fine">Most teams break even vs DynamoDB in week one</div>
+      </div>
+
+      <div class="price">
+        <span class="tier">Enterprise</span>
+        <h3>For Fortune 500 platforms</h3>
+        <p class="for">Dedicated capacity, custom security review, named TAM.</p>
+        <div class="amt"><span class="v">Custom</span></div>
+        <ul>
+          <li>Unlimited cluster size + global active-active</li>
+          <li>99.99% uptime SLA · contractual</li>
+          <li>Dedicated TAM + solutions architect</li>
+          <li>Custom security review + DPA</li>
+          <li>Bring-your-own-cloud or air-gapped</li>
+          <li>Migration services included</li>
+        </ul>
+        <div class="pcta">
+          <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Enterprise">Talk to sales</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COST CALCULATOR ============ -->
+<section id="calc">
+  <div class="wrap">
+    <span class="eyebrow">Cost calculator</span>
+    <h2 class="sh">Move the slider. <span class="em">Watch the savings</span>.</h2>
+    <p class="sh-sub">Pricing assumes a 70/30 read/write workload. DynamoDB On-Demand is benchmarked at $1.00 per million blended ops (RCUs + WCUs + storage + IO).</p>
+
+    <div class="calc">
+      <div class="calc-head">
+        <div>
+          <h3>How much would your team save <span class="em">per month</span>?</h3>
+          <p>Drag to see the gap. We'll model your exact workload during the demo — these are starter numbers.</p>
+        </div>
+        <div class="calc-savings">
+          You save
+          <span class="v" id="calcSavings">$7,260</span>
+          <span style="font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-4)" id="calcMultiplier">3.6× cheaper</span>
+        </div>
+      </div>
+      <div class="calc-body">
+        <div class="calc-slider-wrap">
+          <div class="calc-slider-label">
+            <span>Monthly operations</span>
+            <b><span id="calcOps">10</span> billion ops/mo</b>
+          </div>
+          <input type="range" class="calc-slider" id="calcSlider" min="1" max="100" step="1" value="10">
+          <div class="calc-ticks"><span>1B</span><span>25B</span><span>50B</span><span>75B</span><span>100B</span></div>
+        </div>
+        <div class="calc-cards">
+          <div class="calc-card">
+            <div class="nm"><span>DynamoDB On-Demand</span><span class="tag">AWS</span></div>
+            <div class="price"><span id="ddbPrice">$10,000</span><span class="u">/ mo</span></div>
+            <div class="breakdown" id="ddbBreakdown">$1.00 / M blended ops · 10B ops → $10,000</div>
+          </div>
+          <div class="calc-card us">
+            <div class="nm"><span>VeltrixDB</span><span class="tag">FIXED</span></div>
+            <div class="price"><span id="vdbPrice">$2,740</span><span class="u">/ mo</span></div>
+            <div class="breakdown" id="vdbBreakdown">Growth tier $2,490 + 5B overflow · same NVMe hardware</div>
+          </div>
+        </div>
+        <div class="calc-foot">
+          <span>Numbers are illustrative · actual quote depends on read/write mix, payload, region.</span>
+          <a href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Cost%20Modeling">Get an exact quote for your workload →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta">
+  <div class="wrap cta-inner">
+    <h2>The slider is generic. <span class="em">Your workload isn't</span>.</h2>
+    <div class="cta-cta">
+      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20TCO%20model">Get a TCO model on your real traffic <span class="arrow">&#8599;</span></a>
+      <a class="btn" href="faq.html">What the bill includes</a>
+    </div>
+    <div class="cta-foot">We model RCU/WCU equivalents from your actual metrics <span class="sep">&middot;</span> No commitment</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="#">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="product.html">Product</a></li>
+          <li><a href="performance.html">Performance</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
+          <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
+          <li><a href="docs/operations/security.html">Security model</a></li>
+          <li><a href="blog-architecture.html">Blog · Architecture</a></li>
+          <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v1.1.0 · build 2026-07-18</div>
+    </div>
+  </div>
+</footer>
+<script defer src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Python Client — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Python Client" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="active">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>Python</div>
+    <h1>Python Client</h1>
+<p class="page-lede">The Python client is a pure standard-library driver (<code>socket</code> and <code>struct</code> only, no third-party dependencies) that speaks the VeltrixDB binary protocol via a single connection or a thread-safe pool.</p>
+
+<h2 id="install">Install</h2>
+<pre class="code-block"><div class="code-label">bash</div><code>pip install veltrixdb</code></pre>
+<p>Requires <strong>Python 3.8+</strong>. No external dependencies.</p>
+
+<h2 id="quick-start">Quick start</h2>
+<pre class="code-block"><div class="code-label">python</div><code>import veltrixdb
+db = veltrixdb.Client(host="localhost", port=9000)
+db.put("user:1001", "alice")
+print(db.get("user:1001"))  # alice</code></pre>
+<p>The library's own example (<code>python/example.py</code>) uses the class directly as a context manager, which is the recommended pattern since it guarantees the socket is closed:</p>
+<pre class="code-block"><div class="code-label">python</div><code>from veltrixdb import VeltrixDBClient
+
+with VeltrixDBClient('127.0.0.1', 9000) as c:
+    c.ping()
+
+    c.put('hello', b'world')
+    val = c.get('hello')
+    print(f"PUT+GET  hello = {val.decode()}")
+
+    c.delete('hello')
+    gone = c.get('hello')
+    print(f"GET after DEL  hello = {gone!r}")  # None</code></pre>
+<p><code>put</code> requires <code>bytes</code> for the value — encode strings yourself (<code>.encode()</code>) before writing.</p>
+
+<h2 id="config">Config</h2>
+<pre class="code-block"><div class="code-label">python</div><code>VeltrixDBClient(
+    host='127.0.0.1',
+    port=9000,
+    timeout=10.0,          # per-operation timeout
+    connect_timeout=5.0,   # connection timeout
+    ssl_context=None,      # None = no TLS
+)</code></pre>
+
+<h2 id="api-surface">API surface</h2>
+<h3>Core key-value</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ping()</code></td><td>Check connection health</td></tr>
+<tr><td><code>put(key, value)</code></td><td>Write a key (<code>value</code> must be <code>bytes</code>)</td></tr>
+<tr><td><code>get(key)</code></td><td>Read a key. Returns <code>None</code> if not found</td></tr>
+<tr><td><code>delete(key)</code></td><td>Delete a key</td></tr>
+<tr><td><code>info()</code></td><td>Get server stats string</td></tr>
+<tr><td><code>auth(user, pass)</code></td><td>Authenticate</td></tr>
+<tr><td><code>close()</code></td><td>Close the underlying socket</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Batch operations</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>multi_put(entries, ttls=None)</code></td><td>Write multiple keys. Returns list of errors (None = success)</td></tr>
+<tr><td><code>multi_get(keys)</code></td><td>Read multiple keys. Returns list of <code>bytes</code> or <code>None</code></td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">python</div><code># Batch write — single round trip for N keys
+entries = [
+    ('user:1', b'{"name":"Alice","age":30}'),
+    ('user:2', b'{"name":"Bob","age":25}'),
+    ('user:3', b'{"name":"Carol","age":35}'),
+]
+errors = c.multi_put(entries)
+failed = [i for i, e in enumerate(errors) if e is not None]
+
+# With per-entry TTL (seconds)
+errors = c.multi_put(
+    [('session:abc', b'token-xyz')],
+    ttls=[60],   # 60-second expiry
+)
+
+# Batch read — single round trip for N keys
+keys = ['user:1', 'user:2', 'user:3', 'user:missing']
+values = c.multi_get(keys)
+for key, val in zip(keys, values):
+    if val is not None:
+        print(f"MultiGet  {key} = {val.decode()}")
+    else:
+        print(f"MultiGet  {key} → not found")</code></pre>
+
+<h3>Namespaces</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>put_ns(ns, key, value, ttl=-1)</code></td><td>Write into a namespace</td></tr>
+<tr><td><code>get_ns(ns, key)</code></td><td>Read from a namespace</td></tr>
+<tr><td><code>delete_ns(ns, key)</code></td><td>Delete from a namespace</td></tr>
+<tr><td><code>scan_namespace(ns, prefix, limit)</code></td><td>Scan keys in a namespace</td></tr>
+<tr><td><code>list_namespaces()</code></td><td>List all namespaces and key counts</td></tr>
+<tr><td><code>drop_namespace(ns)</code></td><td>Delete all keys in a namespace</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Hash fields (per-field TTL)</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>hset(key, field, value, ttl=-1)</code></td><td>Set a field with its own TTL</td></tr>
+<tr><td><code>hget(key, field)</code></td><td>Get a field value (<code>None</code> if not found/expired)</td></tr>
+<tr><td><code>hdel(key, field)</code></td><td>Delete one field</td></tr>
+<tr><td><code>hgetall(key)</code></td><td>Get all live fields as <code>[(field, value), ...]</code></td></tr>
+<tr><td><code>hkeys(key)</code></td><td>Get all live field names</td></tr>
+<tr><td><code>hlen(key)</code></td><td>Count live fields</td></tr>
+<tr><td><code>hexpire(key, field, ttl)</code></td><td>Update TTL of an existing field</td></tr>
+<tr><td><code>httl(key, field)</code></td><td>Remaining TTL in seconds (-1=forever, -2=not found)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Atomic operations</h3>
+<p>New in v1.1.0 — typed atomic ops (previously Rust/C++ only). Every method takes an optional <code>ttl</code> in seconds for the stored value (<code>-1</code> = no expiry):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cas(key, expected, new_value, ttl=-1)</code></td><td>Compare-and-swap. Returns <code>True</code> when the swap happened, <code>False</code> on a value mismatch; raises <code>KeyNotFoundError</code> when the key does not exist</td></tr>
+<tr><td><code>incr(key, delta=1, ttl=-1)</code></td><td>Atomically add <code>delta</code> and return the new value (<code>int</code>); a missing key is treated as 0. Raises <code>VeltrixDBError</code> if the existing value is not an integer</td></tr>
+<tr><td><code>decr(key, delta=1, ttl=-1)</code></td><td>Atomically subtract <code>delta</code> and return the new value; a missing key is treated as 0</td></tr>
+<tr><td><code>setnx(key, value, ttl=-1)</code></td><td>Set only if absent. Returns <code>True</code> when the key was created, <code>False</code> when it already existed</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">python</div><code>from veltrixdb import KeyNotFoundError
+
+# Counter — missing key starts from 0
+n = c.incr('counter', 5)          # 5
+n = c.decr('counter', 2)          # 3
+
+# Compare-and-swap (values are bytes)
+try:
+    if c.cas('hello', b'world', b'earth'):
+        print('swapped')
+    else:
+        print('mismatch — current value was not b"world"')
+except KeyNotFoundError:
+    print('key does not exist')
+
+# Set-if-absent with a 30-second TTL (lock-style)
+if c.setnx('lock', b'owner-A', ttl=30):
+    print('lock acquired')</code></pre>
+
+<h2 id="connection-pool">Connection pool (thread-safe)</h2>
+<p><code>example.py</code> demonstrates the pool under real concurrent load — 20 threads sharing 8 connections:</p>
+<pre class="code-block"><div class="code-label">python</div><code>from veltrixdb import VeltrixDBPool
+import threading
+
+pool = VeltrixDBPool(
+    host='127.0.0.1',
+    port=9000,
+    pool_size=8,         # 8 connections shared across all threads
+    acquire_timeout=5.0,
+)
+
+def worker(i: int) -> None:
+    with pool.acquire() as c:
+        c.put(f'thread:{i}', f'value-{i}'.encode())
+
+threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# Functional style
+val = pool.execute(lambda c: c.get('user:1'))
+pool.execute(lambda c: c.put('pool_test', b'hello from pool'))
+
+pool.close()</code></pre>
+<p><code>pool.acquire()</code> is a context manager: on normal exit the connection returns to the pool, and on an exception the broken connection is closed and a replacement is spawned before the exception propagates.</p>
+
+<h2 id="tls">TLS</h2>
+<pre class="code-block"><div class="code-label">python</div><code>import ssl
+
+ctx = ssl.create_default_context()
+ctx.load_verify_locations('ca.crt')
+
+with VeltrixDBClient('veltrix.example.com', 9443, ssl_context=ctx) as c:
+    c.ping()
+
+# mTLS (client certificate)
+ctx.load_cert_chain('client.crt', 'client.key')</code></pre>
+
+<h2 id="auth">Auth</h2>
+<pre class="code-block"><div class="code-label">python</div><code>with VeltrixDBClient('127.0.0.1', 9000) as c:
+    c.auth('alice', 'secret')
+    c.put('secure_key', b'secure_value')</code></pre>
+<p>The pool also supports auto-auth: pass <code>username</code>/<code>password</code> to <code>VeltrixDBPool</code> and every new connection authenticates itself before entering the pool.</p>
+
+<h2 id="error-handling">Error handling</h2>
+<pre class="code-block"><div class="code-label">python</div><code>from veltrixdb import VeltrixDBError
+
+val = c.get('missing-key')
+if val is None:
+    print('not found')
+
+try:
+    c.put('key', b'value')
+except VeltrixDBError as e:
+    print(f'server error: {e}')
+except TimeoutError:
+    print('operation timed out')</code></pre>
+<p><code>VeltrixDBError</code> is raised for a <code>STATUS_ERR</code> response from the server or for a connection dropped mid-read. Missing keys are represented as <code>None</code>, never an exception — check for <code>None</code> rather than wrapping every <code>get</code> in a <code>try</code>/<code>except</code>.</p>
+
+    <div class="page-nav">
+<a class="prev" href="../client-sdks/go.html"><span class="dir">&larr; Previous</span><span>Go</span></a>
+<a class="next" href="../client-sdks/nodejs.html"><span class="dir">Next &rarr;</span><span>Node.js</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

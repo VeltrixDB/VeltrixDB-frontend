@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FAQ - VeltrixDB</title>
+<meta name="description" content="The questions every engineering leader asks before adopting VeltrixDB - plus where the project came from." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+      <b>Veltrix<i>DB</i></b>
+    </a>
+    <div class="nav-links">
+      <a href="product.html">Product</a>
+      <a href="performance.html">Performance</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="faq.html" class="active">FAQ</a>
+      <a href="docs/index.html">Documentation</a>
+    </div>
+    <div class="nav-cta">
+      <a class="nav-gh" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener" aria-label="VeltrixDB on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
+      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">&#8599;</span></a>
+      <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="product.html">Product</a>
+    <a href="performance.html">Performance</a>
+    <a href="pricing.html">Pricing</a>
+    <a href="faq.html" class="active">FAQ</a>
+    <a href="docs/index.html">Documentation</a>
+    <a class="mm-cta" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo &#8599;</a>
+  </div>
+</nav>
+
+
+<!-- ============ FAQ ============ -->
+<section id="faq">
+  <div class="wrap" style="max-width:1080px">
+    <span class="eyebrow">FAQ</span>
+    <h2 class="sh">Questions every <span class="em">CTO asks first</span>.</h2>
+    <p class="sh-sub">The exact concerns we hear in every initial conversation — answered up front so you don't have to chase them.</p>
+    <div class="faq">
+      <details open>
+        <summary>Is VeltrixDB a drop-in replacement for Redis or DynamoDB?</summary>
+        <div class="answer">For <b>point-lookup workloads</b> — yes. We ship a Redis-wire-compatible mode and a native client. If your application uses <code>GET</code>, <code>SET</code>, <code>DEL</code>, <code>HGET</code>-style commands, swap the connection string and you're running. If you rely on range scans, secondary indexes, or full-text search, VeltrixDB is the wrong tool — we'll tell you that in the demo.</div>
+      </details>
+      <details>
+        <summary>How do you actually achieve sub-5ms P99 on disk-backed reads?</summary>
+        <div class="answer">Three things: <code>io_uring</code> SQPOLL eliminates syscalls on the hot path, a 256 GB LIRS cache absorbs ~94% of reads, and key-value separation means compaction never touches the values — so background work never competes with your user requests for NVMe bandwidth.</div>
+      </details>
+      <details>
+        <summary>What does the bill actually look like at scale?</summary>
+        <div class="answer">You pay for the infrastructure (NVMe nodes), not per million operations. A 3-node Growth cluster serving 2M ops/sec typically lands between <b>$2,490 and $4,800/month</b> in cloud costs — customers migrating from DynamoDB usually see 3–5× reduction. We'll model your workload during the demo.</div>
+      </details>
+      <details>
+        <summary>How does data durability and replication work?</summary>
+        <div class="answer">Synchronous WAL with group-commit fsync. Multi-region clusters replicate over QUIC with active-active conflict resolution. RPO is zero for single-region failures, &lt;30s for cross-region. The 99.99% SLA is contractual on Growth and Enterprise tiers.</div>
+      </details>
+      <details>
+        <summary>What's the security and compliance story?</summary>
+        <div class="answer">SOC 2 Type II and ISO 27001 certified. AES-256 encryption at rest, TLS 1.3 in transit, mTLS between nodes. GDPR and HIPAA compliant. Enterprise customers get custom DPAs, BYOK / KMS, VPC peering, and air-gapped deployment options.</div>
+      </details>
+      <details>
+        <summary>How long does production migration take?</summary>
+        <div class="answer">Median: <b>two sprints</b>. Helm install is 94 seconds. Then shadow-read traffic for 3–7 days to validate, then flip the connection. Enterprise migrations include a dedicated solutions architect end-to-end — no extra cost.</div>
+      </details>
+      <details>
+        <summary>What happens if I outgrow my plan?</summary>
+        <div class="answer">Clusters scale online — add nodes, the operator reshards automatically without read interruption. You can upgrade tiers any time with no data migration; we just unlock the additional capacity and support level on your existing cluster.</div>
+      </details>
+      <details>
+        <summary>Is there a free trial or open-source version?</summary>
+        <div class="answer">Yes — 14-day free trial on the Starter tier (full feature parity, just smaller capacity). Core client libraries are MIT-licensed. The server is source-available under a BSL-style license that converts to Apache 2.0 after 4 years.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESOURCES ============ -->
+<section id="docs">
+  <div class="wrap">
+    <span class="eyebrow">Resources</span>
+    <h2 class="sh">Built for teams who <span class="em">read the docs</span>.</h2>
+    <p class="sh-sub">Every claim on this page has a benchmark, a paper, or a config file behind it. Go deep before you commit.</p>
+    <div class="resources">
+      <a class="res" href="blog-benchmark.html">
+        <span class="kind">Benchmark report</span>
+        <h4>The 1B-Key Benchmark — methodology &amp; raw data</h4>
+        <p>Hardware specs, workload generator config, percentile distributions, and replayable harness. 32 pages.</p>
+        <div class="meta"><span>PDF · 4.2 MB</span><span>Read →</span></div>
+      </a>
+      <a class="res" href="blog-architecture.html">
+        <span class="kind">Architecture deep-dive</span>
+        <h4>Key-value separation &amp; why compaction shouldn't touch values</h4>
+        <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+        <div class="meta"><span>Engineering blog · 18 min</span><span>Read →</span></div>
+      </a>
+      <a class="res" href="blog-migration.html">
+        <span class="kind">Migration guide</span>
+        <h4>Moving from DynamoDB to VeltrixDB in two sprints</h4>
+        <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan — with copy-pasteable Terraform.</p>
+        <div class="meta"><span>Guide · 12 min</span><span>Read →</span></div>
+      </a>
+      <a class="res" href="redis-comparison.html">
+        <span class="kind">Comparison guide</span>
+        <h4>VeltrixDB vs Redis — honest comparison &amp; when to use each</h4>
+        <p>P99 latency, storage cost, write amplification, and the GC death spiral Redis can't fully solve. With migration code.</p>
+        <div class="meta"><span>Guide · 12 min</span><span>Read →</span></div>
+      </a>
+    </div>
+
+    <div class="news">
+      <div>
+        <h3>Get the <span class="em">benchmark report</span> in your inbox.</h3>
+        <p>One email. The full methodology, raw P99 distributions, and a side-by-side cost analysis vs DynamoDB, Redis Enterprise, and Cassandra at 1B keys.</p>
+      </div>
+      <a class="news-mail" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20benchmark%20report&body=Hi%20—%20please%20share%20the%20full%20benchmark%20methodology%20and%20cost%20comparison%20PDF.%0A%0AName%3A%0ACompany%3A%0AScale%20(keys%2Fops)%3A%0A">
+        <span class="news-mail-l">Email us on</span>
+        <span class="news-mail-v">veltrixdb@gmail.com</span>
+        <span class="news-mail-a">↗</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ORIGIN STORY ============ -->
+<section class="origin">
+  <div class="wrap origin-inner">
+    <div>
+      <span class="eyebrow">Why we built this</span>
+      <h2>Born from a <span class="em">3 AM</span> page.</h2>
+    </div>
+    <div class="origin-body">
+      <p>VeltrixDB started the night a flash sale buried our Redis cluster under 8 GB of session state. The on-call channel filled with screenshots of P99 climbing past 400 ms. The bill that quarter was already 3× what we'd budgeted.</p>
+      <p>We tried every workaround you've tried — read replicas, write batching, a DynamoDB migration that ended with <span class="si">a quarter of unpredictable per-op billing</span>. None of it solved the actual problem.</p>
+      <p>The real problem was that <b>every popular database rewrites your values during compaction</b>. It's a 10× amplification tax on storage and a guaranteed spike in tail latency exactly when you can least afford it.</p>
+      <p>So we built VeltrixDB the way we wished a database had been built when we were on call: <b>key–value separation so compaction never touches values</b>, <b>io_uring so the kernel never gets in the way</b>, and <b>fixed cluster pricing so the bill never surprises you</b>.</p>
+      <p>Now we ship it to teams who recognise their own war stories in ours.</p>
+      <div class="origin-sig">
+        <div class="avatar">AG</div>
+        <div class="meta">
+          <div class="nm">Akanksha Gupta</div>
+          <div class="role">Founder, VeltrixDB</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta">
+  <div class="wrap cta-inner">
+    <h2>A question we <span class="em">didn't answer</span>?</h2>
+    <div class="cta-cta">
+      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Question">Ask an engineer directly <span class="arrow">&#8599;</span></a>
+      <a class="btn" href="docs/index.html">Search the documentation</a>
+    </div>
+    <div class="cta-foot">Answered by the people who wrote the storage engine <span class="sep">&middot;</span> Usually within a day</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div class="brand-block">
+        <a class="brand" href="#">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
+          <b>Veltrix<i>DB</i></b>
+        </a>
+        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="product.html">Product</a></li>
+          <li><a href="performance.html">Performance</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <ul>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
+          <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
+          <li><a href="docs/operations/security.html">Security model</a></li>
+          <li><a href="blog-architecture.html">Blog · Architecture</a></li>
+          <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bar">
+      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>v1.1.0 · build 2026-07-18</div>
+    </div>
+  </div>
+</footer>
+<script defer src="assets/site.js"></script>
+</body>
+</html>

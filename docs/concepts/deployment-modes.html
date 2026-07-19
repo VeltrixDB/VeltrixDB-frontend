@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Deployment Modes — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Deployment Modes" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="active">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Core Concepts<span class="sep">/</span>Deployment Modes</div>
+    <h1>Deployment Modes</h1>
+<p class="page-lede">VeltrixDB serves every request from local state by default. The distributed layer is opt-in via the <code>-mode</code> flag and is wired directly into the serving path: every mutating request — plain KV (<code>PUT</code>/<code>DELETE</code>/<code>MultiPut</code>), atomics, <code>TXN</code>, and (since v1.1.0) namespace, hash-field, vector, secondary-index, and list/set writes — passes through a write coordinator in front of the storage engine, on both the text and binary protocols.</p>
+
+<h2 id="the-three-modes">The three modes</h2>
+<p>Set the mode with <code>-mode standalone|raft|replicated</code>. Here is exactly what each mode guarantees for writes and reads — this is the load-bearing reference for choosing a mode, so read it precisely rather than skimming.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th><code>-mode</code></th><th>How writes are handled</th><th>Consistency guarantee</th></tr></thead>
+<tbody>
+<tr>
+<td><code>standalone</code> <span class="badge">default</span></td>
+<td>Straight to the local engine — byte-for-byte the pre-existing single-node path. No Raft, no replication, no redirects.</td>
+<td>Single-node linearizable (one writer, one copy).</td>
+</tr>
+<tr>
+<td><code>raft</code></td>
+<td>Ops are gob-encoded and submitted to a Raft log, committed by quorum, and applied on every node via a storage-backed finite state machine. Non-leaders reject writes with a <code>MOVED &lt;leader-addr&gt;</code> redirect.</td>
+<td><strong>Linearizable writes</strong> (single Raft group, quorum commit). Reads default to local applied state — fast but <strong>possibly stale</strong>. With <a class="inline-link" href="#linearizable-reads"><code>--linearizable-reads</code></a>, <code>GET</code> runs the <strong>ReadIndex</strong> fence: quorum-confirmed, never stale, one heartbeat round-trip per read.</td>
+</tr>
+<tr>
+<td><code>replicated</code></td>
+<td>The write is applied to the local engine first, then handed to the replication engine. The <code>-consistency</code> flag decides when the client is ACKed.</td>
+<td>Primary-copy durability across N copies; <strong>NOT</strong> linearizable under concurrent writers (no single-writer ordering). Reads are local.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="consistency-flag">The <code>--consistency</code> flag (replicated mode)</h2>
+<p><code>-consistency</code> only applies in <code>replicated</code> mode and controls the point at which the client's write is acknowledged:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Value</th><th>ACK semantics</th><th>Error behavior</th></tr></thead>
+<tbody>
+<tr><td><code>eventual</code> <span class="badge">default</span></td><td>Async — ACKs immediately after the local write; replicas catch up in the background.</td><td>No blocking wait; a replica that is down simply falls behind.</td></tr>
+<tr><td><code>quorum</code></td><td>ACKs only after a majority of replicas (counting the local copy) have applied the write.</td><td>Surfaces <code>ErrQuorumNotReached</code> if a majority cannot be reached.</td></tr>
+<tr><td><code>strong</code></td><td>ACKs only after <strong>all</strong> replicas have applied the write.</td><td>Surfaces <code>ErrReplicationTimeout</code> (or <code>ErrQuorumNotReached</code>) if the required copies cannot be reached — for example, a strong write with a majority of replicas down errors instead of silently ACKing.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="linearizable-reads">Linearizable reads: <code>--linearizable-reads</code> (raft mode)</h2>
+<p>By default, <code>raft</code>-mode reads are served from whatever state the receiving node has locally applied — fast, but possibly stale (a partitioned ex-leader can serve reads after a new leader has committed writes elsewhere). Starting <code>--linearizable-reads</code> (default <code>false</code>) closes that hole by running every <code>GET</code> through the Raft §6.4 <strong>ReadIndex</strong> fence, without writing anything to the log:</p>
+<ol>
+<li><strong>Capture the fence</strong> — the leader records its current <code>commitIndex</code> as the read fence. The fence is only valid once the leader has committed an entry in its <em>own</em> term; immediately after an election it returns a retryable "leadership not yet established" error until the election no-op commits.</li>
+<li><strong>Quorum heartbeat round</strong> — the leader sends a fresh heartbeat to its peers and waits for a quorum of acknowledgements, proving no higher-term leader existed at that moment.</li>
+<li><strong>Apply catch-up</strong> — the read waits until the local state machine has applied up to the fence, then reads from the engine.</li>
+</ol>
+<p>Semantics and cost: reads are <strong>quorum-confirmed and never stale</strong>, at the price of <strong>one heartbeat round-trip per <code>GET</code></strong> (plus any apply catch-up). Only the leader can serve them — <strong>followers reject reads with a <code>MOVED &lt;leader-addr&gt;</code> redirect</strong>, exactly like writes, which the cluster-aware client follows transparently. Each fence is bounded by a 2-second timeout covering the heartbeat round and apply catch-up. The flag has no effect outside <code>--mode=raft</code> (the server logs a warning and ignores it).</p>
+
+<h2 id="auto-rebalance">Automatic rebalancing: <code>--auto-rebalance</code></h2>
+<p>In distributed modes (v1.1.0+), membership events — node join, leave, or failure — no longer just update routing: they trigger a <strong>ring rebalance plus physical key migration</strong>. A rebalancer subscribes to partition-map membership events, debounces bursts of gossip (3-second window), then recomputes partition ownership and hands off to the <strong>TransferAgent</strong>, which streams re-owned keys to their new owners over a dedicated partition-transfer HTTP listener on <strong>client port +5</strong> (override with <code>-transfer-addr</code>). Local copies are deleted only after the destination confirms receipt, so an interrupted migration is simply retried on the next membership event — it re-sends the unconfirmed remainder. When the cluster TLS flags are set, transfer traffic uses the same inter-node TLS/mTLS configuration.</p>
+<p>Auto-rebalance is <strong>on by default</strong>; disable it with <code>--auto-rebalance=false</code> if you want membership changes to update routing only, with data migration under manual control (the transfer listener still starts so other nodes can push keys to this one).</p>
+<p><strong>Rack-aware placement (v1.1.0):</strong> start each node with <code>--rack-id &lt;zone&gt;</code> (e.g. <code>--rack-id=asia-south1-a</code>) and rebalance never places two copies of a partition in the same failure domain — unless the replication factor exceeds the number of distinct racks, in which case it falls back to distinct nodes while still spanning every rack available. Rack labels spread between members via gossip digests, so only the local node needs the flag, and <code>/admin/cluster</code> reports each node's <code>"rack"</code>. Rackless clusters keep the exact previous deterministic round-robin placement. See <a class="inline-link" href="../architecture/cluster-and-consensus.html#partition-map">Cluster &amp; Consensus</a>.</p>
+
+<h2 id="launching-a-raft-cluster">Launching a 3-node Raft cluster</h2>
+<p>Run the same command on each host with an identical <code>-peers</code> value, changing only <code>-node-id</code> and <code>-addr</code>:</p>
+<pre class="code-block"><code># 3-node raft cluster (run on each host, same --peers value)
+veltrixdb -mode raft -node-id n1 -addr 127.0.0.1:9000 \
+  -peers n1@127.0.0.1:9000,n2@127.0.0.1:9100,n3@127.0.0.1:9200</code></pre>
+<p>Repeat on the other two hosts with <code>-node-id n2</code> / <code>-addr 127.0.0.1:9100</code> and <code>-node-id n3</code> / <code>-addr 127.0.0.1:9200</code> respectively. Each peer entry is <code>id@host:port</code>, where <code>host:port</code> is that peer's own <code>-addr</code> (its client-facing storage port) — inter-node Raft, replication, gossip, and partition-transfer listeners are derived automatically from that port (by default, client port +2 / +1 / +3 / +5 respectively) unless overridden with <code>-raft-addr</code>, <code>-repl-addr</code>, <code>-gossip-addr</code>, or <code>-transfer-addr</code>.</p>
+
+<h2 id="cluster-aware-client">Cluster-aware client behavior</h2>
+<p>The bundled client (<code>client.NewClient</code> in Go; equivalent logic ships in each SDK) is a real cluster client, not a dumb connection wrapper:</p>
+<ul>
+<li><strong>Topology discovery</strong> — it fetches cluster topology over the storage port using the <code>TOPOLOGY</code> command (mirrored at the HTTP endpoint <code>/admin/cluster</code>), which reports role, Raft term/leader, peers, partition epoch, and per-replica replication lag.</li>
+<li><strong>Consistent-hash routing</strong> — it builds a consistent-hash ring identical to the server's own (same hash function, 64 virtual nodes per physical node) and routes each key directly to the node that owns it, avoiding an extra network hop through a random node.</li>
+<li><strong>MOVED redirects</strong> — if a request lands on a non-leader in <code>raft</code> mode, the server rejects it with <code>MOVED &lt;addr&gt; &lt;leader-id&gt;</code> (or <code>MOVED -</code> if the leader is currently unknown); the client transparently retries against the redirected leader, following further hops up to a bounded limit.</li>
+</ul>
+
+<h2 id="limitations">Known limitations</h2>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Raft reads are local by default</span> <code>raft</code> mode gives linearizable <strong>writes</strong> via quorum commit, but by default reads are served from whatever state has been locally applied on the node handling the request — a client that reads immediately after a write acknowledged by a different node may observe stale data. Start the cluster with <a class="inline-link" href="#linearizable-reads"><code>--linearizable-reads</code></a> when you need never-stale reads, and budget one heartbeat round-trip per <code>GET</code>.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Replicated mode is not linearizable</span> <code>replicated</code> mode is primary-copy replication built for durability across copies, not for ordering. It has no single-writer ordering, so two concurrent writers to the same key are not linearizable under any <code>-consistency</code> setting, including <code>strong</code>. Use <code>raft</code> mode when write linearizability matters.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Remaining gaps</span> As of v1.1.0, namespace, hash-field, vector, secondary-index, and list/set <em>writes</em> all route through the coordinator in every mode (raft replays them as dedicated FSM ops; replicated mode ships their composite-key KV effects as ordinary replication traffic). What remains node-local: <strong>replicated-mode secondary-index metadata</strong> (<code>IDXCREATE</code>/<code>IDXDROP</code> must be issued on each node; raft mode replicates it), and <strong><code>QUERY</code>/<code>RANGE</code>/<code>SCANCUR</code> reads</strong>, which are always served from local state in cluster modes. Additionally, the cross-region shipper <code>repl-ship</code> has no back-pressure to the source and resolves conflicts last-write-wins only. See <a class="inline-link" href="data-model.html#namespaces">Data Model</a> for what these operations do.</span></div>
+
+<h2 id="choosing-a-mode">Decision guidance</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>If you need&hellip;</th><th>Use mode</th></tr></thead>
+<tbody>
+<tr><td>Maximum throughput, single node, no HA requirement</td><td><code>standalone</code></td></tr>
+<tr><td>Linearizable writes with automatic failover across a quorum</td><td><code>raft</code></td></tr>
+<tr><td>Strongly consistent reads with no staleness window</td><td><code>raft</code> with <code>--linearizable-reads</code> — every <code>GET</code> is quorum-confirmed via the ReadIndex fence, at one heartbeat round-trip per read (leader-only; followers redirect).</td></tr>
+<tr><td>Durability across multiple copies with the lowest write latency, and can tolerate eventual convergence</td><td><code>replicated</code> with <code>-consistency eventual</code></td></tr>
+<tr><td>Durability across a majority of copies before acknowledging a write, without requiring all replicas up</td><td><code>replicated</code> with <code>-consistency quorum</code></td></tr>
+<tr><td>Every replica confirmed before ACK, and can tolerate rejected writes when a replica is down</td><td><code>replicated</code> with <code>-consistency strong</code></td></tr>
+<tr><td>Namespace / hash-field / vector / list / set / secondary-index writes to be cluster-wide</td><td><code>raft</code> or <code>replicated</code> — routed through the coordinator in both since v1.1.0 (exception: replicated-mode <code>IDXCREATE</code>/<code>IDXDROP</code> metadata stays node-local, and <code>QUERY</code>/<code>RANGE</code>/<code>SCANCUR</code> reads are always local).</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card-grid">
+<a class="card" href="data-model.html"><div class="card-title">Data Model →</div><div class="card-desc">Which operations are plain KV/atomic/TXN versus namespace/hash/vector/query.</div></a>
+<a class="card" href="wire-protocol.html"><div class="card-title">Wire Protocol →</div><div class="card-desc">The PUT/GET/DEL/CAS/INCR/DECR/SETNX commands routed through the coordinator.</div></a>
+<a class="card" href="../architecture/cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Sharding, the Raft FSM, gossip, and partition mapping underneath these modes.</div></a>
+<a class="card" href="../reference/server-configuration.html"><div class="card-title">Server Configuration →</div><div class="card-desc">Full flag reference including -mode, -consistency, -peers, and TLS options.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../concepts/wire-protocol.html"><span class="dir">&larr; Previous</span><span>Wire Protocol</span></a>
+<a class="next" href="../client-sdks/index.html"><span class="dir">Next &rarr;</span><span>SDK Overview</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

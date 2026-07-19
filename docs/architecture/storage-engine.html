@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Storage Engine — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Storage Engine" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="active">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Architecture<span class="sep">/</span>Storage Engine</div>
+    <h1>Storage Engine</h1>
+<p class="page-lede">VeltrixDB separates keys from values on disk, batches durability writes into group commits, and packs small values at high density — a design built specifically to avoid the write-amplification and compaction stalls inherent to LSM-tree engines like RocksDB.</p>
+
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scope</span> This page goes deep on WAL/VLog mechanics, block packing, the LIRS cache, and VLog garbage collection. For the high-level write/read path and system diagram, see <a class="inline-link" href="overview.html">Architecture Overview</a>.</span></div>
+
+<h2 id="why-key-value-separation">Why key-value separation</h2>
+<p>Traditional LSM-tree engines (RocksDB, LevelDB) store full key-value pairs together in sorted SSTables. As data ages, background compaction rewrites the same bytes across levels repeatedly — a value written once may be copied 10-20x over its lifetime before it's finally reclaimed or overwritten. This <strong>write amplification</strong> consumes NVMe write endurance and steals I/O bandwidth from foreground traffic.</p>
+<p>VeltrixDB avoids this with a <strong>WiscKey-inspired key-value separation</strong> architecture: small, fixed-size key metadata lives in a RAM-resident index, while values live in an append-only on-disk log (the <strong>VLog</strong>). There is no on-disk B-tree or LSM tree for the index — durability comes entirely from the <strong>WAL</strong> (Write-Ahead Log), and values are relocated at most once per garbage-collection pass, not repeatedly across compaction levels.</p>
+
+<h2 id="write-ahead-log">Write-Ahead Log (WAL) and group commit</h2>
+<p>Each disk has one <code>wal.log</code> file. On unclean shutdown, <code>replayWAL()</code> reads it back and rebuilds the in-memory index; on clean shutdown, <code>wal.truncate()</code> zeroes the file so the next startup skips replay entirely — startup is O(1) rather than O(numLiveKeys).</p>
+<p>Every WAL record is a 7-field pipe-delimited text line:</p>
+<pre class="code-block"><code>timestamp|isTombstone|key|valueLen|crc32hex|version|vlogOffset[|packed]
+[value bytes]</code></pre>
+<p>When key-value separation is active, <code>vlogOffset &gt; 0</code> and no value bytes follow the header — the WAL record is roughly 100 bytes instead of <code>100 + value_size</code>, because the VLog already holds the durable value bytes.</p>
+
+<h3>Group-commit mechanics</h3>
+<p>Fsync-per-write is the classic throughput killer for any durable log. VeltrixDB amortizes this cost with a <strong>group commit</strong> pattern:</p>
+<ol>
+<li>Every <code>Put</code> call enqueues a <code>WALEntry</code> onto a channel.</li>
+<li>A single flusher goroutine drains up to <code>WALMaxBatchEntries</code> (4096) entries per cycle.</li>
+<li>One <code>fdatasync</code> call covers the entire batch.</li>
+<li>All callers waiting on that batch unblock together after the single fdatasync returns.</li>
+</ol>
+<p>The default flush window is <strong>10 ms</strong>. At 1,000 writes/s the batch is roughly 10 entries; at 100,000 writes/s the batch is roughly 1,000 entries — both pay exactly one <code>fdatasync</code>. This is the single biggest lever for write throughput: N writers sharing one fsync instead of paying N fsyncs turns the durability cost from O(N) into O(1) per window.</p>
+
+<h3>Tuning the flush window</h3>
+<p>The WAL and VLog flush windows (<code>WALFlushWindowMs</code>, <code>VLogFlushWindowMs</code>) should always be kept equal — both default to 10 ms. Lowering the window (e.g. to 5 ms) trades a smaller batch size (lower latency per write) for more frequent fdatasyncs (lower peak throughput); raising it does the opposite. Because the VLog write path is lock-free (see below), pushing the window past ~10 ms yields only marginal batch-size gains — the durability floor, not lock contention, is the binding constraint once the window is wide enough.</p>
+
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Concurrent fsync race</span> WAL and VLog <code>beginAppend()</code> calls run concurrently, not sequentially. The caller waits for <code>max(WAL_wait, VLog_wait)</code>, not their sum — serializing the two would roughly double P99 write latency for no durability benefit.</span></div>
+
+<h2 id="value-log">Value Log (VLog): append-only design</h2>
+<p>Each disk has one <code>vlog_active.dat</code> file — a flat, append-only log of value bytes, identified by magic <code>0x564C5402</code> (<code>"VLT\x02"</code>). Values are never overwritten in place; a superseded value's space is reclaimed later by the defragmenter (GC).</p>
+
+<h3>VLog record format</h3>
+<pre class="code-block"><code>Offset  Size  Field
+  0      4    Magic (0x564C5402)
+  4      4    ValLen  (unpadded value byte count)
+  8      4    CRC32C  (Castagnoli checksum of value bytes)
+ 12      4    Reserved (future: compression/schema flags)
+ 16      8    WriteTimestampUs (int64, µs since epoch)
+─────────────────────────────────────────────────────
+ 24   ValLen  Value bytes (plaintext after encrypt → compress pipeline)
+24+V   pad    Zero-padding to next 512-byte sector boundary</code></pre>
+<p>Records are sector-aligned to 512 bytes to satisfy <code>O_DIRECT</code> requirements on Linux; on NVMe drives with 4Kn geometry, padding extends to 4096 bytes.</p>
+
+<h3>Lock-free offset reservation</h3>
+<p>The VLog write path avoids a mutex entirely. Offset reservation is a single atomic increment:</p>
+<pre class="code-block"><code>offset = vl.end.Add(alignedLen) - alignedLen   // reserves [offset, offset+alignedLen)
+pwrite64(fd, value, offset)                     // POSIX-safe concurrent writes</code></pre>
+<p>Concurrent <code>pwrite64</code> calls to non-overlapping byte ranges are race-free per POSIX — no lock is held during the actual I/O. Throughput is therefore bounded only by NVMe IOPS (roughly 450K/disk), not by lock contention. An earlier design held a mutex across the write call; under heavy concurrency that serialized all writers to roughly <code>1 / WriteAt_latency</code> (~10K writes/s/disk). Removing the mutex was the change that let the engine scale with disk count instead of plateauing.</p>
+
+<h2 id="block-packing">Block packing: high-density mode</h2>
+<p>Small values are the worst case for a naive "one record per aligned block" layout: a 128-byte value padded out to a 4096-byte sector wastes over 96% of the block. The <code>VLogBatcher</code> solves this by packing multiple records into a single 4 KB block on the batched write path (<code>MultiPut</code>, GC relocations, the write batcher) — the single-<code>Put</code> hot path stays on the simpler unpacked fast path.</p>
+<p>For 128-byte values: header (24 B) + value (128 B) = 152 B per record, so a 4096-byte block holds up to <strong>26 records</strong> — a <strong>27x density improvement</strong> over one record per 4 KB block.</p>
+<ul>
+<li><code>FlagPacked</code> (<code>0x40</code>) is set on the <code>IndexEntry</code> for packed records.</li>
+<li><code>MarkDead(valueLen)</code> subtracts only <code>header + value</code> bytes (not the full 4 KB block) when <code>FlagPacked</code> is set — this keeps the garbage-ratio accounting accurate under packing.</li>
+<li>The read path is unchanged: <code>ReadValue(DiskOffset, ValueSize)</code> rounds the offset <strong>down</strong> to the nearest 4 KB block boundary and extracts the record at <code>offset % 4096</code>. Packed records simply have non-4K-aligned <code>DiskOffset</code> values (e.g. <code>blockOff + 152</code>, <code>blockOff + 304</code>, …).</li>
+</ul>
+<p>Oversized records (header + value larger than one block) automatically fall back to the unpacked path inside the batcher, so packing never has to special-case large values.</p>
+
+<h2 id="lirs-cache">LIRS cache</h2>
+<p>VeltrixDB uses <strong>LIRS (Low Inter-Reference Recency Set)</strong> rather than plain LRU for its in-memory value cache. LIRS is <strong>scan-resistant</strong>: a sequential scan over cold data does not evict the hot working set, which is a well-known failure mode of LRU under mixed scan/point-lookup workloads.</p>
+<ul>
+<li><strong>Small values (≤ 256 bytes)</strong> are assigned <code>priority = 2</code> — scan-resistant and harder to evict.</li>
+<li><strong>Large values</strong> are assigned <code>priority = 1</code>.</li>
+<li>A 16-entry scan window is used to pick the largest cold victim for eviction.</li>
+<li>Cache size is configurable via <code>-cache &lt;MB&gt;</code>; production deployments typically size it at 256 GB or larger.</li>
+</ul>
+<p>The priority split matters operationally: high-cardinality small-value workloads (e.g. counters, session flags, feature lookups) are exactly the pattern most vulnerable to premature eviction under LRU, and the priority-2 treatment keeps them resident even when a large scan (backup, range query, GC read pass) runs concurrently.</p>
+
+<h2 id="vlog-gc-tiers">VLog garbage collection: three-tier escalation</h2>
+<p>Dead VLog space accumulates from overwrites and deletes. The <strong>Defragmenter</strong> reclaims it by walking live index entries, rewriting live records to a fresh VLog position, updating <code>IndexEntry.DiskOffset</code> via CAS (safe under concurrent reads), calling <code>MarkDead(oldValueLen)</code> to account for freed bytes, and issuing <code>fallocate(PUNCH_HOLE)</code> or <code>BLKDISCARD</code> (on raw NVMe) to return dead pages to the OS.</p>
+<p>GC bandwidth and pacing escalate automatically as garbage accumulates, specifically to avoid a <strong>death spiral</strong>: high read latency pauses GC, which lets garbage keep growing, which increases cache misses and disk seeks, which keeps read latency high — permanently suppressing GC. The three-tier design exists to break that cycle before it becomes irreversible.</p>
+
+<div class="table-wrap"><table><thead><tr><th>Garbage ratio</th><th>GC bandwidth</th><th>Admission pause honored?</th><th>Defrag interval</th></tr></thead><tbody>
+<tr><td>&lt; 30%</td><td>No GC</td><td>—</td><td>—</td></tr>
+<tr><td>30–50%</td><td>Unlimited / 60 MB/s (throttled)</td><td>Yes</td><td>120 s</td></tr>
+<tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s (throttled)</td><td>Yes</td><td>60 s</td></tr>
+<tr><td>≥ 65% (emergency)</td><td>Unlimited</td><td><strong>No</strong></td><td>30 s</td></tr>
+</tbody></table></div>
+
+<p>The <strong>emergency tier</strong> is the escape hatch: once garbage crosses 65%, GC <strong>bypasses</strong> the admission-control pause entirely, runs at uncapped bandwidth, and checks in on a quartered interval. The system logs this loudly and increments a dedicated counter so operators can see it happening:</p>
+<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
+<p>Metric: <code>veltrixdb_vlog_gc_emergency_runs_total</code>. A persistent non-zero rate on this counter is the canonical production signal that sustained write rate is outpacing GC reclaim throughput — the fix is to investigate disk IOPS headroom or reduce write load, not to disable the emergency tier.</p>
+<p>For how the read-latency EWMA interacts with these tiers, and the full admission-control ladder, see <a class="inline-link" href="admission-control.html">Admission Control &amp; GC</a>.</p>
+
+<h2 id="on-disk-layout">On-disk layout (per disk)</h2>
+<pre class="code-block"><code>/data-dir-N/
+├── wal.log              — Write-Ahead Log (group-commit, 7-field text)
+├── vlog_active.dat      — Value Log (24-byte header + sector-aligned values)
+├── seg_XXXXXXXX.dat     — Segment files (O_DIRECT sequential, 64-byte header)
+├── vlog_punch_watermark — GC punch offset watermark for defragmentation
+└── raft_state.gob       — Raft persistent state (term, votedFor, log entries)</code></pre>
+<p>With multiple disks (<code>-data-dirs /mnt/nvme0,...,/mnt/nvme7</code>), each disk gets its own independent WAL, VLog, segment files, and compaction goroutine. Shard <code>i</code> always lives on disk <code>i % numDisks</code> — a failure on one disk does not affect the other disks' shards.</p>
+
+<h2 id="value-transform-pipeline">Value transform pipeline</h2>
+<pre class="code-block"><code>Write path:   plaintext  →  compress  →  encrypt  →  VLog bytes on disk
+Read  path:   disk bytes →  decrypt   →  decompress →  plaintext</code></pre>
+<p>Compression runs <strong>before</strong> encryption: encrypted ciphertext has high entropy and is effectively incompressible, so compressing after encryption would waste CPU for no space savings. <code>FlagCompressed</code> and <code>FlagEncrypted</code> are stored per-record on the <code>IndexEntry</code>, so records written before encryption was enabled remain readable — the flags, not a global setting, decide which transforms the read path applies.</p>
+<p>Compression uses zstd and is enabled for values ≥ 256 bytes. Encryption uses AES-256-GCM with a unique 12-byte nonce per record, keyed from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64) or a <code>--encryption-key-path</code> file.</p>
+
+<h2 id="crash-recovery">Crash recovery</h2>
+<p>On unclean shutdown (crash, OOM kill, SIGKILL):</p>
+<ol>
+<li><code>replayWAL()</code> opens <code>wal.log</code> on each disk.</li>
+<li>Each record is parsed against the 7-field format and its CRC32C is verified.</li>
+<li><code>applyWALReplay()</code> rebuilds the in-memory sharded index.</li>
+<li>For KV-separated records (<code>vlogOffset &gt; 0</code>), the VLog already holds the value bytes — the WAL entry only re-establishes the index pointer, without re-reading the value.</li>
+<li>Legacy 6-field entries (no <code>vlogOffset</code>) are still supported for backward compatibility.</li>
+</ol>
+<p>If a process crashes after the VLog write but before the WAL write completes, the value bytes are orphaned but were never referenced by the index — they are simply reclaimable garbage on next GC, and the client never received an acknowledgment. This ordering (VLog write, then WAL write) is what keeps crash recovery safe without requiring the two writes to be atomic with each other.</p>
+
+<div class="card-grid">
+<a class="card" href="admission-control.html"><div class="card-title">Admission Control &amp; GC →</div><div class="card-desc">How the read-latency EWMA throttles writes and paces VLog GC.</div></a>
+<a class="card" href="cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Partitioning, replication, and Raft consensus across nodes.</div></a>
+<a class="card" href="overview.html"><div class="card-title">Architecture Overview →</div><div class="card-desc">The system diagram and end-to-end write/read path summary.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../architecture/overview.html"><span class="dir">&larr; Previous</span><span>Architecture Overview</span></a>
+<a class="next" href="../architecture/admission-control.html"><span class="dir">Next &rarr;</span><span>Admission Control & GC</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

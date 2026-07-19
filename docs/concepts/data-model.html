@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Data Model — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Data Model" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="active">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Core Concepts<span class="sep">/</span>Data Model</div>
+    <h1>Data Model</h1>
+<p class="page-lede">VeltrixDB is a byte-oriented key-value store: keys and values are opaque byte strings, and every higher-level feature — TTLs, hash fields, namespaces, atomic counters, transactions — is layered on top of that single primitive.</p>
+
+<h2 id="keys-and-values">Keys and values</h2>
+<p>A key is an arbitrary byte string and a value is an arbitrary byte string. VeltrixDB does not interpret or type-check value contents at the storage layer — encoding (JSON, protobuf, msgpack, raw binary) is entirely up to the application. Internally, every key maps to exactly one 64-byte <code>IndexEntry</code> in the in-memory index (the "Index Vault"), which stores the disk offset, segment ID, value size, write timestamp, TTL deadline, and a version counter. The value itself lives in the per-disk append-only Value Log (VLog); the index never holds value bytes, which is what keeps random-access lookups to a single cache-line fetch plus, at worst, one NVMe read.</p>
+
+<h2 id="ttl">Per-key TTL</h2>
+<p>Every <code>PUT</code> accepts an optional TTL in seconds. A key written with a TTL carries an absolute expiry timestamp (<code>TTLExpiryUs</code>) in its index entry; a TTL of <code>0</code> or a negative value means the key is immortal (no expiry). Expiry is checked lazily on read (a <code>GET</code> against an expired key returns not-found) and is also swept by a background TTL scanner so expired entries don't linger indefinitely and get reclaimed by VLog garbage collection.</p>
+
+<h2 id="hash-fields">Hash fields with per-field TTL</h2>
+<p>A hash key groups multiple named fields under one logical key, and — unlike a single flat value — each field carries its own independent TTL. VeltrixDB implements this without a separate on-disk structure: a hash field is stored as a normal index entry whose internal key is <code>key + "\x01" + field</code> (a reserved separator byte distinct from the namespace separator). Because each field is just another entry in the same sharded index, per-field expiry, per-field overwrite, and per-field storage cost all fall out of the existing <code>PUT</code>/<code>GET</code>/<code>DELETE</code> machinery — no new WAL format or index type was needed.</p>
+<p>The operations are:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>HSET key field value ttl</code></td><td>Stores <code>field → value</code> under <code>key</code> with an independent per-field TTL.</td></tr>
+<tr><td><code>HGET key field</code></td><td>Returns the field's value, or not-found if the field is absent or expired.</td></tr>
+<tr><td><code>HDEL key field</code></td><td>Removes a single field.</td></tr>
+<tr><td><code>HGETALL key</code></td><td>Returns every non-expired field and value under <code>key</code>.</td></tr>
+<tr><td><code>HKEYS key</code> / <code>HLEN key</code></td><td>Lists field names, or counts non-expired fields.</td></tr>
+<tr><td><code>HEXPIRE key field ttl</code></td><td>Updates the TTL on an existing field.</td></tr>
+<tr><td><code>HTTL key field</code></td><td>Returns remaining TTL in seconds: <code>-1</code> immortal, <code>-2</code> not found/expired, or the remaining seconds.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="namespaces">Namespaces</h2>
+<p>A namespace isolates a slice of the keyspace under a prefix. Internally, a namespaced key is stored as <code>namespace + "\x00" + key</code> — the null byte is a safe separator because it never appears in normal UTF-8 keys — so namespaces reuse the same <code>PUT</code>/<code>GET</code>/<code>DELETE</code> paths and on-disk formats as plain keys; there is no separate namespace table. This makes namespaces a convenient way to give each tenant (or each logical dataset) its own key-count quota and write-rate limit without any additional storage engine.</p>
+<p>Namespace operations:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>PutNS(ns, key, value, ttl)</code></td><td>Writes a key scoped to <code>ns</code>. Enforced against the namespace's rate limit and key-count quota before the write happens.</td></tr>
+<tr><td><code>GetNS(ns, key)</code> / <code>DeleteNS(ns, key)</code></td><td>Reads or deletes a namespaced key.</td></tr>
+<tr><td><code>DropNamespace(ns)</code></td><td>Scans all index shards in parallel and deletes every key belonging to <code>ns</code>. Returns the count of keys removed.</td></tr>
+<tr><td><code>ScanNamespace(ns, prefix, limit)</code></td><td>Returns up to <code>limit</code> key-value pairs from <code>ns</code> whose key starts with <code>prefix</code> (the <code>NSSCAN</code> wire command).</td></tr>
+<tr><td><code>ListNamespaces()</code></td><td>Returns every namespace with at least one live key, plus its key count.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Namespace quotas are enforced by a <code>QuotaManager</code>: a token-bucket rate limit covers <code>PUT</code>/<code>DEL</code>/<code>CAS</code>/<code>INCR</code>/<code>SETNX</code> (reads are never rate-limited), and a separate key-count cap rejects new-key writes once a namespace is full — <strong>overwrites of existing keys and deletes still succeed over quota</strong>, so a tenant can always delete its way back under the limit. Quota state is in-memory; key counts are rebuilt from the index on WAL replay after a restart.</p>
+
+<h2 id="lists">Lists &amp; deques</h2>
+<p>A list (added in v1.1.0) is a double-ended queue with Redis-style semantics. Like hash fields and namespaces, lists introduce <strong>no new on-disk format</strong>: each element is a regular KV entry whose internal key is <code>key + "\x02" + seq</code>, where <code>seq</code> is an 8-byte big-endian sequence number (big-endian so lexicographic scans return list order), and a meta entry at <code>key + "\x02!"</code> stores the list's <code>[8B head][8B tail]</code> bounds. A push allocates the next sequence outward from the appropriate end; a pop consumes inward. Multi-key push/pop operations (element + meta) serialize on a striped per-list mutex, and the element is written <em>before</em> the meta commits the new bounds — a crash in between leaves an orphan element outside the committed range, which is invisible to reads and overwritten by the next push at that sequence.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>LPUSH key value</code> / <code>RPUSH key value</code></td><td>Prepends / appends <code>value</code>; returns the new list length.</td></tr>
+<tr><td><code>LPOP key</code> / <code>RPOP key</code></td><td>Removes and returns the first / last element, or <code>NIL</code> when the list is empty.</td></tr>
+<tr><td><code>LLEN key</code></td><td>Returns the number of elements (<code>0</code> for a missing list).</td></tr>
+<tr><td><code>LRANGE key start stop</code></td><td>Returns elements in <code>[start, stop]</code> with Redis semantics: <code>stop</code> is <strong>inclusive</strong>, negative indices count from the end (<code>-1</code> = last element), and out-of-range indices are clamped. One element per line, terminated by <code>END</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>$ nc localhost 9000
+RPUSH jobs render-frame-1
+1
+RPUSH jobs render-frame-2
+2
+LPUSH jobs urgent-fix
+3
+LRANGE jobs 0 -1
+urgent-fix
+render-frame-1
+render-frame-2
+END
+LPOP jobs
+urgent-fix
+LLEN jobs
+2</code></pre>
+
+<h2 id="sets">Sets</h2>
+<p>A set (added in v1.1.0) stores unique string members under one key. Each member is a regular KV entry whose internal key is <code>key + "\x03" + member</code> with an <em>empty</em> value — membership is simply the existence of the entry, so <code>SISMEMBER</code> is a single index lookup and <code>SMEMBERS</code>/<code>SCARD</code> are prefix scans. As with lists, there is no new WAL format or index type.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>SADD key member</code></td><td>Inserts <code>member</code>; returns <code>1</code> if it was added, <code>0</code> if it already existed.</td></tr>
+<tr><td><code>SREM key member</code></td><td>Removes <code>member</code>; returns <code>1</code> if it was removed, <code>0</code> if it was absent.</td></tr>
+<tr><td><code>SISMEMBER key member</code></td><td>Returns <code>1</code> if <code>member</code> is in the set, else <code>0</code>.</td></tr>
+<tr><td><code>SMEMBERS key</code></td><td>Returns all members, one per line (<strong>unordered</strong>), terminated by <code>END</code>.</td></tr>
+<tr><td><code>SCARD key</code></td><td>Returns the member count.</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>$ nc localhost 9000
+SADD tags urgent
+1
+SADD tags billing
+1
+SADD tags urgent
+0
+SISMEMBER tags urgent
+1
+SCARD tags
+2
+SREM tags billing
+1
+SMEMBERS tags
+urgent
+END</code></pre>
+
+<h2 id="vector-search">Vector search</h2>
+<p>VeltrixDB stores float32 embedding vectors and answers approximate nearest-neighbour queries by cosine similarity. As of v1.1.0, queries run on an in-memory <strong>HNSW graph</strong> (Hierarchical Navigable Small World) instead of a brute-force scan: roughly <code>O(log N)</code> per query at ~0.99 recall@10 with the built-in parameters <code>M=16</code> out-edges per node on the upper layers (32 on layer 0) and a query beam width of <code>efSearch=64</code> (automatically raised to <code>k</code> when <code>k</code> is larger). Every vector is L2-normalized on insert, so similarity is a plain dot product. Two implementation details matter operationally: a node's graph level is derived <em>deterministically</em> from its id (hash-based, not an RNG), so replicas that insert the same ids build structurally similar graphs regardless of insert order or restarts; and deletes <em>tombstone</em> the graph node — it remains a routing waypoint but is filtered from results.</p>
+<p>The text-protocol commands operate on the built-in vector namespace <code>"default"</code>, whose dimensionality is fixed by the first <code>VSET</code>:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>VSET &lt;key&gt; &lt;f1&gt; &lt;f2&gt; ...</code></td><td>Inserts or updates the vector for <code>key</code>; replies <code>OK</code>. The dimension is fixed by the first <code>VSET</code>; later writes with a different dimension are rejected, and a zero vector cannot be indexed.</td></tr>
+<tr><td><code>VSEARCH &lt;k&gt; &lt;f1&gt; &lt;f2&gt; ...</code></td><td>Returns the top-<code>k</code> ids by cosine similarity, one <code>id score</code> line each (score in <code>[-1, 1]</code>), terminated by <code>END</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>$ nc localhost 9000
+VSET doc-1 0.1 0.9 0.2
+OK
+VSET doc-2 0.8 0.1 0.1
+OK
+VSEARCH 2 0.15 0.85 0.2
+doc-1 0.997875
+doc-2 0.312625
+END</code></pre>
+<p><strong>Persistence and replication:</strong> the HNSW graph itself lives in RAM only. Each vector is additionally persisted through the ordinary <code>PUT</code> path as a little-endian float32 blob under the reserved key <code>@vec/&lt;ns&gt;/&lt;id&gt;</code>, so vectors survive restarts: on startup (after WAL replay finishes) the engine walks the <code>@vec/</code> keyspace and rebuilds every index, auto-registering each namespace with the dimension inferred from the blob length. In cluster modes the persisted blob replicates as a plain KV write, and the replica's apply hook detects the <code>@vec/</code> prefix and refreshes its own in-RAM index — so <code>VSEARCH</code> on a replica reflects vectors written elsewhere.</p>
+
+<h2 id="atomic-operations">Atomic operations</h2>
+<p>VeltrixDB provides four single-key atomic primitives: <code>CAS</code> (compare-and-swap), <code>INCR</code> / <code>DECR</code> (integer increment/decrement), and <code>SETNX</code> (set-if-not-exists). All four are implemented as a <strong>shard-locked read-modify-write</strong>: the operation holds the write lock on the key's index shard for the full duration of the read, compare, and durable persist (WAL + VLog fdatasync), so no interleaved write from another client can observe or clobber an in-flight atomic operation. Because the index is split across shards, a lock held during one key's atomic RMW only blocks the other keys that happen to hash to the same shard — not the whole keyspace.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>Semantics</th></tr></thead>
+<tbody>
+<tr><td><code>CAS key expected new ttl</code></td><td>Replaces the value iff the current value byte-equals <code>expected</code>. Outcomes: swapped, mismatch (value differed, nothing written), or key-not-found (nothing written).</td></tr>
+<tr><td><code>INCR key delta ttl</code></td><td>Parses the current value as an int64, adds <code>delta</code>, and writes the result back as a decimal string. A missing key is treated as zero. Arithmetic saturates at <code>MaxInt64</code>/<code>MinInt64</code> instead of silently overflowing.</td></tr>
+<tr><td><code>DECR key delta ttl</code></td><td>Sugar for <code>INCR</code> with a negated delta.</td></tr>
+<tr><td><code>SETNX key value ttl</code></td><td>Writes only if the key does not currently exist (or is a tombstone/expired). Outcomes: created, or already-exists (nothing written).</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Safe under concurrency:</strong> because the shard lock spans the entire compare-then-write sequence, two concurrent <code>CAS</code> calls (or an <code>INCR</code> racing a <code>CAS</code>) on the same key cannot interleave — one completes fully before the other's read is even taken. The trade-off is that the shard is briefly unreadable for other keys on that shard during the group-commit window (typically single-digit milliseconds); this is an intentional correctness-over-latency choice for atomic ops specifically, not for plain <code>PUT</code>/<code>GET</code>.</p>
+
+<h2 id="transactions">Transactions</h2>
+<p>VeltrixDB exposes optimistic, multi-key transactions through a <code>Txn</code> builder: stage a set of writes and deletes, optionally guard individual writes with an expected version, then call <code>Commit</code>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><code>BeginTxn()</code></td><td>Starts a new transaction builder (not safe to share across goroutines).</td></tr>
+<tr><td><code>Txn.Set(key, value, ttl)</code></td><td>Stages an unconditional write. Nothing is visible until <code>Commit</code>.</td></tr>
+<tr><td><code>Txn.SetIf(key, value, ttl, expectedVersion)</code></td><td>Stages a write guarded by the key's version at read time — the version token is the key's write timestamp, obtained via <code>KeyVersion(key)</code>.</td></tr>
+<tr><td><code>Txn.Delete(key)</code></td><td>Stages a tombstone.</td></tr>
+<tr><td><code>Txn.Read(key)</code></td><td>Reads the <strong>currently committed</strong> value — reads inside a transaction do not see the transaction's own pending writes.</td></tr>
+<tr><td><code>Txn.Commit()</code></td><td>Validates every <code>SetIf</code> guard, then applies all staged writes via a batched <code>MultiPut</code> and deletes via <code>Delete</code>. Returns <code>ErrTxnConflict</code> if any guard's version no longer matches.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each <code>SetIf</code> guard captures the version of the key it expects to overwrite. At <code>Commit</code> time, VeltrixDB re-checks every guarded key under its shard lock; if any key was written by someone else in the meantime, the whole transaction aborts with <code>ErrTxnConflict</code> and nothing is applied — the caller is expected to re-read and retry. This is <strong>optimistic concurrency control</strong>: conflicts are detected at commit time rather than prevented up front with locks, so transactions never block each other while staging.</p>
+<p>Concretely, this gives you <strong>conflict detection, not automatic conflict resolution</strong> — VeltrixDB tells you a concurrent writer got there first and lets your application decide how to retry or merge, rather than silently picking a winner. On the write path, VeltrixDB's own within-cluster replication engine additionally tracks per-replica <strong>vector clocks</strong> to establish causal ("happened-before") ordering between writes seen by different replicas during anti-entropy — the same detect-don't-resolve philosophy applied to replica reconciliation rather than to a single client's transaction.</p>
+<p>Within a single disk, a transaction's batched writes are durably applied as one atomic unit (all or nothing); across disks, a transaction is not strictly serializable — each disk independently guarantees its own batch is atomic, but there is no two-phase commit tying the disks together. Read isolation is <strong>read-committed</strong>, not snapshot isolation: a <code>Txn.Read</code> always sees the latest committed state, never a stale snapshot.</p>
+
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Distributed routing covers all data types as of v1.1.0</span> Namespace, hash-field, vector, secondary-index, and list/set <em>writes</em> now route through the write coordinator in every mode: <code>raft</code> replays them deterministically via dedicated FSM ops, and <code>replicated</code> mode ships their composite-key KV effects as ordinary replication traffic. Two gaps remain: in <code>replicated</code> mode, secondary-index <em>metadata</em> (<code>IDXCREATE</code>/<code>IDXDROP</code>) is node-local (raft mode replicates it), and <code>QUERY</code>/<code>RANGE</code>/<code>SCANCUR</code> reads are always served locally in cluster modes. See <a class="inline-link" href="deployment-modes.html">Deployment Modes</a> for the full picture.</span></div>
+
+<div class="card-grid">
+<a class="card" href="wire-protocol.html"><div class="card-title">Wire Protocol →</div><div class="card-desc">Text and binary command formats for every operation described here.</div></a>
+<a class="card" href="deployment-modes.html"><div class="card-title">Deployment Modes →</div><div class="card-desc">Which of these operations are cluster-wide versus node-local.</div></a>
+<a class="card" href="../architecture/cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">How sharding, replication, and Raft fit together under the data model.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../architecture/cluster-and-consensus.html"><span class="dir">&larr; Previous</span><span>Cluster & Consensus</span></a>
+<a class="next" href="../concepts/wire-protocol.html"><span class="dir">Next &rarr;</span><span>Wire Protocol</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

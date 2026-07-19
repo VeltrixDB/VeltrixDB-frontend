@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kubernetes Operator — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Kubernetes Operator" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="active">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Kubernetes<span class="sep">/</span>Kubernetes Operator</div>
+    <h1>Kubernetes Operator</h1>
+<p class="page-lede">The VeltrixDB Kubernetes Operator manages <code>VeltrixCluster</code> custom resources — provisioning the StatefulSet, NVMe storage, and networking, and reconciling scale, upgrade, and recovery events without manual intervention.</p>
+
+<h2 id="overview">Overview</h2>
+<p>The Operator is built with Kubebuilder and watches a single CRD, <code>VeltrixCluster</code> (group <code>veltrix.io/v1alpha1</code>, short name <code>vc</code>). On each reconcile pass it creates or updates the child resources needed to run a cluster: a <code>StorageClass</code>, an NVMe-provisioning <code>DaemonSet</code>, a <code>ServiceAccount</code>, headless and client <code>Service</code> objects, a <code>ConfigMap</code>, a <code>ServiceMonitor</code> (best-effort, if the Prometheus Operator CRDs are installed), and the <code>StatefulSet</code> itself.</p>
+
+<h2 id="prerequisites">Prerequisites</h2>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>Detail</th></tr></thead><tbody>
+<tr><td>Kubernetes</td><td>1.27+</td></tr>
+<tr><td>Go</td><td>1.21+ (only needed if building the operator from source)</td></tr>
+<tr><td>Nodes</td><td>Local NVMe SSDs — see the per-cloud notes below</td></tr>
+<tr><td>GKE</td><td>Node pool created with <code>--local-ssd-interface=NVME</code></td></tr>
+<tr><td>AWS</td><td>Instance types with local NVMe storage: i3, i3en, i4i, im4gn, is4gen</td></tr>
+<tr><td>Azure</td><td>Lsv2/Lsv3 series with local NVMe storage</td></tr>
+</tbody></table></div>
+
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">GKE requirement</span> Create node pools with <code>--local-ssd-interface=NVME</code>. Without it, GKE merges all local SSDs into a single RAID-0 device and you lose the parallel I/O benefit that VeltrixDB's per-disk WAL/VLog layout depends on.</span></div>
+
+<h2 id="installation">Installation</h2>
+<p>Install the CRDs, then deploy the operator's controller manager:</p>
+<pre class="code-block"><code># 1. Install the CustomResourceDefinitions
+kubectl apply -f config/crd/bases/
+
+# 2. Deploy the operator (controller manager Deployment + RBAC)
+kubectl apply -f config/manager/manager.yaml</code></pre>
+
+<p>Before creating any <code>VeltrixCluster</code>, deploy the NVMe mount-keeper <code>DaemonSet</code> so real XFS filesystems are bind-mounted at the PV source paths <strong>before</strong> kubelet bind-mounts them into the veltrixdb pod. Skipping this step causes <code>ENOSPC</code> on the very first WAL write.</p>
+<pre class="code-block"><code>kubectl apply -f config/manager/nvme-mount-keeper.yaml
+kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
+<p>See <a class="inline-link" href="../operations/nvme-provisioning.html">NVMe Disk Provisioning</a> for why the keeper is required on GKE COS, AWS Bottlerocket, and any OS where kubelet runs inside its own mount namespace.</p>
+
+<h2 id="veltrixcluster-spec">VeltrixCluster spec reference</h2>
+<p>The fields below are read directly from the <code>VeltrixClusterSpec</code> Go type (<code>api/v1alpha1/veltrixcluster_types.go</code>). Defaults marked <span class="badge">operator default</span> are filled in by the reconcile loop's <code>applyDefaults</code> step when the field is left unset in the CR.</p>
+
+<h3>Core</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>size</code></td><td>int32</td><td><code>3</code></td><td>Number of VeltrixDB nodes. Each node owns a contiguous shard range. Minimum 1.</td></tr>
+<tr><td><code>version</code></td><td>string</td><td><code>1.0.0</code></td><td>Container image tag.</td></tr>
+<tr><td><code>image</code></td><td>string</td><td><code>ghcr.io/veltrixdb/veltrixdb</code></td><td>Container image repository (combined with <code>version</code> to form the full image reference).</td></tr>
+<tr><td><code>replicationFactor</code></td><td>int32</td><td><code>3</code></td><td>Replica copies per shard (min 1, max 5). The operator reports a <code>ReplicationFactorMet</code> condition when live replicas fall below this.</td></tr>
+<tr><td><code>cacheMaxSizeMB</code></td><td>int32</td><td><code>65536</code></td><td>LIRS cache size in MiB, passed as <code>-cache</code>. Minimum 256.</td></tr>
+<tr><td><code>storageClassName</code></td><td>string</td><td><code>local-nvme</code></td><td>StorageClass used for NVMe PVCs — must match the class the provisioner creates.</td></tr>
+<tr><td><code>disksPerNode</code></td><td>int32</td><td><code>8</code></td><td>NVMe disks (and PVCs) per pod. Min 1, max 16.</td></tr>
+<tr><td><code>diskSize</code></td><td>quantity</td><td><code>375Gi</code></td><td>Capacity requested per PVC.</td></tr>
+<tr><td><code>resources</code></td><td>ResourceRequirements</td><td>—</td><td>Standard Kubernetes compute resource requests/limits for the veltrixdb container.</td></tr>
+</tbody></table></div>
+
+<h3>Networking</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>gossipPort</code></td><td><code>7946</code></td><td>UDP port for the gossip failure detector.</td></tr>
+<tr><td><code>serverPort</code></td><td><code>9000</code></td><td>TCP port for the binary/text protocol.</td></tr>
+<tr><td><code>metricsPort</code></td><td><code>2112</code></td><td>Prometheus metrics, <code>/healthz</code>, <code>/readyz</code>.</td></tr>
+<tr><td><code>tlsPort</code></td><td><code>9443</code></td><td>TLS listener; only active when <code>tlsSecretName</code> is set. The plain <code>serverPort</code> stays up for internal cluster traffic.</td></tr>
+</tbody></table></div>
+
+<h3>Scheduling</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>podAntiAffinityTopologyKey</code></td><td><code>kubernetes.io/hostname</code></td><td>Topology key for required pod anti-affinity — one VeltrixDB pod per physical host.</td></tr>
+<tr><td><code>tolerations</code></td><td>—</td><td>Applied verbatim to the StatefulSet pod template.</td></tr>
+<tr><td><code>nodeSelector</code></td><td>—</td><td>Constrains pod scheduling to matching nodes.</td></tr>
+<tr><td><code>imagePullSecrets</code></td><td>—</td><td>For private registries.</td></tr>
+</tbody></table></div>
+
+<h3>Storage engine tuning</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>numShards</code></td><td><code>1024</code></td><td>Index shard count. Must be a power of 2 and match the compiled C++ <code>kNumShards</code> constant. Changing on a live cluster requires a full data migration.</td></tr>
+<tr><td><code>keyValueSeparation</code></td><td><code>true</code></td><td>Enables WiscKey-style KV separation — only key metadata lives in SSTables; values append to a per-disk VLog.</td></tr>
+<tr><td><code>vlogGCThreshold</code></td><td><code>"0.40"</code> (operator default; CRD doc states 0.30)</td><td>Decimal string in <code>[0.0, 1.0]</code>. VLog garbage fraction that triggers defragmentation.</td></tr>
+<tr><td><code>lirRatio</code></td><td><code>"0.90"</code></td><td>Fraction of the LIRS cache reserved for the high-locality (LIR) resident set.</td></tr>
+<tr><td><code>autoTune</code></td><td><code>false</code></td><td>When true, the binary runs hardware detection at startup and derives cache size, shard count, compaction threads, and I/O mode itself; the operator omits <code>-cache</code> and passes <code>-auto-tune</code> instead.</td></tr>
+<tr><td><code>sysTune</code></td><td><code>true</code></td><td>Host-level tuning (sysctl, hugepages, CPU governor, IRQ balance, <code>RLIMIT_NOFILE</code>) via <code>hardware.SysTune</code>. Linux only; only meaningful when <code>autoTune</code> is true. Requires <code>CAP_SYS_ADMIN</code> or root.</td></tr>
+<tr><td><code>checkpointIntervalMs</code></td><td><code>0</code> (disabled)</td><td>WAL checkpoint interval. When non-zero, passed as <code>-wal-checkpoint-interval-ms</code>; checkpoint always runs on clean shutdown regardless.</td></tr>
+</tbody></table></div>
+
+<h3>WAL / VLog flush</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit flush window (ms). <strong>Must equal</strong> <code>vlogFlushWindowMs</code>.</td></tr>
+<tr><td><code>vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms). WAL and VLog are submitted concurrently; effective P99 is the max of the two.</td></tr>
+<tr><td><code>walMaxBatchEntries</code></td><td><code>4096</code></td><td>Caps the WAL group-commit batch size before the flush timer fires early. Min 1, max 65536.</td></tr>
+</tbody></table></div>
+
+<h3>Security</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tlsSecretName</code></td><td>Name of a <code>kubernetes.io/tls</code> Secret with <code>tls.crt</code>/<code>tls.key</code>. When set, the binary is started with <code>-tls-addr</code>, <code>-tls-cert</code>, <code>-tls-key</code>.</td></tr>
+<tr><td><code>tlsCASecretName</code></td><td>Secret containing <code>ca.crt</code> for mTLS client verification; passed as <code>-tls-ca</code> alongside <code>tlsSecretName</code>.</td></tr>
+<tr><td><code>authConfigSecret</code></td><td>Secret with key <code>auth-config.json</code> containing RBAC user definitions. Passed as <code>-auth-config</code>. Permission bitmask: <code>PermRead=1</code>, <code>PermWrite=2</code>, <code>PermDelete=4</code>, <code>PermAdmin=8</code>.</td></tr>
+</tbody></table></div>
+
+<h3>Raw NVMe block-device VLog</h3>
+<p>Set <code>rawVLog</code> to write the VLog directly to <code>/dev/nvmeXnY</code> block devices, skipping the filesystem for the value-bytes path. WAL and segment files still use the per-pod XFS PVCs.</p>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>rawVLog.enabled</code></td><td><code>false</code></td><td>When true, the operator adds <code>SYS_RAWIO</code> to the container's capability set, mounts <code>/dev</code> as a HostPath volume, passes <code>-raw-vlogs</code> to the binary, sets <code>seccompProfile: Unconfined</code> and an unconfined AppArmor annotation, and runs the container <code>privileged: true</code> as root (required to pass the cgroup device allowlist on GKE COS).</td></tr>
+<tr><td><code>rawVLog.devices</code></td><td><code>[]</code></td><td>Explicit block-device list, paired index-by-index with the per-pod NVMe PVCs. When empty, the operator infers <code>/dev/nvme0n1</code> … <code>/dev/nvme(disksPerNode-1)n1</code> (or the <code>p2</code> partition suffix when <code>xfsPartitionPercent &gt; 0</code>) — the GKE local-NVMe convention.</td></tr>
+<tr><td><code>rawVLog.xfsPartitionPercent</code></td><td><code>0</code> (whole-disk XFS)</td><td>Percentage of each NVMe disk reserved as an XFS partition for WAL/segments; the remainder stays a raw partition for VLog values. Min 5, max 50; typical production value 20.</td></tr>
+</tbody></table></div>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Provisioning gotcha</span> Devices intended for raw VLog use must not be <code>mkfs.xfs</code>'d by the NVMe provisioner. WAL/segment XFS partitions belong on a separate slice of each disk (set via <code>xfsPartitionPercent</code>) or on the boot disk.</span></div>
+
+<h2 id="example-cr">Example CustomResource</h2>
+<p>Adapted from the operator's shipped production sample (<code>config/samples/veltrix_v1alpha1_veltrixcluster.yaml</code>) — 3 nodes, 480 GiB RAM, 8 NVMe disks each, replication factor 3, raw block-device VLog with a 20/80 XFS/raw partition split:</p>
+<pre class="code-block"><code>apiVersion: veltrix.io/v1alpha1
+kind: VeltrixCluster
+metadata:
+  name: veltrixdb-prod
+  namespace: veltrixdb
+spec:
+  # Cluster topology
+  size: 3
+  version: "1.0.0"
+  image: "ghcr.io/veltrixdb/veltrixdb"
+  replicationFactor: 3
+
+  # Cache — 256 GiB LIRS cache per node (80% rule for 480 GiB nodes)
+  cacheMaxSizeMB: 262144
+
+  # Storage
+  storageClassName: local-nvme
+  disksPerNode: 8
+  diskSize: "375Gi"
+
+  # Resources (n2-highmem-96 class)
+  resources:
+    requests:
+      memory: "480Gi"
+      cpu: "60"
+    limits:
+      memory: "480Gi"
+      cpu: "60"
+
+  # Network ports
+  serverPort: 9000
+  metricsPort: 2112
+  gossipPort: 7946
+
+  # Raw NVMe block-device VLog: 20% XFS (keys+WAL), 80% raw (values)
+  rawVLog:
+    enabled: true
+    xfsPartitionPercent: 20
+
+  # Scheduling — one pod per physical host
+  podAntiAffinityTopologyKey: "kubernetes.io/hostname"
+  nodeSelector:
+    cloud.google.com/gke-local-nvme-ssd: "true"
+  tolerations:
+    - key: workload
+      value: veltrixdb
+      effect: NoSchedule</code></pre>
+<pre class="code-block"><code>kubectl apply -f veltrixcluster.yaml
+kubectl get veltrixcluster -n veltrixdb</code></pre>
+
+<h2 id="status">Status fields</h2>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Values</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>phase</code></td><td><code>Provisioning</code> / <code>Running</code> / <code>Scaling</code> / <code>Degraded</code> / <code>Terminating</code></td><td>Overall cluster lifecycle state, computed from ready-pod count each reconcile.</td></tr>
+<tr><td><code>readyReplicas</code></td><td>integer</td><td>Pods currently passing the readiness probe.</td></tr>
+<tr><td><code>currentVersion</code></td><td>string</td><td>Image tag from <code>spec.version</code> at last reconcile.</td></tr>
+<tr><td><code>partitionMap</code></td><td>string</td><td>Summary of the current shard-to-node assignment; updated after a resharding event.</td></tr>
+<tr><td><code>conditions</code></td><td><code>Ready</code>, <code>ReplicationFactorMet</code></td><td>Standard Kubernetes conditions. <code>ReplicationFactorMet=False</code> carries the message "DATA LOSS RISK" when ready pods drop below <code>replicationFactor</code>.</td></tr>
+<tr><td><code>lastScaleTime</code></td><td>timestamp</td><td>Set when a resharding event is triggered.</td></tr>
+</tbody></table></div>
+<pre class="code-block"><code>kubectl describe veltrixcluster my-cluster -n veltrixdb</code></pre>
+
+<h2 id="reconcile-behavior">What the reconcile loop actually does</h2>
+<p>This section is scoped to what is verifiably implemented in <code>controllers/veltrixcluster_controller.go</code>, not just described in prose elsewhere.</p>
+
+<h3>Child resource management</h3>
+<p>Each reconcile pass creates or updates, in order: the <code>local-nvme</code> <code>StorageClass</code>, an NVMe-provisioner <code>DaemonSet</code> (plus its <code>ServiceAccount</code>/<code>ClusterRole</code>/<code>ClusterRoleBinding</code>), the pod <code>ServiceAccount</code>, headless and client <code>Service</code> objects, a best-effort <code>ServiceMonitor</code> (a reconcile failure here only logs a warning — it does not fail the whole reconcile, since the Prometheus Operator CRDs may not be installed), the <code>ConfigMap</code> of engine env vars, and finally the <code>StatefulSet</code>.</p>
+
+<h3>Rolling upgrades — confirmed</h3>
+<p>The StatefulSet is built with <code>updateStrategy.type: RollingUpdate</code> and <code>rollingUpdate.maxUnavailable: 1</code>. Bumping <code>spec.version</code> (or <code>spec.image</code>) and re-applying the CR causes Kubernetes' native StatefulSet controller to replace one pod at a time, waiting for each to become ready before proceeding — the operator does not implement custom upgrade orchestration beyond setting this strategy.</p>
+<pre class="code-block"><code>kubectl patch veltrixcluster my-cluster -n veltrixdb \
+  --type merge --patch '{"spec":{"version":"1.1.0"}}'</code></pre>
+
+<h3>Auto-reshard on replica count changes — confirmed, with caveats</h3>
+<p>The reconciler compares the StatefulSet's previous replica count to <code>spec.size</code> on every pass. When the cluster has grown (<code>prevSize &lt; spec.size</code>), it calls <code>triggerResharding</code>, which:</p>
+<ol>
+<li>Blocks (up to 5 minutes) until all desired pods report <code>PodReady</code>.</li>
+<li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. The VeltrixDB binary is expected to watch these annotations via the downward API and recompute its consistent-hash partition map / trigger the actual shard rebalance — the operator's role is limited to <strong>triggering</strong> the reshard, not performing the data movement itself.</li>
+<li>Records <code>status.lastScaleTime</code> and a <code>status.partitionMap</code> summary string.</li>
+</ol>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scale-down is not specially handled</span> The resharding trigger only fires when the new size is <em>greater</em> than the previous size. Scaling down updates the StatefulSet's replica count (removing the highest-ordinal pods) but does not go through the same annotate-and-wait resharding path.</span></span></div>
+
+<h3>Self-healing — partially confirmed</h3>
+<p>The operator itself does not run a custom pod-replacement loop; it relies on the standard StatefulSet controller to recreate any pod that is deleted or fails its liveness probe, which is the same "self-healing" every StatefulSet gets from Kubernetes. What the operator adds on top:</p>
+<ul>
+<li>It stamps every pod with <code>cluster-autoscaler.kubernetes.io/safe-to-evict: "false"</code>, specifically to stop the Cluster Autoscaler from deleting nodes that carry irreplaceable local NVMe PVs.</li>
+<li>Its periodic requeue (every 30 seconds) re-evaluates <code>readyReplicas</code> and updates the <code>Ready</code>/<code>ReplicationFactorMet</code> conditions, surfacing drift for operators/alerting rather than performing autonomous data-rebuild actions itself.</li>
+</ul>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scope of "self-healing"</span> Pod replacement is delegated to the built-in StatefulSet controller, not a bespoke operator routine. Data rebuild after a replacement is a function of the VeltrixDB binary's own replication/recovery path (WAL replay, replica resync), not code inside the operator's reconcile loop.</span></div>
+
+<h3>Graceful WAL flush on termination — confirmed</h3>
+<p>Every pod gets a <code>preStop</code> lifecycle hook (<code>kill -SIGTERM 1 &amp;&amp; sleep 55</code>) and a 60-second <code>terminationGracePeriodSeconds</code>, giving the engine time to flush its WAL before the container is killed. On <code>VeltrixCluster</code> deletion, the operator's finalizer (<code>veltrix.io/finalizer</code>) annotates pods as <code>draining</code> before removing itself — the actual flush is still performed by the pod's own SIGTERM handling and the grace period, not a separate operator-issued flush command.</p>
+
+<h2 id="scaling">Scaling</h2>
+<pre class="code-block"><code>kubectl patch veltrixcluster my-cluster -n veltrixdb \
+  --type merge --patch '{"spec":{"size":5}}'</code></pre>
+<p>Increasing <code>spec.size</code> triggers the StatefulSet to add pods and, once they are ready, the reshard-trigger flow described above.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead><tbody>
+<tr><td>Pod crashes with <code>write /mnt/nvmeN/wal.log: no space left on device</code></td><td>The pod started before the mount-keeper bound real XFS at the PV source path, so kubelet bind-mounted a 256 KB tmpfs placeholder. Confirm the keeper DaemonSet is <code>Running</code>, then delete the pod so kubelet re-creates the bind mount.</td></tr>
+<tr><td>Cluster stuck in <code>Provisioning</code></td><td>Check <code>kubectl get pv</code>; on GKE confirm the node pool used <code>--local-ssd-interface=NVME</code>; check operator logs via <code>kubectl logs -n veltrixdb-system deploy/veltrixdb-controller-manager</code>.</td></tr>
+<tr><td>Resharding not triggering after adding nodes</td><td>The operator only watches <code>spec.size</code> changes on reconcile. Force one with <code>kubectl annotate veltrixcluster my-cluster force-reconcile=$(date +%s)</code>.</td></tr>
+<tr><td>WAL flush timeout on pod termination</td><td>If pods terminate faster than the 30–60s grace window, raise <code>terminationGracePeriodSeconds</code> in the StatefulSet spec.</td></tr>
+<tr><td>Cluster Autoscaler deletes database nodes (local NVMe data lost permanently)</td><td>The operator adds <code>cluster-autoscaler.kubernetes.io/safe-to-evict: "false"</code> automatically; if pods were created by an older operator version, annotate them manually.</td></tr>
+</tbody></table></div>
+
+<h2 id="related">Related pages</h2>
+<div class="card-grid">
+<a class="card" href="helm-chart.html"><div class="card-title">Helm Chart →</div><div class="card-desc">Deploy VeltrixDB with Helm instead of the operator.</div></a>
+<a class="card" href="../operations/nvme-provisioning.html"><div class="card-title">NVMe Disk Provisioning →</div><div class="card-desc">Why the mount-keeper DaemonSet exists and how device detection works per cloud.</div></a>
+<a class="card" href="../operations/monitoring.html"><div class="card-title">Monitoring →</div><div class="card-desc">Prometheus metrics and alerting for VeltrixDB clusters.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../reference/cli-reference.html"><span class="dir">&larr; Previous</span><span>CLI Reference</span></a>
+<a class="next" href="../kubernetes/helm-chart.html"><span class="dir">Next &rarr;</span><span>Helm Chart</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

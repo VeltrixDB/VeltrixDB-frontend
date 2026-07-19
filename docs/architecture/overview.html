@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Architecture Overview — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Architecture Overview" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="active">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Architecture<span class="sep">/</span>Architecture Overview</div>
+    <h1>Architecture Overview</h1>
+<p class="page-lede">How a write and a read actually move through VeltrixDB, from the TCP listener down to NVMe.</p>
+
+<div class="callout note">
+  <span class="icon">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+  </span>
+  <span>
+    <span class="callout-title">In one sentence</span>
+    VeltrixDB separates keys from values (WiscKey KV-separation): a small in-memory index points at values stored in an append-only log on NVMe, so writes never rewrite old data and reads are either a DRAM lookup or a single disk seek.
+  </span>
+</div>
+
+<h2 id="system-diagram">System diagram</h2>
+<pre class="code-block"><code>Client (any SDK or nc)
+        │  TCP — binary or text protocol
+        ▼
+┌─────────────────────────────────────────┐
+│  TCP Server (cmd/server)                │
+│  1 goroutine/conn · pipeline coalescing │
+└──────────────────┬──────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│  Storage Engine (storage/engine.go)     │
+│                                         │
+│  In-Memory Index   LIRS Cache           │
+│  8192 shards       hot values in RAM    │
+│                                         │
+│  WAL (per disk)    VLog (per disk)      │
+│  group-commit      append-only values   │
+└──────────────────┬──────────────────────┘
+                   │ (Linux production only)
+                   ▼
+┌─────────────────────────────────────────┐
+│  C++ Layer                              │
+│  ART index · io_uring · NUMA pinning    │
+└─────────────────────────────────────────┘</code></pre>
+
+<h2 id="sharding">Sharding</h2>
+<p>All data is split across <strong>8192 shards</strong>. Each shard has its own lock, so a read on shard 5 never blocks a read on shard 42.</p>
+<pre class="code-block"><code>key → FNV-1a hash → bottom 13 bits (&amp; 0x1FFF) → shard ID (0–8191)
+shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
+<p>With 8 disks, 1024 shards land on each disk. A failure on one disk doesn't affect the other 7. The Go <code>numShards</code> constant and the C++ <code>kNumShards</code> constant must stay equal — they are a hard cross-language invariant.</p>
+
+<h2 id="key-components">Key components</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Component</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td><strong>In-memory index</strong></td><td>A hash map per shard (Go) or an Adaptive Radix Tree (C++). Each entry stores disk offset, disk index, value size, flags, and a monotone version counter — about 64 bytes per key.</td></tr>
+<tr><td><strong>LIRS cache</strong></td><td>Scan-resistant eviction. Small values (≤256 B) get eviction priority 2 vs. priority 1 for larger values, so a big sequential scan can't push your hot working set out of RAM. Sized with <code>-cache &lt;MB&gt;</code>.</td></tr>
+<tr><td><strong>WAL (Write-Ahead Log)</strong></td><td>Group-commit: many concurrent writers share one <code>fdatasync</code> call per flush window (default 10 ms). One WAL file per disk.</td></tr>
+<tr><td><strong>VLog (Value Log)</strong></td><td>Append-only file per disk. Values live here; the index holds only metadata (this is the WiscKey KV-separation). Appends are lock-free via atomic offset reservation.</td></tr>
+<tr><td><strong>Block packing</strong></td><td>Batched writes (MultiPut) pack up to 26 records per 4&nbsp;KB VLog block. For 128 B values that's 152 bytes of overhead per record instead of 4096 — a 27× density improvement. A single <code>Put</code> stays on the unpacked fast path.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="write-path">Write path</h2>
+<p>What happens on <code>PUT user:42 value</code>:</p>
+<ol>
+<li>Hash the key → shard 307 → disk 2 (<code>307 % 8</code>)</li>
+<li>Atomically reserve a VLog offset and write the value</li>
+<li>Write a WAL entry (key + VLog offset)</li>
+<li>WAL and VLog <code>fdatasync</code> race concurrently — the client waits for the slower of the two</li>
+<li>Update the shard 307 index entry (disk offset, version++)</li>
+<li>Insert the value into the LIRS cache</li>
+<li>Return <code>OK</code></li>
+</ol>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span>If the process crashes after step 2 but before step 3, the value is orphaned on disk but was never made visible to any reader — that's safe by construction, not an edge case that's merely tolerated.</span>
+</div>
+
+<h2 id="read-path">Read path</h2>
+<p>What happens on <code>GET user:42</code>:</p>
+<ol>
+<li>Hash the key → shard 307</li>
+<li>LIRS cache hit → return the value with no disk I/O (~220 ns)</li>
+<li>Cache miss → take a read lock on shard 307, look up the index entry</li>
+<li>Not in the index → <code>NOT_FOUND</code></li>
+<li>In the index → read the value from the VLog at the recorded disk offset (~400 µs on NVMe)</li>
+<li>Insert the value into the cache</li>
+<li>Return the value</li>
+</ol>
+
+<h2 id="admission-control">Admission control</h2>
+<p>Background garbage collection competes with foreground reads for NVMe bandwidth. VeltrixDB tracks an EWMA of read latency and throttles GC before reads degrade:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Read EWMA</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>&lt; 3 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>≥ 3 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
+<tr><td>≥ 4 ms</td><td>GC paused entirely; each <code>PUT</code> sleeps 2 ms to shed load</td></tr>
+<tr><td>&lt; 2 ms (recovery)</td><td>Everything resumes at full speed</td></tr>
+<tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale and GC resumes regardless</td></tr>
+</tbody>
+</table>
+</div>
+<p>See <a class="inline-link" href="admission-control.html">Admission Control &amp; GC</a> for the full escalation ladder, including the emergency GC tier that bypasses admission pauses to prevent a garbage death-spiral.</p>
+
+<h2 id="cpp-layer">C++ layer (Linux only)</h2>
+<p>On Linux, VeltrixDB loads an optional C++ acceleration layer for production throughput. The Go layer is fully functional on its own and is what runs on macOS and in development.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Component</th><th>Replaces</th><th>Why it's faster</th></tr></thead>
+<tbody>
+<tr><td>ART index</td><td>Go hash map</td><td>Faster range scans, prefix compression</td></tr>
+<tr><td>io_uring scheduler</td><td>Blocking <code>pwrite</code></td><td>3-tier I/O priority — foreground reads always beat background compaction</td></tr>
+<tr><td>SQPOLL VLog reader</td><td>Blocking <code>pread</code></td><td>Zero-syscall NVMe reads</td></tr>
+<tr><td>NUMA thread pinning</td><td>Default OS scheduler</td><td>Eliminates cross-socket memory latency</td></tr>
+</tbody>
+</table>
+</div>
+<p>The C++ layer shaves roughly 25 µs off the NVMe read P99 on production hardware.</p>
+
+<h2 id="cluster-layer">Cluster layer at a glance</h2>
+<pre class="code-block"><code>cluster/      partition_map.go     consistent-hash ring (FNV-1a, 64 vnodes/node), epoch fencing
+              failure_detection.go heartbeat SUSPECT → FAILED state machine
+              gossip.go            TCP gossip listener + digest exchange
+
+replication/  async / quorum / strong replication modes
+              vector clocks, anti-entropy, tombstone watermarks
+
+consensus/    Raft — leader election + log replication + snapshots</code></pre>
+<p>Full detail in <a class="inline-link" href="cluster-and-consensus.html">Cluster &amp; Consensus</a>, including which deployment mode (<code>standalone</code> / <code>raft</code> / <code>replicated</code>) gives you which consistency guarantee.</p>
+
+<h2 id="next-steps">Next steps</h2>
+<div class="card-grid">
+  <a class="card" href="storage-engine.html"><div class="card-title">Storage Engine →</div><div class="card-desc">WAL, VLog, LIRS cache, and VLog GC tiers in depth.</div></a>
+  <a class="card" href="cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Gossip, partition maps, Raft, and replication modes.</div></a>
+  <a class="card" href="../concepts/deployment-modes.html"><div class="card-title">Deployment Modes →</div><div class="card-desc">standalone vs. raft vs. replicated — pick the right consistency guarantee.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../getting-started/installation.html"><span class="dir">&larr; Previous</span><span>Installation</span></a>
+<a class="next" href="../architecture/storage-engine.html"><span class="dir">Next &rarr;</span><span>Storage Engine</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

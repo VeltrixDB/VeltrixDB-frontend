@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Go Client — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Go Client" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="active">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>Go</div>
+    <h1>Go Client</h1>
+<p class="page-lede">The Go client is a thread-safe, connection-pooled driver for VeltrixDB with the broadest API surface of any SDK — single-key ops, batches, namespaces, hash fields, atomic ops (CAS/INCR/DECR/SETNX), range scans, optimistic transactions, secondary indexes, and vector search.</p>
+
+<h2 id="install">Install</h2>
+<pre class="code-block"><div class="code-label">bash</div><code>go get github.com/VeltrixDB/veltrixdb-client-go</code></pre>
+<p>Requires <strong>Go 1.19+</strong>. No external dependencies — the client is built entirely on the standard library (<code>net</code>, <code>crypto/tls</code>, <code>encoding/binary</code>).</p>
+
+<h2 id="quick-start">Quick start</h2>
+<p>This example is drawn directly from the SDK's bundled <code>go/example/main.go</code>: connect, ping, put/get/delete, run a batch, and fan out concurrent writes across the pool.</p>
+<pre class="code-block"><div class="code-label">go</div><code>package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "log"
+    "time"
+
+    vdb "github.com/VeltrixDB/veltrixdb-client-go"
+)
+
+func main() {
+    // ── Connect ──────────────────────────────────────────────────────
+    cfg := vdb.DefaultConfig()
+    cfg.PoolSize = 16 // 16 persistent connections
+
+    client, err := vdb.New("127.0.0.1:9000", cfg)
+    if err != nil {
+        log.Fatalf("connect: %v", err)
+    }
+    defer client.Close()
+
+    ctx := context.Background()
+
+    // ── Ping ─────────────────────────────────────────────────────────
+    if err := client.Ping(ctx); err != nil {
+        log.Fatalf("ping: %v", err)
+    }
+
+    // ── Put / Get / Delete ───────────────────────────────────────────
+    if err := client.Put(ctx, "hello", []byte("world")); err != nil {
+        log.Fatalf("put: %v", err)
+    }
+
+    val, err := client.Get(ctx, "hello")
+    if err != nil {
+        log.Fatalf("get: %v", err)
+    }
+    fmt.Printf("GET  hello = %s\n", val)
+
+    if err := client.Delete(ctx, "hello"); err != nil {
+        log.Fatalf("delete: %v", err)
+    }
+
+    // ErrNotFound is a known sentinel, not a hard error.
+    _, err = client.Get(ctx, "hello")
+    if errors.Is(err, vdb.ErrNotFound) {
+        fmt.Println("GET  hello → not found (expected after delete)")
+    }
+}</code></pre>
+
+<h2 id="config">Config</h2>
+<p><code>Config</code> is passed to <code>New</code>; <code>DefaultConfig()</code> returns production-sane defaults that you can override selectively.</p>
+<pre class="code-block"><div class="code-label">go</div><code>type Config struct {
+    PoolSize    int           // connections to maintain (default 8)
+    DialTimeout time.Duration // TCP/TLS handshake timeout (default 5s)
+    IOTimeout   time.Duration // per-operation deadline (default 10s); 0 = no deadline
+    TLS         *tls.Config   // nil = plain TCP
+}</code></pre>
+<p>The client pre-dials all <code>PoolSize</code> connections inside <code>New</code>, so construction fails fast if the server is unreachable. <code>Close()</code> drains and closes every pooled connection; after <code>Close</code>, all methods return <code>ErrClosed</code>.</p>
+
+<h2 id="api-surface">API surface</h2>
+<p>Every method takes a <code>context.Context</code> as its first argument, so cancellation and per-call deadlines compose naturally with the pool's own <code>IOTimeout</code>.</p>
+
+<h3>Core key-value</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>New(addr, cfg)</code></td><td>Create client and pre-dial all pool connections</td></tr>
+<tr><td><code>Put(ctx, key, value)</code></td><td>Write a key</td></tr>
+<tr><td><code>Get(ctx, key)</code></td><td>Read a key. Returns <code>nil, ErrNotFound</code> if missing</td></tr>
+<tr><td><code>Delete(ctx, key)</code></td><td>Delete a key (no error if already absent)</td></tr>
+<tr><td><code>Ping(ctx)</code></td><td>Check connection health</td></tr>
+<tr><td><code>Info(ctx)</code></td><td>Get server stats string</td></tr>
+<tr><td><code>Auth(ctx, user, pass)</code></td><td>Authenticate (only needed if the server has auth enabled)</td></tr>
+<tr><td><code>Close()</code></td><td>Close all pool connections</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Batch operations</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>MultiPut(ctx, entries)</code></td><td>Write multiple keys in one round trip</td></tr>
+<tr><td><code>MultiGet(ctx, keys)</code></td><td>Read multiple keys in one round trip</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">go</div><code>entries := []vdb.Entry{
+    {Key: "user:1", Value: []byte(`{"name":"Alice","age":30}`)},
+    {Key: "user:2", Value: []byte(`{"name":"Bob","age":25}`)},
+    // With a 60-second TTL:
+    {Key: "session:abc", Value: []byte("token-xyz"), TTLSeconds: 60},
+}
+mputResults, err := client.MultiPut(ctx, entries)
+if err != nil {
+    log.Fatalf("multiput: %v", err)
+}
+for i, r := range mputResults {
+    if r.Err != nil {
+        log.Printf("entry %d failed: %v", i, r.Err)
+    }
+}
+
+getResults, err := client.MultiGet(ctx, []string{"user:1", "user:2", "user:99"})
+for _, r := range getResults {
+    if r.Found {
+        fmt.Printf("GET  %s = %s\n", r.Key, r.Value)
+    } else {
+        fmt.Printf("GET  %s → not found\n", r.Key)
+    }
+}</code></pre>
+<p>Results are returned in the same order as the input. Only individual entries fail on partial errors — the batch itself only errors on connection or protocol-level failure.</p>
+
+<h3>Namespaces</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>PutNS(ctx, ns, key, value, ttl)</code></td><td>Write into a namespace</td></tr>
+<tr><td><code>GetNS(ctx, ns, key)</code></td><td>Read from a namespace</td></tr>
+<tr><td><code>DeleteNS(ctx, ns, key)</code></td><td>Delete from a namespace</td></tr>
+<tr><td><code>ScanNamespace(ctx, ns, prefix, limit)</code></td><td>Scan keys in a namespace</td></tr>
+<tr><td><code>ListNamespaces(ctx)</code></td><td>List all namespaces and key counts</td></tr>
+<tr><td><code>DropNamespace(ctx, ns)</code></td><td>Delete all keys in a namespace</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Hash fields (per-field TTL)</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>HSet(ctx, key, field, value, ttl)</code></td><td>Set a field with its own TTL</td></tr>
+<tr><td><code>HGet(ctx, key, field)</code></td><td>Get a field value</td></tr>
+<tr><td><code>HDel(ctx, key, field)</code></td><td>Delete one field</td></tr>
+<tr><td><code>HGetAll(ctx, key)</code></td><td>Get all live fields and values</td></tr>
+<tr><td><code>HKeys(ctx, key)</code></td><td>Get all live field names</td></tr>
+<tr><td><code>HLen(ctx, key)</code></td><td>Count live fields</td></tr>
+<tr><td><code>HExpire(ctx, key, field, ttl)</code></td><td>Update TTL of an existing field</td></tr>
+<tr><td><code>HTTL(ctx, key, field)</code></td><td>Remaining TTL (-1=forever, -2=not found)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Atomic operations</h3>
+<p>New in v1.1.0 — typed atomic ops (previously Rust/C++ only):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>CAS(ctx, key, expected, newValue) (bool, error)</code></td><td>Compare-and-swap. <code>(true, nil)</code> = swapped, <code>(false, nil)</code> = current value didn't match <code>expected</code>, <code>(false, ErrNotFound)</code> = key doesn't exist</td></tr>
+<tr><td><code>Incr(ctx, key, delta) (int64, error)</code></td><td>Atomically add <code>delta</code> (int64) and return the new value; a missing key starts from 0. Errors if the existing value is not an integer</td></tr>
+<tr><td><code>Decr(ctx, key, delta) (int64, error)</code></td><td>Atomically subtract <code>delta</code> and return the new value; a missing key starts from 0</td></tr>
+<tr><td><code>SetNX(ctx, key, value) (bool, error)</code></td><td>Set only if absent. <code>(true, nil)</code> = created, <code>(false, nil)</code> = key already existed</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">go</div><code>// Counter — missing key starts from 0
+n, err := client.Incr(ctx, "counter", 5)   // n = 5
+n, err = client.Decr(ctx, "counter", 2)    // n = 3
+
+// Compare-and-swap
+swapped, err := client.CAS(ctx, "hello", []byte("world"), []byte("earth"))
+if err != nil {
+    if errors.Is(err, vdb.ErrNotFound) {
+        // key doesn't exist
+    }
+} else if !swapped {
+    // current value didn't match "world"
+}
+
+// Distributed lock-style set-if-absent
+created, err := client.SetNX(ctx, "lock", []byte("owner-A"))
+// created == false → someone else holds the key</code></pre>
+
+<h3>Range scans, transactions, indexes, and vectors</h3>
+<p>Beyond the wire-protocol operations documented in the client README, the Go client exposes a further set of methods (<code>RangeScan</code>, <code>ScanCursor</code>, <code>Txn</code>, <code>KeyVersion</code>, <code>IdxCreate</code>/<code>IdxDrop</code>/<code>IdxQuery</code>, <code>VSet</code>/<code>VSearch</code>, <code>Query</code>) implemented directly in <code>client.go</code>:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>RangeScan(ctx, start, end, limit, reverse)</code></td><td>Ordered key-range scan; requires the server's ordered index</td></tr>
+<tr><td><code>ScanCursor(ctx, cursor, limit)</code></td><td>Cursor-paginated full-keyspace scan; pass <code>""</code> to start</td></tr>
+<tr><td><code>Txn(ctx, ops)</code></td><td>Atomic optimistic transaction (<code>SET</code>/<code>SETIF</code>/<code>DEL</code> ops); returns <code>ErrTxnConflict</code> on a failed version guard</td></tr>
+<tr><td><code>KeyVersion(ctx, key)</code></td><td>Optimistic version token for a key (0 = absent) — feeds <code>TxnOp.ExpectedVersion</code></td></tr>
+<tr><td><code>IdxCreate(ctx, name, field)</code> / <code>IdxDrop(ctx, name)</code></td><td>Manage a persistent secondary index on a JSON field</td></tr>
+<tr><td><code>IdxQuery(ctx, name, value, limit)</code></td><td>Look up primary keys by indexed field value</td></tr>
+<tr><td><code>VSet(ctx, key, vec)</code> / <code>VSearch(ctx, k, query)</code></td><td>Store/search vectors by cosine similarity</td></tr>
+<tr><td><code>Query(ctx, ns, field, op, value, limit)</code></td><td>Field-predicate query over a namespace (<code>= != &gt; &lt; &gt;= &lt;= contains</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>Txn</code> semantics are read-committed optimistic CAS — atomic within the batch, but <strong>not</strong> serializable. Re-read versions with <code>KeyVersion</code> and retry on <code>ErrTxnConflict</code>.</p>
+
+<h2 id="tls">TLS</h2>
+<pre class="code-block"><div class="code-label">go</div><code>import "crypto/tls"
+
+// Server verification only
+tlsCfg := &tls.Config{RootCAs: loadCACert("ca.crt")}
+client, _ := veltrix.New("veltrix.example.com:9443", veltrix.Config{TLS: tlsCfg})
+
+// mTLS (client certificate + server certificate)
+tlsCfg := &tls.Config{
+    Certificates: []tls.Certificate{loadCert("client.crt", "client.key")},
+    RootCAs:      loadCACert("ca.crt"),
+}</code></pre>
+
+<h2 id="auth">Auth</h2>
+<pre class="code-block"><div class="code-label">go</div><code>client, _ := veltrix.New("127.0.0.1:9000", veltrix.Config{PoolSize: 4})
+client.Auth(ctx, "alice", "secret")
+client.Put(ctx, "key", []byte("value"))</code></pre>
+
+<h2 id="error-handling">Error handling</h2>
+<p>The client defines three sentinel errors you should check with <code>errors.Is</code>: <code>ErrNotFound</code>, <code>ErrClosed</code>, and <code>ErrTxnConflict</code>.</p>
+<pre class="code-block"><div class="code-label">go</div><code>val, err := client.Get(ctx, "missing-key")
+if errors.Is(err, veltrix.ErrNotFound) {
+    // key doesn't exist
+}
+if errors.Is(err, context.DeadlineExceeded) {
+    // operation timed out
+}</code></pre>
+<p>Internally, when an operation fails with anything other than <code>ErrNotFound</code> or <code>ErrTxnConflict</code>, the pool assumes the connection is broken: it discards it and dials a fresh replacement before returning the error to the caller.</p>
+
+<h2 id="concurrent-usage">Concurrent usage</h2>
+<p>The <code>Client</code> is safe for concurrent use from multiple goroutines — each call borrows a connection from the pool independently:</p>
+<pre class="code-block"><div class="code-label">go</div><code>const workers = 50
+done := make(chan struct{}, workers)
+for i := 0; i < workers; i++ {
+    go func(id int) {
+        key := fmt.Sprintf("concurrent:%d", id)
+        val := []byte(fmt.Sprintf("value-%d", id))
+        if err := client.Put(ctx, key, val); err != nil {
+            log.Printf("worker %d put: %v", id, err)
+        }
+        done <- struct{}{}
+    }(i)
+}
+for i := 0; i < workers; i++ {
+    <-done
+}</code></pre>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Match pool size to concurrency</span> If you run 16 concurrent goroutines against the client, set <code>PoolSize: 16</code>. A larger pool doesn't help throughput and just wastes idle connections.</span>
+</div>
+
+<h2 id="cluster-aware-variant">Cluster-aware variant</h2>
+<p>This page covers <code>github.com/VeltrixDB/veltrixdb-client-go</code> — a single-node, connection-pooled client. The VeltrixDB server repository also bundles a separate cluster-aware client under <code>github.com/VeltrixDB/veltrixdb/client</code> (<code>client.NewClient</code>), which discovers cluster topology, builds a consistent-hash ring matching the server's, and follows Raft <code>MOVED</code> redirects automatically. Reach for that package specifically when talking to a <code>raft</code> or <code>replicated</code> mode deployment — see <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a>.</p>
+
+    <div class="page-nav">
+<a class="prev" href="../client-sdks/index.html"><span class="dir">&larr; Previous</span><span>SDK Overview</span></a>
+<a class="next" href="../client-sdks/python.html"><span class="dir">Next &rarr;</span><span>Python</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

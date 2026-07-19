@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Node.js Client — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Node.js Client" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="active">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>Node.js</div>
+    <h1>Node.js Client</h1>
+<p class="page-lede">The Node.js client is a fully async, Promise-based driver built on the built-in <code>net</code>/<code>tls</code> modules — no third-party dependencies — with a single-connection client and an async connection pool.</p>
+
+<h2 id="install">Install</h2>
+<pre class="code-block"><div class="code-label">bash</div><code>npm install veltrixdb-client</code></pre>
+<p>Requires <strong>Node.js 16+</strong>.</p>
+
+<h2 id="quick-start">Quick start</h2>
+<p>Taken from the SDK's <code>example.js</code>:</p>
+<pre class="code-block"><div class="code-label">javascript</div><code>const { VeltrixDBClient } = require('veltrixdb-client');
+
+async function main() {
+  const c = new VeltrixDBClient({ host: '127.0.0.1', port: 9000 });
+  await c.connect();
+
+  await c.ping();
+  console.log('Connected to VeltrixDB');
+
+  // Put / Get / Delete
+  await c.put('hello', Buffer.from('world'));
+  const val = await c.get('hello');
+  console.log(`PUT+GET  hello = ${val.toString()}`);
+
+  await c.delete('hello');
+  const gone = await c.get('hello');
+  console.log(`GET after DEL  hello = ${gone}`);  // null
+
+  c.close();
+}
+
+main().catch(err => {
+  console.error(`Error: ${err.message}`);
+  process.exit(1);
+});</code></pre>
+<p><code>put</code> accepts either a <code>Buffer</code> or a plain string (it's coerced internally with <code>Buffer.from</code>); <code>get</code> always returns a <code>Buffer</code> or <code>null</code>.</p>
+
+<h2 id="config">Config</h2>
+<pre class="code-block"><div class="code-label">javascript</div><code>new VeltrixDBClient({
+    host: '127.0.0.1',
+    port: 9000,
+    timeout: 10000,          // per-operation idle timeout (ms)
+    connectTimeout: 5000,    // connection timeout (ms)
+    tls: null,               // null = no TLS; object = tls.connect() options
+})</code></pre>
+<p>A single <code>VeltrixDBClient</code> is <strong>not</strong> safe for concurrent method calls — it processes one operation at a time over one socket. Use <code>VeltrixDBPool</code> when multiple call sites need concurrent access.</p>
+
+<h2 id="api-surface">API surface</h2>
+<p>All methods return Promises.</p>
+
+<h3>Core key-value</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>connect()</code></td><td>Open the TCP connection</td></tr>
+<tr><td><code>ping()</code></td><td>Check connection health</td></tr>
+<tr><td><code>put(key, value)</code></td><td>Write a key (<code>value</code> can be Buffer or string)</td></tr>
+<tr><td><code>get(key)</code></td><td>Read a key. Returns <code>Buffer</code> or <code>null</code></td></tr>
+<tr><td><code>delete(key)</code></td><td>Delete a key</td></tr>
+<tr><td><code>info()</code></td><td>Get server stats string</td></tr>
+<tr><td><code>auth(user, pass)</code></td><td>Authenticate</td></tr>
+<tr><td><code>close()</code></td><td>Close the connection</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Batch operations</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>multiPut(entries)</code></td><td>Write multiple keys. Returns array of errors (null = success)</td></tr>
+<tr><td><code>multiGet(keys)</code></td><td>Read multiple keys. Returns array of <code>Buffer</code> or <code>null</code></td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">javascript</div><code>const entries = [
+  { key: 'user:1', value: Buffer.from('{"name":"Alice","age":30}') },
+  { key: 'user:2', value: Buffer.from('{"name":"Bob","age":25}')   },
+  { key: 'session:abc', value: Buffer.from('token-xyz'), ttl: 60 }, // 60s TTL
+];
+const putErrors = await c.multiPut(entries);
+const failures = putErrors.filter(Boolean);
+
+const keys = ['user:1', 'user:2', 'user:3', 'user:missing'];
+const values = await c.multiGet(keys);
+for (const [key, v] of keys.map((k, i) => [k, values[i]])) {
+  console.log(v !== null ? `${key} = ${v.toString()}` : `${key} → not found`);
+}</code></pre>
+
+<h3>Namespaces</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>putNS(ns, key, value, ttl)</code></td><td>Write into a namespace</td></tr>
+<tr><td><code>getNS(ns, key)</code></td><td>Read from a namespace</td></tr>
+<tr><td><code>deleteNS(ns, key)</code></td><td>Delete from a namespace</td></tr>
+<tr><td><code>scanNamespace(ns, prefix, limit)</code></td><td>Scan keys in a namespace</td></tr>
+<tr><td><code>listNamespaces()</code></td><td>List all namespaces and key counts</td></tr>
+<tr><td><code>dropNamespace(ns)</code></td><td>Delete all keys in a namespace</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Hash fields (per-field TTL)</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>hset(key, field, value, ttl=-1)</code></td><td>Set a field with its own TTL</td></tr>
+<tr><td><code>hget(key, field)</code></td><td>Get a field value (<code>null</code> if not found/expired)</td></tr>
+<tr><td><code>hdel(key, field)</code></td><td>Delete one field</td></tr>
+<tr><td><code>hgetAll(key)</code></td><td>Get all live fields as <code>[{field, value}, ...]</code></td></tr>
+<tr><td><code>hkeys(key)</code></td><td>Get all live field names</td></tr>
+<tr><td><code>hlen(key)</code></td><td>Count live fields</td></tr>
+<tr><td><code>hexpire(key, field, ttl)</code></td><td>Update TTL of an existing field</td></tr>
+<tr><td><code>httl(key, field)</code></td><td>Remaining TTL in seconds (-1=forever, -2=not found)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Atomic operations</h3>
+<p>New in v1.1.0 — typed atomic ops (previously Rust/C++ only). All are Promise-based; each takes an optional trailing <code>ttl</code> in seconds for the stored value (<code>-1</code> = no expiry):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cas(key, expected, newValue, ttl=-1)</code></td><td>Compare-and-swap. Resolves to <code>'swapped'</code>, <code>'mismatch'</code>, or <code>'notfound'</code></td></tr>
+<tr><td><code>incr(key, delta=1, ttl=-1)</code></td><td>Atomically add <code>delta</code>; resolves to the new value (<code>Number</code>). Missing keys start from 0</td></tr>
+<tr><td><code>decr(key, delta=1, ttl=-1)</code></td><td>Atomically subtract <code>delta</code>; resolves to the new value (<code>Number</code>). Missing keys start from 0</td></tr>
+<tr><td><code>setnx(key, value, ttl=-1)</code></td><td>Set only if absent. Resolves to <code>true</code> when created, <code>false</code> when the key already existed</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">javascript</div><code>// Counter — missing key starts from 0
+let n = await c.incr('counter', 5);   // 5
+n = await c.decr('counter', 2);       // 3
+
+// Compare-and-swap (expected/new accept Buffer or string)
+const outcome = await c.cas('hello', 'world', 'earth');
+switch (outcome) {
+  case 'swapped':  console.log('replaced');            break;
+  case 'mismatch': console.log('value did not match'); break;
+  case 'notfound': console.log('key does not exist');  break;
+}
+
+// Set-if-absent with a 30-second TTL (lock-style)
+const acquired = await c.setnx('lock', 'owner-A', 30);
+if (!acquired) console.log('someone else holds the lock');</code></pre>
+
+<h2 id="connection-pool">Connection pool</h2>
+<pre class="code-block"><div class="code-label">javascript</div><code>const { VeltrixDBPool } = require('veltrixdb-client');
+
+const pool = new VeltrixDBPool({
+  host:            '127.0.0.1',
+  port:            9000,
+  poolSize:        8,       // 8 connections
+  acquireTimeout:  5000,    // wait up to 5s for a free slot
+});
+await pool.connect();
+
+// 50 concurrent writes — pool distributes across 8 connections
+await Promise.all(
+  Array.from({ length: 50 }, (_, i) =>
+    pool.execute(c => c.put(`concurrent:${i}`, Buffer.from(`value-${i}`)))
+  )
+);
+
+// Functional style
+const user1 = await pool.execute(c => c.get('user:1'));
+
+console.log(`Pool available connections: ${pool.available}`);
+pool.close();</code></pre>
+<p>Each pooled connection handles one operation at a time; concurrent <code>execute</code> calls queue internally until a connection frees up, so throughput scales with <code>poolSize</code> up to your concurrency level.</p>
+
+<h2 id="tls">TLS</h2>
+<pre class="code-block"><div class="code-label">javascript</div><code>const fs = require('fs');
+
+// Server verification
+const c = new VeltrixDBClient({
+  host: 'veltrix.example.com',
+  port: 9443,
+  tls: { ca: fs.readFileSync('ca.crt') },
+});
+
+// mTLS (client certificate)
+const c2 = new VeltrixDBClient({
+  host: 'veltrix.example.com',
+  port: 9443,
+  tls: {
+    ca:   fs.readFileSync('ca.crt'),
+    cert: fs.readFileSync('client.crt'),
+    key:  fs.readFileSync('client.key'),
+  },
+});</code></pre>
+
+<h2 id="auth">Auth</h2>
+<pre class="code-block"><div class="code-label">javascript</div><code>const c = new VeltrixDBClient({ host: '127.0.0.1', port: 9000 });
+await c.connect();
+await c.auth('alice', 'secret');
+await c.put('key', Buffer.from('value'));
+
+// Pool with auto-auth
+const pool = new VeltrixDBPool({
+  host: '127.0.0.1', port: 9000,
+  poolSize: 4,
+  username: 'alice',
+  password: 'secret',  // all connections auto-auth on connect
+});</code></pre>
+
+<h2 id="error-handling">Error handling</h2>
+<pre class="code-block"><div class="code-label">javascript</div><code>const { VeltrixDBError } = require('veltrixdb-client');
+
+const val = await c.get('missing-key');
+if (val === null) {
+  console.log('not found');
+}
+
+try {
+  await c.put('key', Buffer.from('value'));
+} catch (err) {
+  if (err instanceof VeltrixDBError) {
+    console.error('server error:', err.message);
+  } else if (err.code === 'ETIMEDOUT') {
+    console.error('timed out');
+  } else if (err.code === 'ECONNREFUSED') {
+    console.error('server not reachable');
+  }
+}</code></pre>
+<p><code>VeltrixDBError</code> wraps server-side <code>STATUS_ERR</code> responses and protocol-level failures (e.g. a batch-level error on <code>multiPut</code>/<code>multiGet</code>). Socket-level failures surface as regular Node.js <code>Error</code> objects with a <code>code</code> such as <code>ETIMEDOUT</code> or <code>ECONNREFUSED</code>.</p>
+
+    <div class="page-nav">
+<a class="prev" href="../client-sdks/python.html"><span class="dir">&larr; Previous</span><span>Python</span></a>
+<a class="next" href="../client-sdks/java.html"><span class="dir">Next &rarr;</span><span>Java</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

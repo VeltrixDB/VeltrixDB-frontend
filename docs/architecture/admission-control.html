@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admission Control &amp; GC — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Admission Control &amp; GC" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="active">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Architecture<span class="sep">/</span>Admission Control & GC</div>
+    <h1>Admission Control &amp; GC</h1>
+<p class="page-lede">VeltrixDB continuously measures read latency and uses it as a feedback signal to throttle writes and pace VLog garbage collection — protecting foreground reads from being starved by background write and reclaim traffic.</p>
+
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scope</span> This page covers the admission-control ladder and its interaction with GC. For VLog internals, block packing, and the LIRS cache, see <a class="inline-link" href="storage-engine.html">Storage Engine</a>.</span></div>
+
+<h2 id="why-admission-control">Why admission control exists</h2>
+<p>NVMe bandwidth and IOPS are shared between three consumers: foreground reads, foreground writes, and background VLog GC. Without coordination, a burst of write traffic (or a GC pass reclaiming a large garbage backlog) can saturate the disk queue and push read tail latency into double-digit milliseconds. VeltrixDB's admission control closes this loop automatically: it watches read latency and, when it degrades, throttles the traffic that is competing with reads — rather than requiring an operator to manually cap write rate or pause GC during an incident.</p>
+
+<h2 id="read-latency-ewma">The read-latency EWMA</h2>
+<p>Every <code>Get()</code> call feeds an exponentially-weighted moving average of read latency (<code>ReadLatencyEWMANs</code>). This single signal drives every decision described below.</p>
+<p>To keep the EWMA update itself from becoming a bottleneck at multi-million-ops/sec read throughput, the CAS-loop update is <strong>sampled 1-in-64</strong> reads rather than run on every read — at 2M reads/sec this adds at most ~32 microseconds of lag to the signal, far below the millisecond-scale thresholds it drives.</p>
+
+<h2 id="admission-ladder">The admission-control ladder</h2>
+<p>As read latency rises, VeltrixDB escalates through a small set of protective actions:</p>
+
+<div class="table-wrap"><table><thead><tr><th>Read EWMA</th><th>Action</th></tr></thead><tbody>
+<tr><td>&lt; 3 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>≥ 3 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
+<tr><td>≥ 4 ms</td><td>GC paused entirely, and each <code>PUT</code> sleeps 2 ms before submitting to WAL/VLog</td></tr>
+<tr><td>&lt; 2 ms</td><td>Everything resumes — throttle cleared, GC unpaused</td></tr>
+<tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale — GC resumes automatically</td></tr>
+</tbody></table></div>
+
+<p>Two things are worth calling out about this ladder:</p>
+<ul>
+<li><strong>The GC bandwidth cap fires before the full write throttle.</strong> At 3 ms EWMA, GC is capped to 60 MB/s — a soft signal that gives GC a chance to back off before things get bad enough to touch client-visible write latency. Only at 4 ms does the system start actively slowing down <code>PUT</code> calls.</li>
+<li><strong>The resume threshold (2 ms) is lower than the trigger threshold (4 ms).</strong> This hysteresis gap prevents the system from flapping in and out of throttled mode when latency is oscillating right around a single threshold.</li>
+</ul>
+
+<h3>The staleness guard</h3>
+<p>If no <code>Get()</code> call arrives for 4 minutes, the EWMA is treated as stale and GC is unconditionally resumed. Without this guard, a single slow read early in a write-only workload (e.g. a bulk load or benchmark with no read traffic) could latch the EWMA above the throttle threshold and never clear it — permanently blocking VLog GC because there are no subsequent fast reads to bring the average back down. The staleness window is tracked via <code>LastReadNs</code>, stamped on every <code>Get()</code>.</p>
+
+<h2 id="interaction-with-gc-tiers">Interaction with VLog GC tiers</h2>
+<p>The read-EWMA ladder above and the garbage-ratio-driven GC tiers (see <a class="inline-link" href="storage-engine.html#vlog-gc-tiers">Storage Engine: VLog GC tiers</a>) are two independent signals that combine at GC decision time:</p>
+<div class="table-wrap"><table><thead><tr><th>Garbage ratio</th><th>GC bandwidth</th><th>Admission pause honored?</th><th>Defrag interval</th></tr></thead><tbody>
+<tr><td>&lt; 30%</td><td>No GC</td><td>—</td><td>—</td></tr>
+<tr><td>30–50%</td><td>Unlimited / 60 MB/s</td><td>Yes</td><td>120 s</td></tr>
+<tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s</td><td>Yes</td><td>60 s</td></tr>
+<tr><td>≥ 65% (emergency)</td><td>Unlimited</td><td><strong>No</strong></td><td>30 s</td></tr>
+</tbody></table></div>
+<p>In plain terms: as long as garbage is below 65%, a paused-by-admission-control state (read EWMA ≥ 4 ms) is <strong>honored</strong> — GC stands down and gives reads the full disk. Only once garbage crosses the 65% emergency threshold does GC override that pause. This ordering is deliberate: below 65%, protecting read latency is the priority; above 65%, the system is already in enough trouble that continuing to defer GC would make things categorically worse.</p>
+
+<h2 id="emergency-tier">The emergency tier: breaking the death spiral</h2>
+<p>The scenario the emergency tier exists to prevent: read latency rises → admission control pauses GC → garbage keeps accumulating because nothing reclaims it → VLog grows → cache hit rate drops (more cold data to page through) → read latency rises further → GC stays paused indefinitely. This is a genuine death spiral — without an escape hatch, a transient latency spike can turn into a permanent, self-reinforcing degradation.</p>
+<p>At ≥ 65% garbage ratio, VeltrixDB breaks the cycle unconditionally: <code>GCPaused</code> is bypassed, GC bandwidth is uncapped, and the defrag interval is quartered so the system checks in on the disk far more frequently. Every emergency pass logs loudly:</p>
+<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
+<p>and increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>.</p>
+
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Treat emergency GC as an incident, not routine operation</span> The emergency tier is a safety valve, not a steady-state mode. If you regularly see <code>veltrixdb_vlog_gc_emergency_runs_total</code> incrementing, it means sustained write rate is outpacing GC reclaim throughput on that disk — add IOPS headroom or reduce write load rather than relying on the emergency override to keep up indefinitely.</span></div>
+
+<h2 id="operational-guidance">Operational guidance</h2>
+
+<h3>Metrics to watch</h3>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>What it tells you</th></tr></thead><tbody>
+<tr><td><code>veltrixdb_vlog_garbage_ratio</code></td><td>Current dead-space fraction of the VLog per disk. Drives which GC tier is active.</td></tr>
+<tr><td><code>veltrixdb_vlog_gc_emergency_runs_total</code></td><td>Count of GC passes that bypassed the admission-control pause. Should be at or near zero in steady state.</td></tr>
+<tr><td><code>veltrixdb_storage_write_admission_throttles_total</code></td><td>Count of <code>PUT</code> operations delayed by the write-throttle ladder. Non-zero indicates read latency has crossed the throttle threshold.</td></tr>
+</tbody></table></div>
+
+<h3>Healthy pattern</h3>
+<p>In a well-provisioned cluster, the garbage ratio oscillates within the 30–50% band, GC bandwidth stays at the normal cap, the write-admission-throttle counter is flat at zero (or increments only briefly during isolated traffic spikes and then stops), and the emergency-runs counter never moves. Read EWMA stays comfortably under the 3 ms first-tier threshold under normal load.</p>
+
+<h3>Unhealthy pattern</h3>
+<p>Watch for these signals together, since any one in isolation can be a false alarm but the combination is not:</p>
+<ul>
+<li><code>veltrixdb_vlog_garbage_ratio</code> climbing steadily past 50% and staying there rather than oscillating back down after a GC pass.</li>
+<li><code>veltrixdb_storage_write_admission_throttles_total</code> climbing at a sustained, non-trivial rate — this means read latency is high enough to be actively slowing down writes, not just an isolated blip.</li>
+<li><code>veltrixdb_vlog_gc_emergency_runs_total</code> incrementing repeatedly rather than a single one-off spike.</li>
+</ul>
+<p>This combination means write rate has outpaced GC reclaim capacity on one or more disks for a sustained period. The fix is capacity, not configuration: add NVMe IOPS/bandwidth headroom, reduce write rate to the affected disks, or check for a hot-shard skew that is concentrating write traffic on a single disk (see the shard-to-disk routing model in <a class="inline-link" href="storage-engine.html">Storage Engine</a>).</p>
+
+<div class="card-grid">
+<a class="card" href="storage-engine.html"><div class="card-title">Storage Engine →</div><div class="card-desc">WAL group commit, VLog append-only design, block packing, and the LIRS cache.</div></a>
+<a class="card" href="cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Partitioning, replication, and Raft consensus across nodes.</div></a>
+<a class="card" href="../operations/monitoring.html"><div class="card-title">Monitoring →</div><div class="card-desc">Full Prometheus metrics reference and alerting guidance.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../architecture/storage-engine.html"><span class="dir">&larr; Previous</span><span>Storage Engine</span></a>
+<a class="next" href="../architecture/cluster-and-consensus.html"><span class="dir">Next &rarr;</span><span>Cluster & Consensus</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

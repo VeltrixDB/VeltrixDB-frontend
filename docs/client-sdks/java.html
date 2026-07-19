@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Java Client — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: Java Client" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E5121C'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.1.0</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="active">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>Java</div>
+    <h1>Java Client</h1>
+<p class="page-lede">The Java client is a blocking, <code>java.net.Socket</code>-based driver with no runtime dependencies, paired with a thread-safe <code>VeltrixDBPool</code> for use from multi-threaded servers.</p>
+
+<h2 id="install">Install</h2>
+<p><strong>Maven:</strong></p>
+<pre class="code-block"><div class="code-label">xml</div><code>&lt;dependency&gt;
+    &lt;groupId&gt;com.veltrixdb&lt;/groupId&gt;
+    &lt;artifactId&gt;veltrixdb-client&lt;/artifactId&gt;
+    &lt;version&gt;1.0.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<p><strong>Gradle:</strong></p>
+<pre class="code-block"><div class="code-label">groovy</div><code>implementation 'com.veltrixdb:veltrixdb-client:1.0.0'</code></pre>
+<p>Requires <strong>Java 11+</strong> at runtime (the client source is compiled targeting Java 17 in its own build). No runtime dependencies — <code>VeltrixDBClient</code> is built on plain <code>java.net.Socket</code>/<code>javax.net.ssl</code>.</p>
+
+<h2 id="quick-start">Quick start</h2>
+<p>This example follows the class's own documented usage in <code>VeltrixDBClient.java</code>: open a connection, ping, then put/get/delete. <code>VeltrixDBClient</code> implements <code>Closeable</code>, so try-with-resources closes the socket automatically.</p>
+<pre class="code-block"><div class="code-label">java</div><code>import com.veltrixdb.client.VeltrixDBClient;
+
+// Single connection (not thread-safe — use VeltrixDBPool for concurrent access)
+try (VeltrixDBClient c = new VeltrixDBClient("127.0.0.1", 9000)) {
+    c.ping();
+
+    c.put("hello", "world".getBytes());
+    byte[] val = c.get("hello");        // null if not found
+    System.out.println(new String(val)); // "world"
+
+    c.delete("hello");
+}</code></pre>
+
+<h2 id="config">Config</h2>
+<p><code>VeltrixDBClient.Config</code> lets you set timeouts and TLS explicitly instead of using the two-argument constructor:</p>
+<pre class="code-block"><div class="code-label">java</div><code>VeltrixDBClient.Config cfg = new VeltrixDBClient.Config();
+cfg.host             = "prod-veltrix.internal";
+cfg.port             = 9000;
+cfg.connectTimeoutMs = 3_000;   // TCP connect timeout (default 5000)
+cfg.socketTimeoutMs  = 5_000;   // per-operation read timeout (default 10000, 0 = none)
+cfg.sslContext       = null;    // non-null = TLS
+
+VeltrixDBClient c = new VeltrixDBClient(cfg);</code></pre>
+
+<h2 id="api-surface">API surface</h2>
+<p>Every data method throws <code>IOException</code> (network failure) and <code>VeltrixDBException</code> (server-side error response). These are checked exceptions in the actual source, so calling code must declare or catch them.</p>
+
+<h3>Core key-value</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ping()</code></td><td>Check connection health</td></tr>
+<tr><td><code>put(key, value)</code></td><td>Write a key</td></tr>
+<tr><td><code>get(key)</code></td><td>Read a key. Returns <code>null</code> if not found</td></tr>
+<tr><td><code>delete(key)</code></td><td>Delete a key (no-op if already absent)</td></tr>
+<tr><td><code>info()</code></td><td>Get server stats string</td></tr>
+<tr><td><code>auth(user, pass)</code></td><td>Authenticate</td></tr>
+<tr><td><code>close()</code></td><td>Close the underlying socket (safe to call more than once)</td></tr>
+<tr><td><code>isClosed()</code></td><td>Whether the socket has been closed</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Batch operations</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>multiPut(entries)</code></td><td>Write multiple keys. Returns <code>Exception[]</code> (null = success)</td></tr>
+<tr><td><code>multiGet(keys)</code></td><td>Read multiple keys. Returns <code>MultiGetResult[]</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>Entry</code> and <code>MultiGetResult</code> are static nested classes on <code>VeltrixDBClient</code>:</p>
+<pre class="code-block"><div class="code-label">java</div><code>import com.veltrixdb.client.VeltrixDBClient.Entry;
+import java.util.List;
+
+List&lt;Entry&gt; entries = List.of(
+    new Entry("user:1", "{\"name\":\"Alice\"}".getBytes()),
+    new Entry("user:2", "{\"name\":\"Bob\"}".getBytes(), 60) // TTL 60s
+);
+Exception[] errors = c.multiPut(entries);
+// errors[i] is null if that entry succeeded
+
+VeltrixDBClient.MultiGetResult[] results =
+    c.multiGet(List.of("user:1", "user:missing"));
+// results[i].found is false, results[i].value is null when not found</code></pre>
+
+<h3>Namespaces</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>putNS(ns, key, value, ttl)</code></td><td>Write into a namespace</td></tr>
+<tr><td><code>getNS(ns, key)</code></td><td>Read from a namespace</td></tr>
+<tr><td><code>deleteNS(ns, key)</code></td><td>Delete from a namespace</td></tr>
+<tr><td><code>scanNamespace(ns, prefix, limit)</code></td><td>Scan keys in a namespace, returns <code>NSEntry[]</code></td></tr>
+<tr><td><code>listNamespaces()</code></td><td>List namespaces, returns <code>NSInfo[]</code></td></tr>
+<tr><td><code>dropNamespace(ns)</code></td><td>Delete all keys in a namespace; returns the deleted count</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Hash fields (per-field TTL)</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>hset(key, field, value, ttl)</code></td><td>Set a field with its own TTL</td></tr>
+<tr><td><code>hget(key, field)</code></td><td>Get a field value (<code>null</code> if not found/expired)</td></tr>
+<tr><td><code>hdel(key, field)</code></td><td>Delete one field</td></tr>
+<tr><td><code>hgetAll(key)</code></td><td>Get all live fields as <code>HashField[]</code></td></tr>
+<tr><td><code>hkeys(key)</code></td><td>Get all live field names as <code>String[]</code></td></tr>
+<tr><td><code>hlen(key)</code></td><td>Count live fields</td></tr>
+<tr><td><code>hexpire(key, field, ttl)</code></td><td>Update TTL of an existing field</td></tr>
+<tr><td><code>httl(key, field)</code></td><td>Remaining TTL (-1=forever, -2=not found)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Atomic operations</h3>
+<p>New in v1.1.0 — typed atomic ops (previously Rust/C++ only). Each method has an overload with a trailing <code>ttlSeconds</code> for the stored value (&le; 0 = no expiry); like the rest of the API, all of them throw <code>IOException</code> and <code>VeltrixDBException</code>:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cas(key, expected, newValue)</code> / <code>cas(key, expected, newValue, ttlSeconds)</code></td><td>Compare-and-swap; returns a <code>CasResult</code> enum: <code>SWAPPED</code>, <code>MISMATCH</code>, or <code>NOT_FOUND</code></td></tr>
+<tr><td><code>incr(key)</code> / <code>incr(key, delta)</code> / <code>incr(key, delta, ttlSeconds)</code></td><td>Atomically add <code>delta</code> (default 1); returns the new value as <code>long</code>. Missing keys start from 0</td></tr>
+<tr><td><code>decr(key)</code> / <code>decr(key, delta)</code> / <code>decr(key, delta, ttlSeconds)</code></td><td>Atomically subtract <code>delta</code> (default 1); returns the new value as <code>long</code>. Missing keys start from 0</td></tr>
+<tr><td><code>setnx(key, value)</code> / <code>setnx(key, value, ttlSeconds)</code></td><td>Set only if absent; returns <code>true</code> when the key was created, <code>false</code> when it already existed</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>CasResult</code> is a nested enum on <code>VeltrixDBClient</code>:</p>
+<pre class="code-block"><div class="code-label">java</div><code>import com.veltrixdb.client.VeltrixDBClient.CasResult;
+
+// Counter — missing key starts from 0
+long n = c.incr("counter", 5);   // 5
+n = c.decr("counter", 2);        // 3
+
+// Compare-and-swap
+CasResult r = c.cas("hello", "world".getBytes(), "earth".getBytes());
+switch (r) {
+    case SWAPPED:   System.out.println("replaced");            break;
+    case MISMATCH:  System.out.println("value did not match"); break;
+    case NOT_FOUND: System.out.println("key does not exist");  break;
+}
+
+// Set-if-absent with a 30-second TTL (lock-style)
+boolean acquired = c.setnx("lock", "owner-A".getBytes(), 30);</code></pre>
+
+<h2 id="connection-pool">Connection pool (thread-safe)</h2>
+<p><code>VeltrixDBPool</code> wraps an <code>ArrayBlockingQueue&lt;VeltrixDBClient&gt;</code> and pre-dials <code>poolSize</code> connections in its constructor. This is the class's own documented quick start:</p>
+<pre class="code-block"><div class="code-label">java</div><code>import com.veltrixdb.client.VeltrixDBPool;
+
+VeltrixDBPool.Config cfg = new VeltrixDBPool.Config();
+cfg.host     = "127.0.0.1";
+cfg.port     = 9000;
+cfg.poolSize = 16;
+
+try (VeltrixDBPool pool = new VeltrixDBPool(cfg)) {
+
+    // Functional style — acquire/release handled automatically
+    pool.execute(c -> {
+        c.put("key", "value".getBytes());
+        return null;
+    });
+
+    byte[] val = pool.execute(c -> c.get("key"));
+}</code></pre>
+<p>Manual acquire/release is also supported when you need to hold a connection across multiple calls:</p>
+<pre class="code-block"><div class="code-label">java</div><code>VeltrixDBClient c = pool.acquire();
+try {
+    c.put("x", data);
+    pool.release(c);
+} catch (Exception e) {
+    c.close();           // broken conn — don't return to pool
+    pool.replenish();    // replace it
+    throw e;
+}</code></pre>
+<p><code>VeltrixDBPool.Config</code> extends <code>VeltrixDBClient.Config</code>, adding <code>poolSize</code> (default 8), <code>acquireTimeoutMs</code> (default 5000), and optional <code>username</code>/<code>password</code> for auto-auth on every new connection. <code>pool.available()</code> reports the current idle-connection count.</p>
+
+<h2 id="tls">TLS</h2>
+<pre class="code-block"><div class="code-label">java</div><code>import javax.net.ssl.*;
+import java.security.KeyStore;
+
+// Server-only verification
+SSLContext ctx = SSLContext.getInstance("TLS");
+TrustManagerFactory tmf = TrustManagerFactory.getInstance("PKIX");
+KeyStore ks = KeyStore.getInstance("JKS");
+ks.load(new FileInputStream("truststore.jks"), "password".toCharArray());
+tmf.init(ks);
+ctx.init(null, tmf.getTrustManagers(), null);
+
+VeltrixDBClient.Config cfg = new VeltrixDBClient.Config();
+cfg.host = "veltrix.example.com";
+cfg.port = 9443;
+cfg.sslContext = ctx;
+VeltrixDBClient c = new VeltrixDBClient(cfg);</code></pre>
+
+<h2 id="auth">Auth</h2>
+<pre class="code-block"><div class="code-label">java</div><code>// Single connection
+VeltrixDBClient c = new VeltrixDBClient("127.0.0.1", 9000);
+c.auth("alice", "secret");
+c.put("key", "value".getBytes());
+
+// Pool with auto-auth
+VeltrixDBPool.Config cfg = new VeltrixDBPool.Config();
+cfg.username = "alice";
+cfg.password = "secret";
+VeltrixDBPool pool = new VeltrixDBPool(cfg); // all connections auto-auth on connect</code></pre>
+
+<h2 id="error-handling">Error handling</h2>
+<pre class="code-block"><div class="code-label">java</div><code>try {
+    byte[] val = c.get("key");
+    if (val == null) {
+        // key not found — not an exception
+    }
+} catch (VeltrixDBException e) {
+    // server returned an error status
+} catch (java.net.SocketTimeoutException e) {
+    // operation timed out
+} catch (java.io.EOFException e) {
+    // connection dropped by the server
+}</code></pre>
+<p><code>VeltrixDBException</code> (extends <code>Exception</code>) is thrown for any non-OK, non-NOT_FOUND status the server returns; it optionally wraps a lower-level <code>Throwable</code> cause. Missing keys and missing hash fields return <code>null</code> rather than throwing — check for <code>null</code> first.</p>
+
+    <div class="page-nav">
+<a class="prev" href="../client-sdks/nodejs.html"><span class="dir">&larr; Previous</span><span>Node.js</span></a>
+<a class="next" href="../client-sdks/rust.html"><span class="dir">Next &rarr;</span><span>Rust</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>
