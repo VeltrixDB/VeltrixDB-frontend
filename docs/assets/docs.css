@@ -263,3 +263,18 @@ html,body{background:#FFFFFF;color:var(--ink)}
 .brand b i{color:#0B5CFF}
 /* inline code → readable on light (block code stays dark via .code-block) */
 .content-col code{background:var(--blue-tint,#E9F0FF);color:#0940BC;border-color:#D4E0FF}
+
+/* --- mobile topbar: stop search/icons colliding --- */
+@media (max-width:900px){
+  .topbar{padding:0 14px;gap:10px}
+  .topbar-search{display:none !important}
+  .topbar-right{gap:12px}
+  .topbar-right .version-pill{display:none}
+  .brand .docs-tag{display:none}
+}
+@media (max-width:560px){
+  .topbar-right{gap:10px}
+  .topbar-right a:not(.btn){display:none}   /* GitHub + FAQ live in the sidebar on mobile */
+  .topbar-right .btn.primary{height:32px;padding:0 12px;font-size:12px}
+  .brand{font-size:14px}
+}
