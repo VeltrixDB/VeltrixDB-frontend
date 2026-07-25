@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>VeltrixDB Technical Whitepaper — Architecture, Durability &amp; Failure Modes</title>
 <meta name="description" content="The full 42-page architectural whitepaper for VeltrixDB — the storage engine, the sharding model, durability proofs, and the failure modes we test in chaos engineering." />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
     --surface:#15151E; --surface-2:#1B1B26;
     --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-strong:rgba(255,255,255,.22);
     --ink:#F4F4F6; --ink-2:#C5C6CC; --ink-3:#8A8C95; --ink-4:#5A5C66;
-    --red:#E5121C; --red-2:#FF3340; --red-glow:rgba(229,18,28,.35);
+    --red:#0B5CFF; --red-2:#2E8BFF; --red-glow:rgba(11,92,255,.35);
     --warm:#F4A65A; --good:#46D391;
     --grid:1280px;
     --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -24,7 +24,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
-  body{background:radial-gradient(1200px 700px at 78% -5%, rgba(229,18,28,.08), transparent 60%),radial-gradient(900px 500px at 0% 30%, rgba(229,18,28,.03), transparent 70%),var(--bg);overflow-x:hidden}
+  body{background:radial-gradient(1200px 700px at 78% -5%, rgba(11,92,255,.08), transparent 60%),radial-gradient(900px 500px at 0% 30%, rgba(11,92,255,.03), transparent 70%),var(--bg);overflow-x:hidden}
   a{color:inherit;text-decoration:none}
   ::selection{background:var(--red);color:#FFFFFF}
   .wrap{max-width:var(--grid);margin:0 auto;padding:0 28px;position:relative;z-index:1}
@@ -33,7 +33,7 @@
   nav.top{position:sticky;top:0;z-index:50;background:rgba(7,7,11,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
   .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
-  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#FF3340 0%, var(--red) 60%, #B30E16 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#2E8BFF 0%, var(--red) 60%, #0A3FD1 100%);display:grid;place-items:center;color:#FFFFFF;box-shadow:0 0 24px var(--red-glow), inset 0 0 0 1px rgba(255,255,255,.18)}
   .brand .mark svg{width:14px;height:14px}
   .brand b{font-weight:700;font-size:16px;letter-spacing:-.015em}
   .brand b i{font-style:normal;color:var(--ink-3);font-weight:400}
@@ -58,7 +58,7 @@
   /* whitepaper hero */
   .wp-hero{position:relative;padding:120px 0 88px;border-bottom:1px solid var(--line);overflow:hidden}
   .wp-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.035) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px);background-size:84px 84px;mask-image:radial-gradient(ellipse 70% 80% at 50% 30%, black 30%, transparent 80%);pointer-events:none}
-  .wp-hero::after{content:"";position:absolute;right:-260px;top:-180px;width:840px;height:840px;background:radial-gradient(circle, rgba(229,18,28,.16) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
+  .wp-hero::after{content:"";position:absolute;right:-260px;top:-180px;width:840px;height:840px;background:radial-gradient(circle, rgba(11,92,255,.16) 0%, transparent 60%);filter:blur(40px);pointer-events:none}
   .wp-hero-inner{position:relative;display:grid;grid-template-columns:1.4fr 1fr;gap:64px;align-items:center}
   .wp-eyebrow{display:inline-flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--red)}
   .wp-eyebrow::before{content:"";display:block;width:28px;height:1px;background:var(--red);opacity:.85}
@@ -72,12 +72,12 @@
   .wp-meta b{color:var(--ink-2);font-weight:500}
 
   /* document mock card */
-  .wp-doc{position:relative;border:1px solid var(--line-2);border-radius:14px;background:linear-gradient(180deg,#13131C,#0A0A12);padding:28px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(229,18,28,.30),0 0 0 1px rgba(255,255,255,.04)}
-  .wp-doc::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,#B30E16,#E5121C 50%,#FF3340)}
+  .wp-doc{position:relative;border:1px solid var(--line-2);border-radius:14px;background:linear-gradient(180deg,#13131C,#0A0A12);padding:28px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(11,92,255,.30),0 0 0 1px rgba(255,255,255,.04)}
+  .wp-doc::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,#0A3FD1,#0B5CFF 50%,#2E8BFF)}
   .wp-doc .seal{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
   .wp-doc .seal-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-4);line-height:1.6}
   .wp-doc .seal-l b{color:var(--red);font-weight:500}
-  .wp-doc .seal-r{padding:6px 12px;border:1px solid rgba(229,18,28,.32);border-radius:4px;font-family:var(--mono);font-size:10.5px;color:var(--red);letter-spacing:.14em;text-transform:uppercase;background:rgba(229,18,28,.06)}
+  .wp-doc .seal-r{padding:6px 12px;border:1px solid rgba(11,92,255,.32);border-radius:4px;font-family:var(--mono);font-size:10.5px;color:var(--red);letter-spacing:.14em;text-transform:uppercase;background:rgba(11,92,255,.06)}
   .wp-doc h3{margin:0;font-family:var(--serif);font-style:italic;font-size:30px;font-weight:400;line-height:1.15;letter-spacing:-.015em;color:var(--ink)}
   .wp-doc .sub{margin-top:14px;font-size:14px;color:var(--ink-3);line-height:1.55}
   .wp-doc .lines{margin-top:24px;display:flex;flex-direction:column;gap:8px}
@@ -104,7 +104,7 @@
   /* what's inside grid */
   .toc{margin-top:48px;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
   .toc-card{border:1px solid var(--line);border-radius:12px;padding:28px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);transition:border-color .2s,background .2s;display:flex;flex-direction:column;gap:12px;position:relative}
-  .toc-card:hover{border-color:var(--line-2);background:rgba(229,18,28,.04)}
+  .toc-card:hover{border-color:var(--line-2);background:rgba(11,92,255,.04)}
   .toc-card .num{font-family:var(--serif);font-style:italic;font-size:40px;line-height:.9;color:transparent;-webkit-text-stroke:1px var(--red);letter-spacing:-.04em;font-weight:400;position:absolute;top:24px;right:24px}
   .toc-card .ch{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
   .toc-card h3{margin:0;font-size:21px;font-weight:600;letter-spacing:-.018em;line-height:1.25;color:var(--ink);max-width:80%}
@@ -122,7 +122,7 @@
   .pv-text h3 .em{font-family:var(--serif);font-style:italic;color:var(--red);font-weight:400}
   .pv-text p{margin:0;color:var(--ink-2);font-size:15.5px;line-height:1.7;font-weight:300}
   .pv-text p b{color:var(--ink);font-weight:600}
-  .pv-text p code{font-family:var(--mono);background:rgba(229,18,28,.10);color:var(--red);padding:2px 6px;border-radius:4px;font-size:13px}
+  .pv-text p code{font-family:var(--mono);background:rgba(11,92,255,.10);color:var(--red);padding:2px 6px;border-radius:4px;font-size:13px}
   .pv-figure{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#0A0A12,#07070B);position:relative;overflow:hidden;min-height:280px;padding:24px}
   .pv-figure::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right, rgba(255,255,255,.02) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.02) 1px, transparent 1px);background-size:24px 24px;pointer-events:none}
   .pv-figure .fl{position:relative;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);margin-bottom:16px;display:flex;justify-content:space-between}
@@ -134,7 +134,7 @@
   .fig-row .pre{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);text-align:right}
   .fig-row .post{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .fig-node{padding:8px 12px;border:1px solid var(--line-2);border-radius:6px;background:rgba(255,255,255,.04);font-family:var(--mono);font-size:11px;color:var(--ink-2);letter-spacing:.02em;white-space:nowrap}
-  .fig-node.us{border-color:rgba(229,18,28,.40);background:rgba(229,18,28,.08);color:var(--red);box-shadow:0 0 16px -6px rgba(229,18,28,.40)}
+  .fig-node.us{border-color:rgba(11,92,255,.40);background:rgba(11,92,255,.08);color:var(--red);box-shadow:0 0 16px -6px rgba(11,92,255,.40)}
   .fig-arr{color:var(--ink-4);font-family:var(--mono);font-size:13px}
 
   /* table of contents */
@@ -145,7 +145,7 @@
   .toc-list{padding:8px 0}
   .toc-list .toc-item{padding:14px 28px;display:grid;grid-template-columns:60px 1fr 80px;gap:18px;align-items:center;border-bottom:1px dashed var(--line);transition:background .15s,color .15s}
   .toc-list .toc-item:last-child{border-bottom:0}
-  .toc-list .toc-item:hover{background:rgba(229,18,28,.04);color:var(--red)}
+  .toc-list .toc-item:hover{background:rgba(11,92,255,.04);color:var(--red)}
   .toc-list .ch{font-family:var(--mono);font-size:11.5px;letter-spacing:.10em;color:var(--ink-4);font-weight:600}
   .toc-list .ch.us{color:var(--red)}
   .toc-list .nm{font-size:15px;font-weight:500;color:var(--ink-2);letter-spacing:-.005em}
@@ -155,13 +155,13 @@
   /* failure modes (chaos) */
   .chaos{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   .chaos-cell{border:1px solid var(--line);border-radius:12px;padding:24px;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent)}
-  .chaos-cell .ic{width:32px;height:32px;border-radius:6px;background:rgba(229,18,28,.12);border:1px solid rgba(229,18,28,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
+  .chaos-cell .ic{width:32px;height:32px;border-radius:6px;background:rgba(11,92,255,.12);border:1px solid rgba(11,92,255,.30);display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-weight:600;font-size:14px}
   .chaos-cell h4{margin:14px 0 8px;font-size:16px;font-weight:600;letter-spacing:-.015em;color:var(--ink)}
   .chaos-cell p{margin:0;color:var(--ink-3);font-size:13.5px;line-height:1.6;font-weight:300}
   .chaos-cell p b{color:var(--ink);font-weight:600}
 
   /* download CTA */
-  .download{margin-top:0;padding:120px 0;border-top:1px solid var(--line);background:radial-gradient(900px 360px at 50% 0%, rgba(229,18,28,.18), transparent 60%),linear-gradient(180deg, rgba(229,18,28,.06), transparent 50%);text-align:center;position:relative;overflow:hidden}
+  .download{margin-top:0;padding:120px 0;border-top:1px solid var(--line);background:radial-gradient(900px 360px at 50% 0%, rgba(11,92,255,.18), transparent 60%),linear-gradient(180deg, rgba(11,92,255,.06), transparent 50%);text-align:center;position:relative;overflow:hidden}
   .download::before{content:"";position:absolute;inset:0;background-image:linear-gradient(to right,rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.04) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(ellipse 50% 70% at 50% 50%, black 30%, transparent 80%);pointer-events:none}
   .download-inner{position:relative;z-index:1}
   .download h2{font-size:clamp(32px,4vw,52px);line-height:1.05;letter-spacing:-.035em;font-weight:600;margin:0 auto;max-width:14ch;color:var(--ink)}
@@ -215,6 +215,89 @@
   .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1)}
   .reveal.in{opacity:1;transform:none}
   @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+
+/* injected: Confluent light theme */
+/* ============================================================
+   CONFLUENT LIGHT THEME OVERRIDE  (all sibling pages)
+   Homepage uses its own home.css and is unaffected by this block.
+   Flips the palette to light + blue/purple; keeps the RED icon;
+   re-scopes ink variables inside dark regions so text stays visible.
+   ============================================================ */
+:root{
+  --bg:#FFFFFF; --bg-2:#F5F7FB; --bg-3:#EEF2F9;
+  --surface:#FFFFFF; --surface-2:#F5F7FB;
+  --line:#E4E8F2; --line-2:#D4DAE8; --line-strong:#C2CADD;
+  --ink:#0A0B2E; --ink-2:#3A3F63; --ink-3:#697093; --ink-4:#9AA0BF;
+  --red:#0B5CFF; --red-2:#2E7BFF; --red-glow:rgba(11,92,255,.28);
+  --warm:#16B8E8; --good:#12B76A;
+}
+.stream-grad{background:linear-gradient(100deg,#0B5CFF 0%,#2E7BFF 35%,#2E7BFF 62%,#16B8E8 100%)}
+
+/* base */
+html,body{background:#FFFFFF;color:var(--ink)}
+body{background:
+  radial-gradient(1100px 600px at 82% -8%, rgba(11,92,255,.06), transparent 60%),
+  radial-gradient(800px 500px at -5% 20%, rgba(11,92,255,.05), transparent 70%),
+  #FFFFFF !important;}
+::selection{background:#0B5CFF;color:#fff}
+
+/* nav → white */
+nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line)}
+.subnav{background:rgba(255,255,255,.86) !important;border-bottom:1px solid var(--line)}
+.nav-links a{color:var(--ink-2)} .nav-links a:hover{color:#0B5CFF}
+
+/* keep the RED VeltrixDB icon + wordmark accent */
+.brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 58%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.22) !important}
+.brand b i{color:#0B5CFF}
+
+/* buttons → Confluent blue */
+.btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
+.btn.primary:hover{background:#0A4FE0}
+
+/* ---- dark regions: re-scope ink vars so light text stays visible ---- */
+.hero, footer, .terminal, .dash, .pipe-wrap, .globe-wrap, .path-shapes{
+  --ink:#FFFFFF; --ink-2:#B9BEE6; --ink-3:#8B90C9; --ink-4:#6E74A8;
+  --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.16); --line-strong:rgba(255,255,255,.24);
+  --surface:rgba(255,255,255,.04); --surface-2:rgba(255,255,255,.06);
+}
+footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
+.path-shapes{background:linear-gradient(135deg,#12143F 0%,#0A0B2E 100%) !important}
+
+/* hero → deep-indigo band (matches homepage) */
+.hero{background:linear-gradient(180deg,#0A0B2E 0%,#0C0D34 100%);border-bottom:none;color:#fff}
+.hero::after{background:radial-gradient(circle, rgba(11,92,255,.30) 0%, transparent 60%) !important}
+.hero::before{opacity:.5}
+.hero-kinetic .big .num{
+  background:linear-gradient(180deg,#FFFFFF 0%,#9AB6FF 55%,#16B8E8 100%) !important;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 80px rgba(11,92,255,.30) !important;
+}
+.hero-kinetic .big .num::after{background:linear-gradient(90deg,transparent,rgba(11,92,255,.45) 30%,rgba(11,92,255,.45) 70%,transparent) !important}
+
+/* CTA band → blue/purple glow on light */
+.cta{background:
+  radial-gradient(900px 360px at 50% 0%, rgba(11,92,255,.14), transparent 60%),
+  linear-gradient(180deg, rgba(11,92,255,.05), transparent 50%) !important;}
+
+/* misc red-tint panels → blue tint */
+.wp-callout{background:linear-gradient(135deg, rgba(11,92,255,.10), rgba(11,92,255,.03)) !important}
+
+
+/* nav fixups — align + hide mobile menu on desktop */
+.nav-inner{display:flex;align-items:center;gap:30px;justify-content:flex-start;height:68px}
+.nav-links{display:flex;margin-right:auto;gap:24px;align-items:center}
+.nav-links a{font-size:14.5px;font-weight:600}
+.nav-links a:hover,.nav-links a.active{color:#0B5CFF}
+.nav-cta{display:flex;gap:14px;align-items:center}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mark{width:30px;height:30px;border-radius:9px}
+.brand b{font-size:19px;font-weight:800}
+.nav-cta .btn.primary,.btn.sm{height:40px;padding:0 18px;border-radius:8px;font-size:14px;font-weight:700}
+.nav-burger{display:none;width:40px;height:40px;border-radius:8px;background:transparent;cursor:pointer}
+.mobile-menu{display:none}
+.mobile-menu.open{display:flex;flex-direction:column}
+@media(max-width:960px){.nav-links{display:none}.nav-burger{display:grid;place-items:center}}
+:root{--grid:1200px}
 </style>
 </head>
 <body>
@@ -230,13 +313,13 @@
       <a href="performance.html">Performance</a>
       <a href="pricing.html">Pricing</a>
       <a href="faq.html">FAQ</a>
-      <a href="docs/index.html">Documentation</a>
+      <a href="docs/index.html">Docs</a>
     </div>
     <div class="nav-cta">
       <a class="nav-gh" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener" aria-label="VeltrixDB on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
-      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">&#8599;</span></a>
+      <a class="btn primary sm" href="docs/getting-started/quickstart.html">Get started free <span class="arrow">↗</span></a>
       <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
-        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
     </div>
   </div>
@@ -245,8 +328,8 @@
     <a href="performance.html">Performance</a>
     <a href="pricing.html">Pricing</a>
     <a href="faq.html">FAQ</a>
-    <a href="docs/index.html">Documentation</a>
-    <a class="mm-cta" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo &#8599;</a>
+    <a href="docs/index.html">Docs</a>
+    <a class="mm-cta" href="docs/getting-started/quickstart.html">Get started free ↗</a>
   </div>
 </nav>
 
@@ -267,7 +350,7 @@
           <span><b>Pages</b> · 42</span>
           <span><b>Author</b> · A. Gupta</span>
           <span><b>Updated</b> · May 2026</span>
-          <span><b>License</b> · Closed source · reproducible benchmarks</span>
+          <span><b>License</b> · Apache 2.0 (open source) · reproducible benchmarks</span>
         </div>
       </div>
 
@@ -298,8 +381,8 @@
 <section>
   <div class="wrap reveal">
     <span class="sec-eyebrow">Why we wrote it</span>
-    <h2 class="sh">Closed source <span class="em">doesn't mean opaque</span>.</h2>
-    <p class="sh-sub">We're closed source — for reasons that are honest and uninteresting. But we shipped a 42-page architectural document so that no CTO ever has to take "trust us" for an answer. If your security-review team wants the engineer who wrote a section on a call, we'll send them. This is the document that makes that conversation possible.</p>
+    <h2 class="sh">Open source, <span class="em">documented to the last byte</span>.</h2>
+    <p class="sh-sub">VeltrixDB is open source under Apache 2.0 — every line is on GitHub. But reading 40k lines of Go isn't how most teams evaluate a database, so we also shipped this 42-page architectural document. It's the fastest way for a CTO or security-review team to understand exactly how the engine works — and the source is right there when they want to go deeper.</p>
 
     <div class="toc">
       <div class="toc-card">
@@ -519,7 +602,7 @@
       <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A%0AChapters%20of%20most%20interest%3A">Email me the whitepaper <span class="arrow">↗</span></a>
       <a class="btn" href="mailto:veltrixdb@gmail.com?subject=Whitepaper%20walkthrough&body=Hi%20—%20we'd%20like%20to%20schedule%20a%2030-minute%20call%20with%20the%20engineer%20who%20wrote%20the%20whitepaper.%0A%0AName%3A%0ACompany%3A%0AChapters%20of%20most%20interest%3A">Schedule a walkthrough</a>
     </div>
-    <div class="fine">Closed source · architecture documented in full · we'll walk a security-review team through any component</div>
+    <div class="fine">Apache 2.0 open source · architecture documented in full · read the code on GitHub</div>
   </div>
 </section>
 
@@ -578,5 +661,6 @@
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 })();
 </script>
+<script>(function(){var b=document.getElementById('navBurger'),m=document.getElementById('mobileMenu');if(b&&m){b.addEventListener('click',function(){m.classList.toggle('open')})}})();</script>
 </body>
 </html>

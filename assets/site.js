@@ -13,7 +13,7 @@ function makePipeline3D(){
   el.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-  const dl = new THREE.DirectionalLight(0xE5121C, 0.9); dl.position.set(2,4,4); scene.add(dl);
+  const dl = new THREE.DirectionalLight(0x0B5CFF, 0.9); dl.position.set(2,4,4); scene.add(dl);
   const dl2 = new THREE.DirectionalLight(0xffffff, 0.35); dl2.position.set(-3,2,3); scene.add(dl2);
 
   const xs = [-4.2, -2.1, 0, 2.1, 4.2];
@@ -23,16 +23,16 @@ function makePipeline3D(){
     const grp = new THREE.Group();
     const geom = new THREE.BoxGeometry(1.0, 0.8, 0.8);
     const body = new THREE.Mesh(geom, new THREE.MeshPhysicalMaterial({
-      color: i===accentIdx ? 0xE5121C : 0x1B1B26,
+      color: i===accentIdx ? 0x0B5CFF : 0x1B1B26,
       metalness:0.55, roughness:0.45,
-      emissive: i===accentIdx ? 0xE5121C : 0x000000,
+      emissive: i===accentIdx ? 0x0B5CFF : 0x000000,
       emissiveIntensity: i===accentIdx ? 0.55 : 0.0,
       transparent:true, opacity: 0.92
     }));
     grp.add(body);
     const wf = new THREE.LineSegments(
       new THREE.WireframeGeometry(geom),
-      new THREE.LineBasicMaterial({color: i===accentIdx ? 0xFF8088 : 0x6A6C78, transparent:true, opacity: i===accentIdx?0.85:0.55})
+      new THREE.LineBasicMaterial({color: i===accentIdx ? 0x8FB4FF : 0x6A6C78, transparent:true, opacity: i===accentIdx?0.85:0.55})
     );
     grp.add(wf);
     grp.position.set(x, 0, 0);
@@ -45,18 +45,18 @@ function makePipeline3D(){
       new THREE.Vector3(xs[i]+0.5, 0, 0),
       new THREE.Vector3(xs[i+1]-0.5, 0, 0)
     ]);
-    scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xE5121C, transparent:true, opacity:0.32})));
+    scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({color:0x0B5CFF, transparent:true, opacity:0.32})));
   }
 
   const packets = [];
   function spawn(isWrite){
     const m = new THREE.Mesh(
       new THREE.SphereGeometry(0.13, 16, 12),
-      new THREE.MeshBasicMaterial({color: isWrite ? 0xF4A65A : 0xFF3340})
+      new THREE.MeshBasicMaterial({color: isWrite ? 0x16B8E8 : 0x2E8BFF})
     );
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 16, 12),
-      new THREE.MeshBasicMaterial({color: isWrite ? 0xF4A65A : 0xFF3340, transparent:true, opacity:0.18})
+      new THREE.MeshBasicMaterial({color: isWrite ? 0x16B8E8 : 0x2E8BFF, transparent:true, opacity:0.18})
     );
     m.add(halo);
     m.userData = {t:0, speed: 0.0050 + Math.random()*0.0030, write:isWrite};
@@ -106,7 +106,7 @@ function makeGlobe3D(){
   el.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-  const dl = new THREE.DirectionalLight(0xE5121C, 1.0); dl.position.set(3,2,5); scene.add(dl);
+  const dl = new THREE.DirectionalLight(0x0B5CFF, 1.0); dl.position.set(3,2,5); scene.add(dl);
 
   const r = 1.7;
   const grp = new THREE.Group();
@@ -117,12 +117,12 @@ function makeGlobe3D(){
   grp.add(sphere);
   grp.add(new THREE.LineSegments(
     new THREE.WireframeGeometry(new THREE.SphereGeometry(r*1.005, 28, 18)),
-    new THREE.LineBasicMaterial({color:0xE5121C, transparent:true, opacity:0.32})
+    new THREE.LineBasicMaterial({color:0x0B5CFF, transparent:true, opacity:0.32})
   ));
   // outer ring (atmospheric)
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(r*1.18, r*1.20, 64),
-    new THREE.MeshBasicMaterial({color:0xFF3340, side:THREE.DoubleSide, transparent:true, opacity:0.5})
+    new THREE.MeshBasicMaterial({color:0x2E8BFF, side:THREE.DoubleSide, transparent:true, opacity:0.5})
   );
   ring.rotation.x = Math.PI*0.18;
   grp.add(ring);
@@ -137,12 +137,12 @@ function makeGlobe3D(){
     const v = new THREE.Vector3(...p).normalize().multiplyScalar(r*1.02);
     const dot = new THREE.Mesh(
       new THREE.SphereGeometry(0.05, 14, 10),
-      new THREE.MeshBasicMaterial({color:0xFF3340})
+      new THREE.MeshBasicMaterial({color:0x2E8BFF})
     );
     dot.position.copy(v); grp.add(dot);
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(0.06, 0.085, 24),
-      new THREE.MeshBasicMaterial({color:0xFF6B73, side:THREE.DoubleSide, transparent:true, opacity:0.6})
+      new THREE.MeshBasicMaterial({color:0x5B93FF, side:THREE.DoubleSide, transparent:true, opacity:0.6})
     );
     halo.position.copy(v); halo.lookAt(0,0,0);
     halo.userData = {ph: Math.random()*Math.PI*2};
@@ -158,7 +158,7 @@ function makeGlobe3D(){
     const curve = new THREE.QuadraticBezierCurve3(va, mid, vb);
     const pts = curve.getPoints(40);
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    return new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xFF6B73, transparent:true, opacity:0.55}));
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({color:0x5B93FF, transparent:true, opacity:0.55}));
   }
   for (let i=0;i<pts.length;i++){
     grp.add(arc(pts[i], pts[(i+2)%pts.length]));
@@ -209,8 +209,8 @@ function makeHero3D(){
   el.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-  const key = new THREE.DirectionalLight(0xE5121C, 1.0); key.position.set(4,3,5); scene.add(key);
-  const rim = new THREE.DirectionalLight(0xFF3340, 0.5); rim.position.set(-4,-2,3); scene.add(rim);
+  const key = new THREE.DirectionalLight(0x0B5CFF, 1.0); key.position.set(4,3,5); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x2E8BFF, 0.5); rim.position.set(-4,-2,3); scene.add(rim);
 
   // Big wire icosahedron
   const objs = [];
@@ -232,11 +232,11 @@ function makeHero3D(){
     scene.add(grp);
     objs.push(grp);
   }
-  makeSolid(new THREE.IcosahedronGeometry(1.6, 0),  {x:-4.5, y:1.0, color:0xE5121C, wire:0xFF6B73, s:1.0});
-  makeSolid(new THREE.OctahedronGeometry(1.0, 0),   {x:4.6,  y:-1.4, color:0xE5121C, wire:0xFF6B73, s:1.0});
-  makeSolid(new THREE.TorusKnotGeometry(0.6,0.18,80,12,2,3), {x:3.8, y:1.8, color:0xFF3340, wire:0xFF8088, s:1.0, bodyOp:.06});
-  makeSolid(new THREE.TetrahedronGeometry(0.85,0),  {x:-3.5, y:-2.0, color:0xE5121C, wire:0xFF6B73, s:1.0});
-  makeSolid(new THREE.DodecahedronGeometry(0.55,0), {x:0.6, y:2.6, z:-1, color:0xE5121C, wire:0xFF6B73, s:1.0, bodyOp:.08});
+  makeSolid(new THREE.IcosahedronGeometry(1.6, 0),  {x:-4.5, y:1.0, color:0x0B5CFF, wire:0x5B93FF, s:1.0});
+  makeSolid(new THREE.OctahedronGeometry(1.0, 0),   {x:4.6,  y:-1.4, color:0x0B5CFF, wire:0x5B93FF, s:1.0});
+  makeSolid(new THREE.TorusKnotGeometry(0.6,0.18,80,12,2,3), {x:3.8, y:1.8, color:0x2E8BFF, wire:0x8FB4FF, s:1.0, bodyOp:.06});
+  makeSolid(new THREE.TetrahedronGeometry(0.85,0),  {x:-3.5, y:-2.0, color:0x0B5CFF, wire:0x5B93FF, s:1.0});
+  makeSolid(new THREE.DodecahedronGeometry(0.55,0), {x:0.6, y:2.6, z:-1, color:0x0B5CFF, wire:0x5B93FF, s:1.0, bodyOp:.08});
 
   // Starfield
   const N = 380;
@@ -249,7 +249,7 @@ function makeHero3D(){
   }
   sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
-    color:0xE5121C, size:0.06, transparent:true, opacity:0.5,
+    color:0x0B5CFF, size:0.06, transparent:true, opacity:0.5,
     sizeAttenuation:true, depthWrite:false, blending:THREE.AdditiveBlending
   })));
 
@@ -378,14 +378,14 @@ function makePathShapes3D(){
   const camera = new THREE.PerspectiveCamera(46, W()/H(), 0.1, 100);
   camera.position.set(0,0,9);
   scene.add(new THREE.AmbientLight(0xffffff,0.25));
-  const keyLight = new THREE.DirectionalLight(0xFF3340,1.8);
+  const keyLight = new THREE.DirectionalLight(0x2E8BFF,1.8);
   keyLight.position.set(3,5,6); scene.add(keyLight);
-  const fillLight = new THREE.PointLight(0xE5121C,0.6,14);
+  const fillLight = new THREE.PointLight(0x0B5CFF,0.6,14);
   fillLight.position.set(-3,2,3); scene.add(fillLight);
 
   const mat = new THREE.MeshPhysicalMaterial({
     color:0x181824, metalness:0.55, roughness:0.35,
-    emissive:0xE5121C, emissiveIntensity:0.06,
+    emissive:0x0B5CFF, emissiveIntensity:0.06,
   });
   const matB = mat.clone(); matB.emissiveIntensity = 0.03;
 
@@ -405,7 +405,7 @@ function makePathShapes3D(){
   scene.add(tetra);
 
   const ringGeo = new THREE.RingGeometry(0.7,0.78,40);
-  const ringMat = new THREE.MeshBasicMaterial({color:0xE5121C,opacity:0.18,transparent:true,side:THREE.DoubleSide});
+  const ringMat = new THREE.MeshBasicMaterial({color:0x0B5CFF,opacity:0.18,transparent:true,side:THREE.DoubleSide});
   const ring1 = new THREE.Mesh(ringGeo,ringMat); ring1.rotation.x = -Math.PI/2; ring1.position.set(-1.4,-2.0,0); scene.add(ring1);
   const ring2 = ring1.clone(); ring2.position.set(0.6,-2.4,-0.8); scene.add(ring2);
   const ring3 = ring1.clone(); ring3.position.set(1.5,-0.6,-0.5); scene.add(ring3);
@@ -571,15 +571,15 @@ function makePathShapes3D(){
   chart.innerHTML = `
     <defs>
       <linearGradient id="dashFill" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stop-color="#E5121C" stop-opacity=".35"/>
-        <stop offset="100%" stop-color="#E5121C" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#0B5CFF" stop-opacity=".35"/>
+        <stop offset="100%" stop-color="#0B5CFF" stop-opacity="0"/>
       </linearGradient>
     </defs>
     <line x1="0" y1="${H-(5/max)*H*0.85-8}" x2="${W}" y2="${H-(5/max)*H*0.85-8}" stroke="rgba(255,255,255,.08)" stroke-dasharray="3 4"/>
     <text x="${W-4}" y="${H-(5/max)*H*0.85-12}" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#5A5C66" letter-spacing=".08em">SLA 5MS</text>
     <path d="${path(p99, max)} L${W} ${H} L0 ${H} Z" fill="url(#dashFill)"/>
-    <path d="${path(p99, max)}" fill="none" stroke="#E5121C" stroke-width="1.5"/>
-    <path d="${path(p95, max)}" fill="none" stroke="#F4A65A" stroke-width="1.2" stroke-opacity=".7"/>
+    <path d="${path(p99, max)}" fill="none" stroke="#0B5CFF" stroke-width="1.5"/>
+    <path d="${path(p95, max)}" fill="none" stroke="#16B8E8" stroke-width="1.2" stroke-opacity=".7"/>
     <path d="${path(p50, max)}" fill="none" stroke="#46D391" stroke-width="1.2" stroke-opacity=".7"/>
   `;
   // bars: 32 shards visible, varied heights

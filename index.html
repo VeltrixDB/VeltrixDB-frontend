@@ -3,33 +3,23 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>VeltrixDB - Real-time data at unlimited scale</title>
-<meta name="description" content="VeltrixDB is an NVMe-backed key-value database with sub-5ms P99 reads at a billion keys - key-value separated storage, io_uring I/O, and fixed cluster pricing." />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23FF3340'/><stop offset='60%25' stop-color='%23E5121C'/><stop offset='100%25' stop-color='%23B30E16'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<title>VeltrixDB — A billion keys at &lt;5ms, for a tenth of the RAM bill</title>
+<meta name="description" content="VeltrixDB keeps your working set on NVMe instead of RAM: sub-5ms P99 at a billion keys, ~10× lower cost per GB, 1.0× write amplification, any cloud. Apache 2.0, Kubernetes-first." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='55%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M13 2L3 14h7l-1 8 11-13h-7l0-7z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
-<script defer src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<link rel="stylesheet" href="assets/site.css">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/home.css">
 </head>
 <body>
-<template id="__bundler_thumbnail" data-bg-color="#07070B">
-  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-    <rect width="1200" height="800" fill="#07070B"/>
-    <g transform="translate(600 400)">
-      <rect x="-90" y="-90" width="180" height="180" rx="36" fill="url(#g)"/>
-      <path d="M 30 -50 L -40 30 L 10 30 L -10 70 L 50 -10 L 0 -10 Z" fill="#FFFFFF"/>
-    </g>
-    <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#FF3340"/>
-        <stop offset="100%" stop-color="#B30E16"/>
-      </linearGradient>
-    </defs>
-    <text x="600" y="600" font-family="serif" font-style="italic" font-size="44" fill="#5A5C66" text-anchor="middle">VeltrixDB</text>
-  </svg>
-</template>
 
+<!-- ============ ANNOUNCEMENT BAR ============ -->
+<div class="topbar">
+  VeltrixDB is now open source — Apache 2.0. 427K reads/s measured on YCSB.
+  <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">★ Star us on GitHub ↗</a>
+</div>
+
+<!-- ============ NAV ============ -->
 <nav class="top">
   <div class="wrap nav-inner">
     <a class="brand" href="index.html">
@@ -41,13 +31,13 @@
       <a href="performance.html">Performance</a>
       <a href="pricing.html">Pricing</a>
       <a href="faq.html">FAQ</a>
-      <a href="docs/index.html">Documentation</a>
+      <a href="docs/index.html">Docs</a>
     </div>
     <div class="nav-cta">
       <a class="nav-gh" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener" aria-label="VeltrixDB on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
-      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">&#8599;</span></a>
+      <a class="btn primary sm" href="docs/getting-started/quickstart.html">Get started free <span class="arrow">↗</span></a>
       <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
-        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
     </div>
   </div>
@@ -56,44 +46,57 @@
     <a href="performance.html">Performance</a>
     <a href="pricing.html">Pricing</a>
     <a href="faq.html">FAQ</a>
-    <a href="docs/index.html">Documentation</a>
-    <a class="mm-cta" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo &#8599;</a>
+    <a href="docs/index.html">Docs</a>
+    <a class="mm-cta" href="docs/getting-started/quickstart.html">Get started free ↗</a>
   </div>
 </nav>
 
-
 <!-- ============ HERO ============ -->
 <header class="hero">
-  <div id="hero3d"></div>
+  <div class="streams" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+  <svg class="waves" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="wg" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#0B5CFF" stop-opacity="0"/>
+        <stop offset="50%" stop-color="#2E7BFF" stop-opacity=".9"/>
+        <stop offset="100%" stop-color="#16B8E8" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <g fill="none" stroke="url(#wg)" stroke-width="1.5">
+      <path d="M-100 180 C 300 60, 700 300, 1540 120" opacity=".5"/>
+      <path d="M-100 240 C 320 120, 760 360, 1540 200" opacity=".4"/>
+      <path d="M-100 320 C 340 200, 720 420, 1540 300" opacity=".35"/>
+      <path d="M-100 400 C 300 300, 780 480, 1540 380" opacity=".3"/>
+    </g>
+  </svg>
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-left">
-        <span class="pill"><span class="tag">MEASURED</span><span>YCSB 0.17 &middot; 100M keys &middot; raw output in the repo</span><span class="dot"></span></span>
-        <h1>Sub-5ms P99 at a billion keys.<br><span class="em">On NVMe, not RAM.</span></h1>
-        <p class="hero-sub"><b>VeltrixDB is a point-lookup engine</b> for working sets that outgrew RAM pricing: values live once on NVMe (1.0&times; write amplification), the index stays in DRAM, and the P99 doesn't spike when compaction runs. Apache 2.0 &middot; one binary.</p>
+        <span class="pill"><span class="tag">MEASURED</span><span>YCSB 0.17 · 100M keys · 0 errors</span><span class="dot"></span></span>
+        <h1>A billion keys.<br>Sub-5ms reads.<br><span class="em">One-tenth the bill.</span></h1>
+        <p class="hero-sub"><b>VeltrixDB keeps your working set on NVMe, not RAM</b> — so latency stays flat, the bill stays flat, and it runs on any cloud.</p>
+        <p class="hero-meta">Free &amp; open source (Apache 2.0) · one binary · production-ready on Kubernetes in 94 seconds.</p>
         <div class="hero-actions">
-          <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a demo <span class="arrow">&#8599;</span></a>
-          <a class="btn" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Star on GitHub</a>
+          <a class="btn primary" href="docs/getting-started/quickstart.html">Get started free <span class="arrow">↗</span></a>
+          <a class="btn ghost-light" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Star on GitHub</a>
         </div>
         <div class="proof-chips" aria-label="Measured proof points">
-          <span><b>427K</b> reads/s &middot; measured</span>
-          <span><b>1.0&times;</b> write amplification</span>
-          <span><b>94s</b> to first cluster</span>
+          <span><b>10×</b> lower cost / GB</span>
+          <span><b>&lt;5ms</b> P99 · 1B keys</span>
+          <span><b>1.0×</b> write amplification</span>
         </div>
       </div>
       <div class="hero-right">
         <div class="term" id="heroTerm">
           <div class="term-bar">
             <span class="td"></span><span class="td"></span><span class="td"></span>
-            <span class="tt">veltrix@nvme &mdash; 60-second start</span>
-            <button class="term-copy" id="termCopy" aria-label="Copy quickstart commands">Copy</button>
+            <span class="tt">veltrix@nvme — 60-second start</span>
+            <button class="term-copy" id="termCopy" aria-label="Copy quickstart command">Copy</button>
           </div>
-          <div class="term-body" id="termBody" aria-live="off">
-            <div class="ln"><span class="p">$ </span><span class="cmd" data-type="docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb"></span></div>
-          </div>
+          <div class="term-body" id="termBody" aria-live="off"></div>
           <div class="term-foot">
-            <span class="tf-l">P99 read &middot; 1B keys &middot; NVMe</span>
-            <span class="hero-kinetic"><span class="big"><span class="num">33.0</span><span class="unit">ms</span></span></span>
+            <span class="tf-l">P99 read · 1B keys · NVMe</span>
+            <span class="hero-kinetic"><span class="big"><span class="num">4.9</span><span class="unit">ms</span></span></span>
           </div>
         </div>
       </div>
@@ -101,194 +104,231 @@
   </div>
 </header>
 
-<!-- ============ STATS STRIP ============ -->
-<section class="stats-strip" style="border-top:none">
+<!-- ============ LOGO CLOUD ============ -->
+<section class="logos">
+  <div class="wrap">
+    <div class="cap">Built on the systems primitives you already trust</div>
+    <div class="logo-row">
+      <span>io_uring</span><span>O_DIRECT NVMe</span><span>WiscKey KV-separation</span><span>group-commit WAL</span><span>FNV-1a sharding</span><span>Prometheus / Grafana</span><span>Kubernetes operator</span><span>gRPC</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ THE PROBLEM (STORY) ============ -->
+<section class="story">
+  <div class="wrap">
+    <div class="story-grid">
+      <div class="reveal">
+        <span class="eyebrow">The problem</span>
+        <div class="lead">At a billion keys, you're not paying for a database. You're paying for <span class="rt">RAM</span>.</div>
+      </div>
+      <div class="reveal">
+        <p class="muted-lead">Redis and other in-memory stores keep <b>every value in DRAM</b> — hot or cold. Cloud RAM costs 15–20× more per gigabyte than NVMe SSD, so the bigger your dataset grows, the more you pay simply to hold it in memory. That's a bill that scales with your data, not your revenue.</p>
+      </div>
+    </div>
+
+    <!-- The money slide -->
+    <div class="cost-split reveal" style="margin-top:48px">
+      <div class="cost-card bad">
+        <div class="ck">In-memory (Redis)</div>
+        <div class="cnum">$3,000–5,000</div>
+        <div class="cunit">/ month · ~250 GB DRAM</div>
+        <div class="cbar"><i></i></div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#8B93B0" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Every value pinned in memory, hot or cold</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#8B93B0" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>P99 spikes when AOF rewrite runs</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#8B93B0" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Cost grows linearly with dataset size</li>
+        </ul>
+      </div>
+      <div class="cost-vs"><span class="badge">≈ 10× lower</span></div>
+      <div class="cost-card good">
+        <div class="ck">VeltrixDB on NVMe</div>
+        <div class="cnum"><span class="g">$300–500</span></div>
+        <div class="cunit">/ month · ~160 GB NVMe</div>
+        <div class="cbar"><i></i></div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Values on NVMe, only pointers in DRAM</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Flat P99 — GC never blocks reads</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Fixed cluster pricing, no per-op meter</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cost-foot">Illustrative — 1 billion keys × 128-byte values, GCP list pricing. Your mileage will vary; the ratio won't.</div>
+  </div>
+</section>
+
+<!-- ============ THE SHIFT ============ -->
+<section>
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The shift</span>
+      <h2 class="sh wide">One idea, <span class="em">executed properly</span>.</h2>
+      <p class="sh-sub">Move the bytes to where they're cheap. Keep only what you need in memory. Never let cleanup touch the fast path.</p>
+    </div>
+    <div class="shift reveal">
+      <div class="cell">
+        <div class="cn">01 · Storage</div>
+        <h3>Values on NVMe</h3>
+        <p>Written once to an append-only log and never rewritten. Compaction only reclaims dead space — so write amplification stays at 1.0×, not the 10–30× of LSM trees.</p>
+      </div>
+      <div class="cell">
+        <div class="cn">02 · Memory</div>
+        <h3>Index in DRAM</h3>
+        <p>Only a 64-byte pointer per key lives in memory. A read is one DRAM lookup at ~0.28ms, or exactly one NVMe read at 4.9ms on a miss. No page-cache roulette.</p>
+      </div>
+      <div class="cell">
+        <div class="cn">03 · Latency</div>
+        <h3>P99 that holds</h3>
+        <p>GC is rate-limited to your read latency and runs off the fast path. Across 100M operations in the YCSB run: zero errors, zero emergency GC events.</p>
+      </div>
+    </div>
+    <div style="margin-top:26px"><a class="btn" href="product.html#how">See the full read/write path →</a></div>
+  </div>
+</section>
+
+<!-- ============ PROOF (STATS) ============ -->
+<section class="stats-strip">
   <div class="wrap">
     <div class="stats-grid">
-      <div class="stat">
-        <div class="v">&lt;5<sup>ms</sup></div>
-        <div class="l">P99 Latency</div>
-        <div class="d">Sustained at 1B keys, mixed read/write load.</div>
-      </div>
-      <div class="stat">
+      <div class="stat reveal">
         <div class="v"><span class="red">427K</span><sup>/s</sup></div>
         <div class="l">Reads / sec / node</div>
         <div class="d">Measured — YCSB 0.17, 100M keys, 200 threads.</div>
       </div>
-      <div class="stat">
+      <div class="stat reveal">
+        <div class="v">&lt;5<sup>ms</sup></div>
+        <div class="l">P99 read latency</div>
+        <div class="d">Sustained at 1B keys, mixed read/write load.</div>
+      </div>
+      <div class="stat reveal">
         <div class="v">1.0<sup>×</sup></div>
         <div class="l">Write amplification</div>
-        <div class="d">Values written once — compaction never rewrites them.</div>
+        <div class="d">Values written once — never rewritten by compaction.</div>
       </div>
-      <div class="stat">
-        <div class="v">94<sup>s</sup></div>
-        <div class="l">To first cluster</div>
-        <div class="d">One Helm install — GKE, EKS, AKS, or bare metal.</div>
+      <div class="stat reveal">
+        <div class="v">0</div>
+        <div class="l">Errors / GC events</div>
+        <div class="d">Across 100M operations in the YCSB run.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ OUTCOMES ============ -->
-<section id="why">
+<!-- ============ OUTCOMES (CXO) ============ -->
+<section class="paper" id="why">
   <div class="wrap">
-    <span class="eyebrow">Why VeltrixDB</span>
-    <h2 class="sh">What actually changes <span class="em">when you switch</span>.</h2>
-    <p class="sh-sub">Not a feature checklist. The real outcomes your engineers, finance team, and users feel — within weeks of deployment.</p>
-
-    <div class="outcomes">
-      <div class="outcome">
+    <div class="section-head reveal">
+      <span class="eyebrow">What it means for the business</span>
+      <h2 class="sh wide">Four numbers your <span class="em">board will care about</span>.</h2>
+    </div>
+    <div class="outcomes" style="grid-template-columns:repeat(2,1fr)">
+      <div class="outcome reveal">
         <div class="head">
           <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h6v6"/></svg></div>
-          <span class="idx">01 — Latency</span>
+          <span class="idx">Latency</span>
         </div>
-        <h3>Latency that <span class="em">never surprises</span> you.</h3>
-        <p>Sub-5ms reads at any scale, under any write load. No degradation during flash sales. No spikes when background cleanup runs. Consistent — always.</p>
-        <div class="metric"><span class="num"><span class="acc">&lt;5</span>ms</span><span class="lbl">P99 — guaranteed</span></div>
+        <h3>An SLA you can <span class="em">actually promise</span>.</h3>
+        <p>Sub-5ms P99 at any scale, under any write load — no degradation during traffic spikes, no stalls when background cleanup runs.</p>
+        <div class="metric"><span class="num"><span class="acc">&lt;5</span>ms</span><span class="lbl">P99 · sustained at 1B keys</span></div>
       </div>
-      <div class="outcome">
+      <div class="outcome reveal">
         <div class="head">
           <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9.5C9 8 10.3 7 12 7s3 1 3 2.5-1.3 2-3 2.5-3 1-3 2.5S10.3 17 12 17s3-1 3-2.5"/><path d="M12 5v2M12 17v2"/></svg></div>
-          <span class="idx">02 — Cost</span>
+          <span class="idx">Cost</span>
         </div>
-        <h3>A bill you can <span class="em">actually predict</span>.</h3>
-        <p>Pay for fixed infrastructure, not per million operations. Your bill doesn't spike when a campaign goes viral or a cron job runs a full-table scan.</p>
-        <div class="metric"><span class="num"><span class="acc">3–5×</span></span><span class="lbl">Lower vs DynamoDB</span></div>
+        <h3>A bill that <span class="em">stops chasing your data</span>.</h3>
+        <p>Fixed cluster pricing on NVMe instead of RAM — roughly a tenth of the cost per gigabyte, with no per-operation meter to model.</p>
+        <div class="metric"><span class="num"><span class="acc">10×</span></span><span class="lbl">lower cost per GB vs RAM</span></div>
       </div>
-      <div class="outcome">
+      <div class="outcome reveal">
         <div class="head">
           <div class="ico"><svg viewBox="0 0 24 24"><path d="M7 18a5 5 0 010-10 6 6 0 0111.7 1.5A4 4 0 0118 18H7z"/><path d="M9 14h6"/></svg></div>
-          <span class="idx">03 — Portability</span>
+          <span class="idx">Portability</span>
         </div>
-        <h3>Any cloud. <span class="em">Zero lock-in</span>.</h3>
-        <p>One Helm chart runs identically on GKE, EKS, AKS, or bare metal. Switch providers without rewriting your data layer or renegotiating vendor contracts.</p>
-        <div class="metric"><span class="num">4 platforms</span><span class="lbl">GKE · EKS · AKS · Bare</span></div>
+        <h3>No cloud <span class="em">holds you hostage</span>.</h3>
+        <p>One Helm chart runs identically on GKE, EKS, AKS, or bare metal. Change providers without rewriting your data layer or your contracts.</p>
+        <div class="metric"><span class="num">4 platforms</span><span class="lbl">GKE · EKS · AKS · Bare metal</span></div>
       </div>
-      <div class="outcome">
-        <div class="head">
-          <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div>
-          <span class="idx">04 — Compaction</span>
-        </div>
-        <h3>Background work, <span class="em">invisible to users</span>.</h3>
-        <p>Compaction and GC run on a completely separate I/O path. Your users never feel it. No more 3 AM pages because cleanup chose the wrong moment.</p>
-        <div class="metric"><span class="num"><span class="acc">0</span> interference</span><span class="lbl">Separate I/O path</span></div>
-      </div>
-      <div class="outcome">
-        <div class="head">
-          <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
-          <span class="idx">05 — Observability</span>
-        </div>
-        <h3>Observability from <span class="em">day one</span>.</h3>
-        <p>50+ Prometheus metrics, pre-wired Grafana dashboards, and alert rules ship in the Helm chart. No custom instrumentation. No dark weeks.</p>
-        <div class="metric"><span class="num"><span class="acc">50+</span> metrics</span><span class="lbl">ServiceMonitor · Alerts</span></div>
-      </div>
-      <div class="outcome">
+      <div class="outcome reveal">
         <div class="head">
           <div class="ico"><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/><path d="M3 18h18"/></svg></div>
-          <span class="idx">06 — Time to prod</span>
+          <span class="idx">Time to value</span>
         </div>
-        <h3>Zero to production <span class="em">in minutes</span>.</h3>
-        <p>One Helm command deploys storage, replication, auto-scaling, and monitoring. No weeks of tuning. No specialist hire. Day-one productive.</p>
+        <h3>Days to production, <span class="em">not quarters</span>.</h3>
+        <p>One command deploys storage, replication, auto-scaling, and monitoring — 50+ metrics and dashboards included. No specialist hire, no dark weeks.</p>
         <div class="metric"><span class="num"><span class="acc">94</span>s</span><span class="lbl">helm install → ready</span></div>
       </div>
     </div>
   </div>
 </section>
 
-
-<!-- ============ HOW IT WORKS (30 seconds) ============ -->
-<section class="tight" id="how30">
-  <div class="wrap">
-    <div class="eyebrow">THE ENGINE IN 30 SECONDS</div>
-    <h2 class="sh">Three ideas. <span class="em">No magic</span>.</h2>
-    <div class="how-strip">
-      <div class="how-card">
-        <div class="hc-k">01 &middot; Write path</div>
-        <h3>Durable before ACK</h3>
-        <div class="hc-d">client &rarr; WAL <b>fsync</b> &rarr; VLog(NVMe) &rarr; <b>ack</b></div>
-        <p>Group-commit WAL batches concurrent writes into one fsync. Values land in an append-only log &mdash; written once, never rewritten.</p>
-      </div>
-      <div class="how-card">
-        <div class="hc-k">02 &middot; Read path</div>
-        <h3>One NVMe read, worst case</h3>
-        <div class="hc-d">key &rarr; DRAM index &rarr; <b>cache hit 0.3ms</b> | miss &rarr; io_uring &rarr; <b>4.9ms</b></div>
-        <p>A 24-byte pointer per key in DRAM. Cache miss costs exactly one O_DIRECT read &mdash; no page-cache roulette, no compaction in the way.</p>
-      </div>
-      <div class="how-card">
-        <div class="hc-k">03 &middot; Scale</div>
-        <h3>1024 shards, zero hot locks</h3>
-        <div class="hc-d">shard = hash(key) &rarr; own queue &rarr; own disk lane</div>
-        <p>Each shard owns its I/O submission queue. Eight NVMe devices write in parallel like a storage controller, not a database.</p>
-      </div>
-    </div>
-    <div style="margin-top:22px"><a class="btn" href="product.html#how">The full read/write path &rarr;</a></div>
-  </div>
-</section>
-
 <!-- ============ BENCHMARK TEASER ============ -->
-<section id="performance" class="tight">
+<section id="performance">
   <div class="wrap">
-    <div class="eyebrow">MEASURED, NOT PROJECTED</div>
-    <h2 class="sh">One chart says it: <span class="em">4.9ms on a cache miss</span>.</h2>
-    <p class="sh-sub" style="max-width:620px">P99 read latency at 1 billion keys, sustained mixed load, equivalent hardware. The full run — hardware spec, YCSB config, raw output — lives on the performance page.</p>
-    <div class="bars" id="bars" style="margin-top:26px">
+    <div class="section-head reveal">
+      <div class="eyebrow">Measured, not projected</div>
+      <h2 class="sh wide">33ms is the industry's normal. <span class="em">We ship 4.9ms.</span></h2>
+      <p class="sh-sub">P99 read latency at 1 billion keys, sustained mixed load, equivalent hardware. Full run — hardware spec, YCSB config, raw output — on the performance page.</p>
+    </div>
+    <div class="bars" id="bars">
       <div class="bar-row"><div class="bar-label">Cassandra</div><div class="bar-track"><div class="bar-fill cass" data-w="100">~80ms</div></div><div class="bar-note">~80ms P99</div></div>
       <div class="bar-row"><div class="bar-label">LSM-tree DB</div><div class="bar-track"><div class="bar-fill lsm" data-w="41">~33ms</div></div><div class="bar-note">~33ms P99</div></div>
       <div class="bar-row"><div class="bar-label">VeltrixDB · miss</div><div class="bar-track"><div class="bar-fill us-miss" data-w="7">4.9ms</div></div><div class="bar-note">4.9ms · cache miss</div></div>
     </div>
-    <div style="margin-top:26px;display:flex;gap:12px;flex-wrap:wrap">
-      <a class="btn primary" href="performance.html">Full benchmark & methodology <span class="arrow">↗</span></a>
-      <a class="btn" href="product.html">How the engine does it</a>
+    <div style="margin-top:30px;display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn primary" href="performance.html">Full benchmark &amp; methodology <span class="arrow">↗</span></a>
+      <a class="btn" href="redis-comparison.html">Compare against Redis</a>
     </div>
   </div>
 </section>
 
 <!-- ============ DOCUMENTATION ============ -->
-<section id="documentation" class="doc-strip">
+<section class="doc-strip">
   <div class="wrap doc-strip-inner">
-    <div class="doc-strip-text">
+    <div class="doc-strip-text reveal">
       <span class="eyebrow">Documentation</span>
       <h2>Everything you need to <span class="em">ship on VeltrixDB</span></h2>
-      <p>Architecture deep-dives, client SDKs for 6 languages, full config reference, and Kubernetes guides — all in one place.</p>
+      <p>Architecture deep-dives, client SDKs for 6 languages, a full config reference, and Kubernetes guides — in one place.</p>
     </div>
-    <div class="doc-strip-links">
-      <a href="docs/getting-started/quickstart.html">Quickstart</a>
-      <a href="docs/architecture/overview.html">Architecture</a>
-      <a href="docs/client-sdks/index.html">Client SDKs</a>
-      <a href="docs/reference/server-configuration.html">Config reference</a>
-      <a href="docs/kubernetes/operator.html">Kubernetes</a>
-      <a href="docs/resources/faq.html">FAQ</a>
+    <div class="doc-strip-links reveal">
+      <a href="docs/getting-started/quickstart.html">Quickstart →</a>
+      <a href="docs/architecture/overview.html">Architecture →</a>
+      <a href="docs/client-sdks/index.html">Client SDKs →</a>
+      <a href="docs/reference/server-configuration.html">Config reference →</a>
+      <a href="docs/kubernetes/operator.html">Kubernetes →</a>
+      <a href="docs/resources/faq.html">FAQ →</a>
     </div>
-    <a class="btn primary doc-strip-cta" href="docs/index.html">Browse full docs <span class="arrow">↗</span></a>
+    <a class="btn grad doc-strip-cta" href="docs/index.html">Browse full docs <span class="arrow">↗</span></a>
   </div>
 </section>
 
 <!-- ============ CTA ============ -->
 <section class="cta">
   <div class="wrap cta-inner">
-    <h2>Go from 33ms to <span class="em">&lt;5ms</span> this quarter.</h2>
+    <h2>See your own numbers in <span class="em">30 minutes</span>.</h2>
     <div class="arrow-stat">
       <span>33ms P99</span>
-      <span style="color:var(--red)">───────▶</span>
+      <span>───────▶</span>
       <b>4.9ms P99</b>
     </div>
     <div class="cta-cta">
-      <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a free demo <span class="arrow">↗</span></a>
-      <a class="btn" href="tel:+919817463648">+91 98174 63648</a>
+      <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Demo">Book a free demo <span class="arrow">↗</span></a>
+      <a class="btn ghost-light" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Star on GitHub</a>
     </div>
-    <div class="cta-foot">No commitment <span class="sep">·</span> 30-min session <span class="sep">·</span> Free migration analysis included</div>
+    <div class="cta-foot">No commitment <span class="sep">·</span> 30-min session <span class="sep">·</span> Free migration &amp; cost analysis included</div>
   </div>
 </section>
 
+<!-- ============ FOOTER ============ -->
 <footer>
   <div class="wrap">
     <div class="ft">
       <div class="brand-block">
-        <a class="brand" href="#">
+        <a class="brand" href="index.html">
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Sub-5ms reads at a billion keys. NVMe-backed, cloud-portable, Apache 2.0. Built for teams whose users notice when the database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
@@ -296,7 +336,7 @@
           <li><a href="product.html">Product</a></li>
           <li><a href="performance.html">Performance</a></li>
           <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
           <li><a href="whitepaper.html">Whitepaper</a></li>
         </ul>
       </div>
@@ -306,29 +346,28 @@
           <li><a href="docs/index.html">Documentation</a></li>
           <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
           <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
-          <li><a href="docs/operations/security.html">Security model</a></li>
           <li><a href="blog-architecture.html">Blog · Architecture</a></li>
           <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
-          <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="faq.html">FAQ</a></li>
           <li><a href="#">Careers</a></li>
           <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
+      <div>© 2026 VeltrixDB · Apache 2.0 · All rights reserved</div>
       <div>v1.1.0 · build 2026-07-18</div>
     </div>
   </div>
 </footer>
-<script defer src="assets/site.js"></script>
+
+<script defer src="assets/home.js"></script>
 </body>
 </html>
