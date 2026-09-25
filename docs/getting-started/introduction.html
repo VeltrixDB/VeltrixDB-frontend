@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -93,74 +93,70 @@
 <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database that keeps values on flash and only a small pointer index in DRAM, trading Redis-style RAM costs and LSM-style write amplification for predictable, disk-backed performance.</p>
 
 <h2 id="what-is-veltrixdb">What is VeltrixDB</h2>
-<p>VeltrixDB is a key-value store written in Go, with an optional C++ acceleration layer on Linux, designed around one idea: <strong>values belong on NVMe, not in RAM</strong>. Instead of an in-memory hash table (Redis) or a log-structured merge tree that rewrites data repeatedly (RocksDB, LevelDB), VeltrixDB separates keys from values using a <strong>WiscKey</strong>-style design, hashes every key across <strong>8192 shards</strong>, and drives up to 8 NVMe disks in parallel with no single hot lock.</p>
+<p>VeltrixDB is a key-value store written in Go, with optional C++ components on cgo builds, designed around one idea: <strong>values belong on NVMe, not in RAM</strong>. Instead of an in-memory hash table (Redis) or a log-structured merge tree that rewrites data repeatedly (RocksDB, LevelDB), VeltrixDB separates keys from values using a <strong>WiscKey</strong>-style design, hashes every key across <strong>8192 shards</strong>, and drives up to 8 NVMe disks in parallel with no single hot lock.</p>
 <p>It speaks a simple text protocol (usable directly with <code>nc</code> or <code>telnet</code>) and a binary protocol used by its client SDKs, and it is built to run first-class on Kubernetes via a Helm chart and a CRD-based Operator.</p>
 
 <h2 id="why-veltrixdb">Why VeltrixDB</h2>
 
 <h3>The problem with Redis at scale</h3>
-<p>Redis keeps everything in RAM. At 1 billion keys with 128-byte values, that's roughly 250 GB of RAM — an <code>r6g.16xlarge</code>-class node costing <strong>~$3,000&ndash;5,000/month</strong>. Cloud RAM costs 15&ndash;20&times; more per GB than NVMe SSD.</p>
-<p>VeltrixDB stores values on NVMe with the index and hot data in DRAM. The same 1 billion keys fit in <strong>~160 GB of NVMe</strong>, and three nodes cost roughly <strong>$300&ndash;500/month</strong>.</p>
+<p>Redis keeps every value in RAM, plus its own per-key overhead, and cloud RAM costs far more per GB than NVMe SSD.</p>
+<p>VeltrixDB stores values on NVMe and keeps the index (and whatever cache you configure) in DRAM: about <strong>142&nbsp;B/key</strong> with the native index (measured at 5M keys), plus ~90&nbsp;B/key for the ordered index unless <code>--disable-ordered-index</code>. For 1 billion keys &times; 1&nbsp;KB values that is 142&ndash;232&nbsp;GB of RAM plus ~1.4&nbsp;TB of NVMe, against over 1&nbsp;TB of RAM for an in-memory store &mdash; roughly 4&ndash;7&times; less RAM. With 128-byte values the index is about as large as the values, so the saving grows with value size. This is per-key arithmetic, not a billion-key benchmark.</p>
 
 <h3>The problem with LSM trees (RocksDB, LevelDB)</h3>
 <p>LSM compaction rewrites full key-value records to merge sorted runs, which typically produces <strong>10&ndash;30&times; write amplification</strong> — every byte you write eventually lands on disk 10 to 30 times. That burns SSD write endurance and adds latency spikes during heavy compaction.</p>
-<p>VeltrixDB uses <strong>WiscKey KV-separation</strong>: values are written once to an append-only Value Log (VLog) on NVMe and never rewritten. Compaction only garbage-collects dead space in the VLog. Write amplification is approximately <strong>1.0&times;</strong>.</p>
+<p>VeltrixDB uses <strong>WiscKey KV-separation</strong>: values are written once to an append-only Value Log (VLog) on NVMe, and there is no LSM compaction. GC only copies still-live values out of mostly-dead VLog regions, so write amplification is about <strong>1&times;</strong> by design (not a measured figure).</p>
 
 <h3>Predictable P99</h3>
-<p>Redis P99 latency spikes when AOF rewrite runs; RocksDB P99 spikes during compaction. VeltrixDB's three-tier admission-controlled garbage collector enforces a ceiling: GC bandwidth is rate-limited proportional to read latency, and an emergency mode bypasses pauses before garbage can accumulate. In a 30-minute sustained benchmark at 1 billion keys, VeltrixDB recorded <strong>zero GC emergency events</strong>.</p>
+<p>Redis P99 latency spikes when AOF rewrite runs; RocksDB P99 spikes during compaction. VeltrixDB's three-tier admission-controlled garbage collector enforces a ceiling: GC bandwidth is rate-limited proportional to read latency, and an emergency mode bypasses pauses before garbage can accumulate. In the reproducible YCSB run (100M operations) there were <strong>zero errors and zero GC emergency events</strong>.</p>
 
 <h2 id="how-it-works">How it works</h2>
 <p><strong>8192 shards, FNV-1a routing.</strong> Each key hashes (FNV-1a &amp; 0x1FFF) into 1 of 8192 shards. With 8 NVMe disks, shard <code>N</code> routes to disk <code>N % 8</code>, and all 8 disks write in parallel.</p>
-<p><strong>Values on NVMe, index in DRAM.</strong> The in-memory index stores only a 64-byte pointer per key (disk offset, shard, size, TTL, version). Value bytes go directly to the per-disk append-only VLog. A cache hit is a DRAM lookup (~220 ns); a cache miss is one NVMe random read (~400 &micro;s).</p>
-<p><strong>Group-commit WAL.</strong> A background flusher amortizes <code>fdatasync</code> across all writers within a configurable window (default 10 ms) — one <code>fdatasync</code> per batch instead of per write.</p>
+<p><strong>Values on NVMe, index in DRAM.</strong> The in-memory index holds a 64-byte record per key (disk offset, shard, size, TTL, version) &mdash; about 142&nbsp;B/key of RAM with the native index (measured at 5M keys), plus ~90&nbsp;B/key for the ordered index unless it is disabled. Value bytes go directly to the per-disk append-only VLog. A cache hit is a DRAM lookup (~92 ns in-process, with the sharded LIRS cache); a cache miss is one NVMe random read (a Go <code>pread</code>, CRC32C-verified). On cgo builds the index tables live off the Go heap in C++, so a large index does not slow Go garbage collection.</p>
+<p><strong>Group-commit WAL.</strong> A background flusher amortizes <code>fdatasync</code> across all writers within a configurable window (default 15 ms) — one <code>write(2)</code> and one <code>fdatasync</code> per batch instead of per write. Records are binary with a CRC32C over the whole record <span class="badge good">New in v1.6</span>; replay still reads legacy text WALs.</p>
 <p><strong>LIRS cache.</strong> Scan-resistant eviction means large sequential reads don't evict hot keys; small values (&le;256 B) get higher eviction priority.</p>
-<p><strong>C++ io_uring on Linux.</strong> The optional C++ layer adds <code>io_uring</code> SQPOLL + <code>O_DIRECT</code> VLog reads, an Adaptive Radix Tree (ART) index on 2 MB hugepages, and NUMA-aware thread pinning, shaving roughly 25 &micro;s off the NVMe read P99 on production hardware. The Go layer is fully functional and cross-platform without it.</p>
+<p><strong>C++ components (cgo builds).</strong> <span class="badge good">New in v1.6</span> With <code>CGO_ENABLED=1</code> (the default for the Docker image) the index moves off the Go heap into C++ shard tables — with 5M keys a full GC went from 21 ms to 0.27 ms and RSS from 168 to 142 B/key. An opt-in <code>io_uring</code> bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>, Linux, default off) can submit VLog batch writes. <code>--net=cpp|uring|poll</code> swaps the Go listener for an experimental C++ event-loop front-end (binary PUT GET DEL PING MPUT MGET, standalone mode only) that is not faster overall. The VLog read path and the LIRS cache stay in Go; the ART index and priority io_uring scheduler under <code>cpp/</code> have no Go call site and do not run. The Go layer is fully functional and cross-platform without any of it (<code>CGO_ENABLED=0</code>).</p>
 
 <h2 id="benchmark-numbers">Benchmark numbers</h2>
-<p>Measured on a 3-node GKE cluster (<code>n2-highmem-64</code>, 8&times;375 GB NVMe per node), 1 billion keys, 30 minutes sustained:</p>
+<p>The reproducible headline numbers come from YCSB 0.17.0 on a single node (June 9, 2026; AWS EC2 high-memory instance, 4&times; NVMe raw block VLog, 400 GB LIRS cache, 200 client threads, 100M keys &times; ~100 B values). Full setup and raw output are in the project's <code>BENCHMARK_RESULTS.md</code>; reproduce with <code>scripts/bench.sh</code>.</p>
 <div class="table-wrap">
 <table>
-<thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<thead><tr><th>Workload</th><th>Throughput</th><th>Latency</th></tr></thead>
 <tbody>
-<tr><td>Reads/s <em>(internal GKE run — unverified)</em></td><td><strong>7,200,000</strong></td></tr>
-<tr><td>Writes/s <em>(internal GKE run — unverified)</em></td><td><strong>1,800,000</strong></td></tr>
-<tr><td>P50 (80R/20W blended)</td><td><strong>~220 ns</strong></td></tr>
-<tr><td>P99 (80R/20W blended)</td><td><strong>~510 &micro;s</strong></td></tr>
-<tr><td>GC emergency events</td><td><strong>0</strong></td></tr>
-<tr><td>Errors</td><td><strong>0</strong></td></tr>
-<tr><td>Storage density</td><td><strong>~160 GB</strong> for 1B &times; 128 B values</td></tr>
+<tr><td>Load — durable writes (fdatasync, 5 ms windows)</td><td><strong>18,064 ops/s</strong></td><td>avg 11.06 ms &middot; P95 30.8 ms &middot; P99 47.3 ms</td></tr>
+<tr><td>Reads — workload C, 10M ops, entire dataset in cache (100% hits)</td><td><strong>427,697 ops/s</strong></td><td>avg 461 &micro;s &middot; P95 2,069 &micro;s &middot; P99 2,771 &micro;s</td></tr>
+<tr><td>Errors</td><td colspan="2"><strong>0</strong></td></tr>
 </tbody>
 </table>
-<p class="note" style="font-size:12.5px;color:#8A8C95;margin-top:8px"><b>Verified vs unverified:</b> the measured, reproducible numbers are the YCSB single-node results (427,697 reads/s &middot; 18,064 durable writes/s &middot; AWS EC2, 4&times;NVMe, 100M keys). The 3-node GKE figures (7.2M reads/s / 1.8M writes/s) come from an internal run without a published harness — treat them as unverified until reproduced.</p>
 </div>
-<p>Single-node figures on Linux NVMe:</p>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Read these numbers carefully</span> This run used the pure-Go build and predates the native index, the binary WAL and <code>--net</code>. The read figure measures cache hits, not NVMe reads. An earlier internal 3-node GKE run (7.2M reads/s, 1B keys) was never reproduced with a published harness and is <strong>unverified</strong>; &ldquo;1 billion keys&rdquo; has not been measured reproducibly.</span></div>
+<p>Historical single-node figures on Linux NVMe (pure-Go path):</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Operation</th><th>P50</th><th>P99</th></tr></thead>
 <tbody>
 <tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s)</td></tr>
-<tr><td>PUT &mdash; 10 ms flush window</td><td>5 ms</td><td>10.2 ms</td></tr>
+<tr><td>PUT &mdash; 15 ms flush window (default)</td><td>5 ms</td><td>15.2 ms</td></tr>
 <tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s)</td></tr>
 <tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s)</td></tr>
 </tbody>
 </table>
 </div>
-<p>Write amplification is approximately <strong>1.0&times;</strong> versus the 10&ndash;30&times; typical of LSM-tree engines. Full methodology lives in the project's <code>BENCHMARKING.md</code>.</p>
+<p>Later server batch writes (8 clients &times; 1024-key <code>MPUT</code>): 3.54M keys/s, P99 4.2 ms on macOS with a 1M-key space, and 1.77M keys/s, P99 12.2&ndash;12.7 ms on a 4-CPU CI runner (tmpfs, same-host client). Write amplification is approximately <strong>1.0&times;</strong> by design (values are written once), versus the 10&ndash;30&times; typical of LSM-tree engines. Full methodology lives in the project's <code>BENCHMARKING.md</code>.</p>
 
 <h2 id="features">Features</h2>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Area</th><th>Details</th></tr></thead>
 <tbody>
-<tr><td><strong>Storage</strong></td><td>WiscKey KV-separation, 8192-shard index, LIRS cache, append-only VLog</td></tr>
-<tr><td><strong>Durability</strong></td><td>Group-commit WAL, fdatasync amortization, crash recovery via WAL replay</td></tr>
+<tr><td><strong>Storage</strong></td><td>WiscKey KV-separation, 8192-shard index (off-heap C++ tables on cgo builds), LIRS cache, append-only VLog, ordered index for range scans</td></tr>
+<tr><td><strong>Durability</strong></td><td>Group-commit WAL (binary, CRC32C-checked records), fdatasync amortization, crash recovery via WAL replay, compacted checkpoint on clean shutdown</td></tr>
 <tr><td><strong>Atomic ops</strong></td><td><code>CAS</code>, <code>INCR</code>, <code>DECR</code>, <code>SETNX</code> &mdash; shard-locked read-modify-write, safe under concurrency</td></tr>
-<tr><td><strong>Data types</strong></td><td>Keys with TTL, hash fields with per-field TTL, namespaces</td></tr>
-<tr><td><strong>Replication</strong></td><td>Raft consensus, async / quorum / strong modes, anti-entropy</td></tr>
-<tr><td><strong>Transactions</strong></td><td>Optimistic MVCC with vector clocks</td></tr>
+<tr><td><strong>Data types</strong></td><td>Keys with TTL, hash fields with per-field TTL, namespaces, lists, sets, vector search (HNSW), <code>RANGE</code> / <code>SCANCUR</code> range scans</td></tr>
+<tr><td><strong>Replication</strong></td><td>Raft consensus (with snapshots and optional linearizable reads), async / quorum / strong replication, anti-entropy</td></tr>
+<tr><td><strong>Transactions</strong></td><td>Optimistic multi-key transactions with per-key version guards (conflict detection)</td></tr>
 <tr><td><strong>Security</strong></td><td>AES-256-GCM at-rest encryption, RBAC, mTLS, append-only audit log</td></tr>
 <tr><td><strong>Quotas</strong></td><td>Per-namespace rate limiting (token bucket) + key-count caps</td></tr>
-<tr><td><strong>CDC</strong></td><td>In-process change data capture, <code>repl-ship</code> for cross-process forwarding</td></tr>
+<tr><td><strong>CDC</strong></td><td>In-process change data capture, durable <code>/admin/changes</code> catch-up feed, <code>repl-ship</code> for cross-region forwarding</td></tr>
 <tr><td><strong>Backup</strong></td><td>Full + incremental chains, S3 + GCS upload/restore</td></tr>
 <tr><td><strong>Observability</strong></td><td>60+ Prometheus metrics, web dashboard, liveness/readiness probes</td></tr>
 <tr><td><strong>Compression</strong></td><td>Per-record zstd, 256 B threshold, transparent on read</td></tr>
@@ -182,11 +178,10 @@
 <p>These are real, current gaps &mdash; not hypothetical edge cases:</p>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No Redis protocol (RESP)</span> You cannot point an existing Redis client at VeltrixDB today. RESP compatibility is on the roadmap; once shipped, migration should require only a connection-string change.</span></div>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No managed cloud offering</span> VeltrixDB is self-hosted only. A managed service is planned but not available.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No native range/prefix scans</span> Workaround today: namespaces with <code>NSSCAN</code>, or secondary indexes.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">CDC is in-process only</span> Change events are lost if <code>repl-ship</code> is down. A durable WAL-tail mode is future work.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Raft reads are local and can be stale</span> <code>raft</code> mode gives linearizable <strong>writes</strong> via quorum commit, but reads are served from local applied state &mdash; there is no read-index or lease-read path yet.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title"><code>repl-ship</code> has no back-pressure</span> The cross-region shipper can catch up after a restart through the durable <code>/admin/changes</code> feed (<code>--checkpoint</code>), but it has no back-pressure to the source and resolves conflicts last-write-wins only.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Raft reads are local by default</span> <code>raft</code> mode gives linearizable <strong>writes</strong> via quorum commit, but by default reads are served from local applied state and can be stale. <code>--linearizable-reads</code> runs the ReadIndex fence at one heartbeat round-trip per <code>GET</code>.</span></div>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Replicated mode is not linearizable</span> <code>replicated</code> mode is primary-copy replication for durability across copies; it has no single-writer ordering, so concurrent writers to the same key are not linearizable. Use <code>raft</code> mode when write linearizability matters.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Non-KV ops are node-local in cluster modes</span> Namespace, hash-field, vector, secondary-index, and query operations are not routed through Raft or replication yet &mdash; only plain KV, atomic ops, and transactions are.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Some operations stay node-local in cluster modes</span> Namespace, hash-field, vector, secondary-index and list/set <em>writes</em> route through the coordinator in every mode, but <code>QUERY</code> / <code>RANGE</code> / <code>SCANCUR</code> reads are always local, and replicated-mode secondary-index metadata (<code>IDXCREATE</code>/<code>IDXDROP</code>) is node-local.</span></div>
 
 <div class="card-grid">
 <a class="card" href="quickstart.html"><div class="card-title">Quickstart &rarr;</div><div class="card-desc">Run VeltrixDB in Docker and issue your first commands in under a minute.</div></a>

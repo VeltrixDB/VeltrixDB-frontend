@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -196,7 +196,7 @@ veltrix --addr 10.0.0.5:2112 status</code></pre>
 </table>
 </div>
 
-<p>Shared cloud flags (from <code>cloudFlags</code>): <code>--provider</code> (<code>s3</code>|<code>gcs</code>|<code>azure</code>), <code>--bucket</code>, <code>--prefix</code> (default <code>veltrixdb-backups</code>), and provider-specific credentials: <code>--region</code>/<code>--aws-access-key</code>/<code>--aws-secret-key</code> for S3, <code>--gcs-token</code>/<code>--gcs-cred-file</code> for GCS, <code>--azure-account</code>/<code>--azure-key</code> for Azure. Each credential flag can instead be supplied via environment variable: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_SESSION_TOKEN</code>, <code>GOOGLE_APPLICATION_CREDENTIALS</code>, <code>GCS_ACCESS_TOKEN</code>, <code>AZURE_STORAGE_ACCOUNT</code>, <code>AZURE_STORAGE_KEY</code>, <code>AZURE_STORAGE_CONTAINER</code>.
+<p>Shared cloud flags (from <code>cloudFlags</code>): <code>--provider</code> (<code>s3</code>|<code>gcs</code>|<code>azure</code>), <code>--bucket</code>, <code>--prefix</code> (default <code>veltrixdb-backups</code>), and provider-specific credentials: <code>--region</code>/<code>--aws-access-key</code>/<code>--aws-secret-key</code> for S3, <code>--gcs-token</code>/<code>--gcs-cred-file</code> for GCS, <code>--azure-account</code>/<code>--azure-key</code> for Azure. Each credential flag can instead be supplied via environment variable: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_SESSION_TOKEN</code>, <code>GOOGLE_APPLICATION_CREDENTIALS</code>, <code>GCS_ACCESS_TOKEN</code>, <code>AZURE_STORAGE_ACCOUNT</code>, <code>AZURE_STORAGE_KEY</code>, <code>AZURE_STORAGE_CONTAINER</code>.</p>
 
 <h3>Examples</h3>
 <pre class="code-block"><code># Full local backup of a single-disk server
@@ -242,7 +242,7 @@ veltrixdb-backup restore-pitr \
 <tr><td><code>compact</code></td><td><code>--addr</code>, <code>--user</code>, <code>--password</code></td><td>Sends a <code>COMPACT</code> text command. <strong>Not currently wired server-side</strong> &mdash; the engine's GC runs automatically every 30s regardless; this subcommand is a documented no-op stub today.</td></tr>
 <tr><td><code>check</code></td><td><code>--data</code> or <code>--data-dirs</code></td><td>Offline CRC32C corruption scan &mdash; walks each disk's <code>vlog_active.dat</code> directly, verifying every record's stored checksum. No running server required.</td></tr>
 <tr><td><code>repair</code></td><td><code>--addr</code>, <code>--key</code>, <code>--user</code>, <code>--password</code></td><td>Tombstones (deletes) a specific key on a running server.</td></tr>
-<tr><td><code>hash-password</code></td><td><code>--user</code>, <code>--password</code></td><td>Generates a SHA-256 password hash and a ready-to-paste JSON snippet for the RBAC <code>--auth-config</code> file.</td></tr>
+<tr><td><code>hash-password</code></td><td><code>--user</code>, <code>--password</code>, <code>--legacy-sha256</code></td><td>Generates a salted PBKDF2-SHA256 password hash (210,000 iterations, <code>pbkdf2$sha256$&hellip;</code>) and a ready-to-paste JSON snippet for the RBAC <code>--auth-config</code> file.</td></tr>
 </tbody>
 </table>
 </div>
@@ -334,6 +334,7 @@ veltrix-chaos soak k8s:veltrixdb/veltrixdb-0 10m</code></pre>
 <tr><td><code>--report-every</code></td><td><code>1</code></td><td>Live stats interval in seconds.</td></tr>
 <tr><td><code>--safe-reads</code></td><td><code>false</code></td><td>Only read keys that have already been written (eliminates not-found errors during mixed ingestion).</td></tr>
 <tr><td><code>--key-offset</code></td><td><code>0</code></td><td>Start key index offset, for continuing a previous run without overlap.</td></tr>
+<tr><td><code>--proto</code></td><td><code>text</code></td><td><span class="badge good">New in v1.7</span> Wire protocol for unbatched (<code>--batch-size=1</code>) workers: <code>text</code> or <code>binary</code>. <code>binary</code> is required against a server started with <code>--net=cpp|uring|poll</code>, which serves only the binary protocol. Batched workers always use binary.</td></tr>
 <tr><td><code>--batch-size</code></td><td><code>1</code></td><td>Entries per MPut/MGet batch. Values &gt;1 switch to the batched code path, engaging server-side block packing (up to ~25&times; disk density gain for tiny values). Latency is reported per-batch; per-key amortized = batch-P99 / batch-size.</td></tr>
 <tr><td><code>--log-errors</code></td><td><code>5</code></td><td>Log the first N distinct errors per worker to stderr. <code>0</code> = silent.</td></tr>
 </tbody>
@@ -354,7 +355,37 @@ go run ./cmd/loadtest --mode=write --batch-size=1024 \
 
 # Batched reads via MGet-256
 go run ./cmd/loadtest --mode=read --batch-size=256 \
-                      --concurrency=64 --duration=30</code></pre>
+                      --concurrency=64 --duration=30
+
+# Unbatched reads against the C++ front-end (server started with --net=cpp)
+go run ./cmd/loadtest --mode=read --proto=binary --concurrency=64 --duration=30</code></pre>
+
+<h2 id="veltrix-repair">veltrix-repair &mdash; offline value-metadata repair</h2>
+<p><span class="badge good">New in v1.3</span> Offline repair for nodes that ran a build predating the value-transform WAL fix with compression (zstd is the default) or <code>--encrypt-at-rest</code>, and were restarted since writing data. On such nodes reads after a clean restart can return the raw compressed/encrypted blob, and reads after a crash fail with a CRC32C mismatch. The VLog bytes are intact; the tool rebuilds the lost metadata in place and rewrites the WAL as a corrected (binary) checkpoint on exit. <strong>The server must be stopped.</strong></p>
+
+<pre class="code-block"><code># 1. Always scan first (read-only)
+veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --scan
+
+# 2. Repair (each wal.log is backed up first)
+veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>--data</code></td><td><em>(empty)</em></td><td>Single data directory. Ignored when <code>--data-dirs</code> is set.</td></tr>
+<tr><td><code>--data-dirs</code></td><td><em>(empty)</em></td><td>Comma-separated data directories &mdash; must match the server's.</td></tr>
+<tr><td><code>--raw-vlogs</code></td><td><em>(empty)</em></td><td>Linux: raw VLog block devices, paired with <code>--data-dirs</code>.</td></tr>
+<tr><td><code>--scan</code></td><td><code>false</code></td><td>Read-only: report what a repair would change.</td></tr>
+<tr><td><code>--repair</code></td><td><code>false</code></td><td>Apply the repair and write a corrected checkpoint on exit.</td></tr>
+<tr><td><code>--encrypt-at-rest</code></td><td><code>false</code></td><td>Load the at-rest key (needed to resolve encrypted records).</td></tr>
+<tr><td><code>--encryption-key-path</code></td><td><em>(empty)</em></td><td>AES-256 key file. <code>VELTRIXDB_ENCRYPTION_KEY</code> takes priority.</td></tr>
+<tr><td><code>--compression</code></td><td><code>zstd</code></td><td>Compression the data was written with: <code>none</code> | <code>flate</code> | <code>zstd</code>.</td></tr>
+<tr><td><code>--backup-dir</code></td><td><em>(alongside original)</em></td><td>Where to copy each <code>wal.log</code> before repairing.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Exit codes: <code>0</code> nothing to do / repaired, <code>1</code> scan found work, <code>2</code> entries could not be resolved, <code>3</code> error.</p>
 
 <h2 id="kubectl-veltrix">kubectl-veltrix &mdash; kubectl plugin</h2>
 <p>A dependency-free <code>kubectl</code> plugin that resolves a VeltrixDB pod by label selector, opens a <code>kubectl port-forward</code> to its admin port, and hits the HTTP admin API on localhost. No client-go or cobra dependency &mdash; it shells out to <code>kubectl</code> directly so auth and kubeconfig behavior always match the operator's normal workflow.</p>
@@ -396,7 +427,7 @@ go run ./cmd/loadtest --mode=read --batch-size=256 \
 <pre class="code-block"><code>kubectl veltrix stats
 kubectl veltrix gc-status
 kubectl veltrix quota-set tenant_42 5000 1000000
-kubectl veltrix cdc tail --prefix orders/
+kubectl veltrix cdc-tail --prefix=orders/
 kubectl veltrix -n veltrixdb-prod -l app.kubernetes.io/name=veltrixdb stats</code></pre>
 
 <div class="callout limitation">
@@ -405,7 +436,7 @@ kubectl veltrix -n veltrixdb-prod -l app.kubernetes.io/name=veltrixdb stats</cod
 </div>
 
 <h2 id="repl-ship">repl-ship &mdash; cross-region replication shipper</h2>
-<p>Tails a local server's <code>/admin/cdc</code> stream and forwards each event to a remote VeltrixDB cluster's binary protocol &mdash; <code>PUT</code> events become a remote <code>MultiPut</code>, <code>DEL</code> events become a remote delete. Designed for asynchronous, eventually-consistent geo-replication, with exponential-backoff retries and a deadletter file for permanent failures.</p>
+<p>Tails a local server's <code>/admin/cdc</code> stream and forwards each event to a remote VeltrixDB cluster's binary protocol &mdash; each <code>PUT</code> event becomes a binary <code>PUT</code> and each <code>DEL</code> event a binary <code>DEL</code>, sent one request at a time (<code>--batch</code> only sets how many events are buffered per flush). Flags are listed on <a class="inline-link" href="../operations/replication-and-cdc.html#repl-ship">Replication &amp; CDC</a>. Designed for asynchronous, eventually-consistent geo-replication, with exponential-backoff retries and a deadletter file for permanent failures.</p>
 
 <pre class="code-block"><code>go build -o repl-ship ./cmd/repl-ship
 
@@ -436,6 +467,7 @@ repl-ship --src http://primary:2112 \
 <tr><td><code>loadtest</code></td><td><code>cmd/loadtest</code></td><td>Concurrent read/write load generator with latency percentiles.</td></tr>
 <tr><td><code>kubectl-veltrix</code></td><td><code>cmd/kubectl-veltrix</code></td><td>kubectl plugin wrapping the admin HTTP API via port-forward.</td></tr>
 <tr><td><code>repl-ship</code></td><td><code>cmd/repl-ship</code></td><td>Cross-region CDC-based replication shipper.</td></tr>
+<tr><td><code>veltrix-repair</code></td><td><code>cmd/veltrix-repair</code></td><td>Offline repair of lost compression/encryption metadata (server stopped). Since v1.3.</td></tr>
 </tbody>
 </table>
 </div>

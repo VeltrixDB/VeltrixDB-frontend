@@ -4,11 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Performance - VeltrixDB</title>
-<meta name="description" content="Measured benchmarks, a live cluster dashboard, and what is currently being built in the engine." />
+<meta name="description" content="Measured benchmarks with their exact conditions, what the /metrics endpoint exposes, and what is currently being worked on in the engine." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -45,7 +45,7 @@
 <div class="subnav" aria-label="Page sections">
   <div class="subnav-inner">
     <a href="#performance">Benchmark</a>
-    <a href="#transparency">Live cluster</a>
+    <a href="#transparency">Metrics</a>
     <a href="#research">Active R&D</a>
   </div>
 </div>
@@ -54,7 +54,7 @@
   <div class="wrap">
     <div class="eyebrow">PERFORMANCE</div>
     <h2 class="sh" style="margin-top:10px;border-top:none">Numbers we can <span class="em">reproduce</span>.</h2>
-    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">Every figure on this page comes from a measured run - YCSB 0.17, published hardware, raw output in the repo. No projected numbers.</p>
+    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">Every figure on this page comes from a measured run, and each one states the conditions it was measured under. Raw results are in <code>BENCHMARK_RESULTS.md</code> in the repo. No projected numbers, no competitor numbers we did not measure.</p>
   </div>
 </section>
 
@@ -62,112 +62,110 @@
 <section id="performance">
   <div class="wrap">
     <span class="eyebrow">By the numbers</span>
-    <h2 class="sh">Results that <span class="em">speak for themselves</span>.</h2>
-    <p class="sh-sub">Benchmarked on real cloud hardware — GCP N2 nodes with 8 NVMe SSDs, 64 cores, 480 GB RAM.</p>
+    <h2 class="sh">The YCSB run, <span class="em">with its conditions</span>.</h2>
+    <p class="sh-sub">YCSB 0.17.0, June 9 2026 · pure-Go build (historical: it predates the native index, the binary WAL and <code>--net</code>) · AWS EC2 high-memory, 495 GB RAM · 4&times; NVMe, raw block VLog · 400 GB LIRS cache · 200 client threads · 100M keys &times; ~100 B values.</p>
     <div class="metric-row">
       <div class="metric">
-        <div class="big"><span class="red">85</span><span class="u">%</span></div>
-        <div class="lbl">Reduction in read latency</div>
-        <div class="desc">From 33ms down to 4.9ms P99</div>
+        <div class="big"><span class="red">427,697</span></div>
+        <div class="lbl">Reads per second</div>
+        <div class="desc">Workload C, 10M ops · entire dataset in cache, 100% hits</div>
       </div>
       <div class="metric">
-        <div class="big">10<span class="u">×</span></div>
-        <div class="lbl">Less unnecessary rewriting</div>
-        <div class="desc">Compaction only touches keys, never values</div>
+        <div class="big">18,064</div>
+        <div class="lbl">Durable writes per second</div>
+        <div class="desc">100M-key load · WAL + fdatasync before ACK · 5 ms windows</div>
       </div>
       <div class="metric">
-        <div class="big">3–5<span class="u">×</span></div>
-        <div class="lbl">Lower infrastructure cost</div>
-        <div class="desc">vs DynamoDB at equivalent scale</div>
+        <div class="big">100<span class="u">M</span></div>
+        <div class="lbl">Keys loaded</div>
+        <div class="desc">~100 B values · single node</div>
       </div>
       <div class="metric">
-        <div class="big">1B<span class="u">+</span></div>
-        <div class="lbl">Keys on a 3-node cluster</div>
-        <div class="desc">256 GB cache · 3 TB NVMe per node</div>
+        <div class="big">0</div>
+        <div class="lbl">Failed operations</div>
+        <div class="desc">Across the 100M-key load</div>
       </div>
     </div>
 
     <div class="lat-wrap">
       <div class="lat-head">
         <div>
-          <h3>P99 read latency at 1 billion keys — head to head</h3>
-          <p>Lower is better. Sustained mixed read/write load. Equivalent hardware.</p>
+          <h3>YCSB latency: reads vs durable writes</h3>
+          <p>Same run as above. Reads are cache hits (the whole dataset fit in the 400 GB cache), so this is not a disk-read latency. Writes wait for fdatasync.</p>
         </div>
-        <span class="lat-axis">— ms (P99) →</span>
+        <span class="lat-axis">&mdash; ms &rarr;</span>
       </div>
       <div class="bars" id="bars">
-        <div class="bar-row"><div class="bar-label">Cassandra</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">Vendor-published typicals &middot; wide-column &middot; JVM GC pauses included</span><div class="bar-fill cas" data-w="100">~80ms</div></div><div class="bar-note">~80ms P99</div></div>
-        <div class="bar-row"><div class="bar-label">LSM-tree DB</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">RocksDB-class store &middot; compaction stalls dominate the tail</span><div class="bar-fill lsm" data-w="42">~33ms</div></div><div class="bar-note">~33ms P99</div></div>
-        <div class="bar-row"><div class="bar-label">DynamoDB</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">AWS-published single-digit-ms &middot; per-request billing</span><div class="bar-fill ddb" data-w="16">~12ms</div></div><div class="bar-note">~12ms P99</div></div>
-        <div class="bar-row"><div class="bar-label">VeltrixDB · miss</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">Measured &middot; one NVMe read via io_uring &middot; no compaction in the read path</span><div class="bar-fill us-miss" data-w="7">4.9ms</div></div><div class="bar-note">4.9ms · cache miss</div></div>
-        <div class="bar-row"><div class="bar-label">VeltrixDB · hit</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">Measured &middot; LIRS DRAM cache &middot; zero disk I/O</span><div class="bar-fill us-hit" data-w="2.5">0.3ms</div></div><div class="bar-note">0.3ms · cache hit</div></div>
+        <div class="bar-row"><div class="bar-label">Read · avg</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">YCSB workload C &middot; 10M ops &middot; 100% cache hits &middot; 200 threads</span><div class="bar-fill us-hit" data-w="1">0.46</div></div><div class="bar-note">461 µs</div></div>
+        <div class="bar-row"><div class="bar-label">Read · P95</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">YCSB workload C &middot; 10M ops &middot; 100% cache hits &middot; 200 threads</span><div class="bar-fill us-hit" data-w="4.4">2.07</div></div><div class="bar-note">2,069 µs</div></div>
+        <div class="bar-row"><div class="bar-label">Read · P99</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">YCSB workload C &middot; 10M ops &middot; 100% cache hits &middot; 200 threads</span><div class="bar-fill us-hit" data-w="5.9">2.77</div></div><div class="bar-note">2,771 µs</div></div>
+        <div class="bar-row"><div class="bar-label">Write · avg</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">100M-key load &middot; WAL + fdatasync &middot; 5 ms flush windows &middot; 200 threads</span><div class="bar-fill us-miss" data-w="23.4">11.06</div></div><div class="bar-note">11.06 ms</div></div>
+        <div class="bar-row"><div class="bar-label">Write · P95</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">100M-key load &middot; WAL + fdatasync &middot; 5 ms flush windows &middot; 200 threads</span><div class="bar-fill us-miss" data-w="65.1">30.8 ms</div></div><div class="bar-note">30.8 ms</div></div>
+        <div class="bar-row"><div class="bar-label">Write · P99</div><div class="bar-track" tabindex="0"><span class="bar-tip" role="tooltip">100M-key load &middot; WAL + fdatasync &middot; 5 ms flush windows &middot; 200 threads</span><div class="bar-fill us-miss" data-w="100">47.3 ms</div></div><div class="bar-note">47.3 ms</div></div>
       </div>
       <div class="lat-toggle" style="margin-top:14px">
         <button type="button" id="latChartBtn" aria-pressed="true">Chart</button>
         <button type="button" id="latTableBtn" aria-pressed="false">Table</button>
       </div>
-      <table class="lat-table" id="latTable" aria-label="P99 read latency comparison, tabular view">
-        <thead><tr><th scope="col">System</th><th scope="col">P99 read latency</th><th scope="col">vs VeltrixDB miss</th><th scope="col">Source</th></tr></thead>
+      <table class="lat-table" id="latTable" aria-label="YCSB read and write latency, tabular view">
+        <thead><tr><th scope="col">Operation</th><th scope="col">Avg</th><th scope="col">P95</th><th scope="col">P99</th><th scope="col">Conditions</th></tr></thead>
         <tbody>
-          <tr><td>Cassandra</td><td>~80 ms</td><td>16&times; slower</td><td>Vendor-published typical</td></tr>
-          <tr><td>LSM-tree DB (RocksDB-class)</td><td>~33 ms</td><td>6.7&times; slower</td><td>Vendor-published typical</td></tr>
-          <tr><td>DynamoDB</td><td>~12 ms</td><td>2.4&times; slower</td><td>AWS-published</td></tr>
-          <tr><td>VeltrixDB &middot; cache miss</td><td>4.9 ms</td><td>baseline</td><td>Measured (YCSB 0.17)</td></tr>
-          <tr><td>VeltrixDB &middot; cache hit</td><td>0.3 ms</td><td>16&times; faster</td><td>Measured (YCSB 0.17)</td></tr>
+          <tr><td>Read (workload C)</td><td>461 µs</td><td>2,069 µs</td><td>2,771 µs</td><td>10M ops, 100% cache hits, 427,697 ops/s</td></tr>
+          <tr><td>Write (100M-key load)</td><td>11.06 ms</td><td>30.8 ms</td><td>47.3 ms</td><td>fdatasync-durable, 5 ms windows, 18,064 ops/s</td></tr>
         </tbody>
       </table>
-      <div class="lat-foot">VeltrixDB achieves <b>&lt;5ms P99 even on cache misses</b> because values are read directly from NVMe via zero-copy <code>io_uring</code> — no compaction, no page-cache eviction, no surprises.</div>
+      <div class="lat-foot">This run did not measure cache-miss reads. When a read does miss the cache, the value is read with one Go <code>pread</code> of a 4 KB-aligned VLog block, checked with magic + CRC32C. That is not io_uring and not zero-copy. The in-process cache hit itself costs <b>~92 ns</b>; the rest of the read latency above is spent outside the cache lookup (network round trip, protocol, 200 concurrent clients).</div>
     </div>
   </div>
 </section>
 
-<!-- ============ TRANSPARENCY DASHBOARD ============ -->
+<!-- ============ METRICS ENDPOINT (illustrative) ============ -->
 <section id="transparency">
   <div class="wrap">
     <span class="eyebrow">Transparency</span>
-    <h2 class="sh">Live cluster, <span class="em">live metrics</span>.</h2>
-    <p class="sh-sub">A snapshot from one of our internal benchmark clusters. Every number on this page traces back to a metric you can read in Prometheus.</p>
+    <h2 class="sh">Measure it <span class="em">on your own cluster</span>.</h2>
+    <p class="sh-sub">Every node serves Prometheus metrics on <code>/metrics</code> (<code>--metrics-addr</code>, default <code>:2112</code>, alongside <code>/healthz</code> and <code>/readyz</code>). Below is an illustrative layout of what it exposes: metric names only, no values. It is not a snapshot of a real cluster.</p>
 
     <div class="dash">
       <div class="dash-head">
-        <span class="ttl">veltrixdb · cluster-prod-01 · us-east-1</span>
-        <span class="meta">Snapshot · May 21 2026 · 14:42 UTC · uptime 187 d</span>
+        <span class="meta">ILLUSTRATIVE · metric names from metrics/prometheus.go</span>
+        <span class="meta">every series carries a <code style="font-family:var(--mono);color:var(--ink-2)">node</code> label</span>
       </div>
       <div class="dash-grid">
         <div class="dash-tile">
-          <div class="l">Active keys</div>
-          <div class="v">1.04<span class="red">B</span></div>
-          <div class="d">↗ +2.1M / hr</div>
+          <div class="l">Live keys</div>
+          <div class="v" style="font-size:16px">gauge</div>
+          <div class="d">veltrixdb_storage_index_size_keys</div>
         </div>
         <div class="dash-tile">
-          <div class="l">Reads scrubbed (lifetime)</div>
-          <div class="v">108<span class="red">B</span>+</div>
-          <div class="d">14.3k/s sustained</div>
+          <div class="l">Cache hit rate</div>
+          <div class="v" style="font-size:16px">gauge</div>
+          <div class="d">veltrixdb_cache_hit_rate</div>
         </div>
         <div class="dash-tile">
-          <div class="l">Writes processed</div>
-          <div class="v">3.42<span class="red">B</span>+</div>
-          <div class="d">WAL group-commit 80µs</div>
+          <div class="l">Read latency</div>
+          <div class="v" style="font-size:16px">histogram</div>
+          <div class="d">veltrixdb_storage_read_latency_seconds</div>
         </div>
         <div class="dash-tile">
-          <div class="l">P99 read latency</div>
-          <div class="v">4.9 <span style="font-size:16px;color:var(--ink-3);font-weight:400">ms</span></div>
-          <div class="d">stable for 187 d</div>
+          <div class="l">GC emergency runs</div>
+          <div class="v" style="font-size:16px">counter</div>
+          <div class="d">veltrixdb_vlog_gc_emergency_runs_total</div>
         </div>
       </div>
       <div class="dash-panels">
         <div class="dash-panel">
-          <div class="hd"><span>Read latency · P50 / P95 / P99</span><b>last 24h</b></div>
-          <svg class="dash-chart" id="dashChart" viewBox="0 0 600 140" preserveAspectRatio="none"></svg>
+          <div class="hd"><span>Write path &amp; durability</span><b>storage / vlog</b></div>
+          <p style="margin:14px 0 0;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--ink-2)">veltrixdb_storage_write_latency_seconds<br/>veltrixdb_storage_wal_flushes_total<br/>veltrixdb_storage_wal_batch_entries_total<br/>veltrixdb_vlog_garbage_ratio{disk}<br/>veltrixdb_vlog_disk_slow{disk}<br/>veltrixdb_storage_native_index_bytes</p>
         </div>
         <div class="dash-panel">
-          <div class="hd"><span>Ops/sec per shard</span><b>1024 shards</b></div>
-          <div class="dash-bars" id="dashBars"></div>
+          <div class="hd"><span>Integrity &amp; cluster</span><b>scrub / cluster</b></div>
+          <p style="margin:14px 0 0;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--ink-2)">veltrixdb_scrub_corruption_total<br/>veltrixdb_scrub_records_total<br/>veltrixdb_cluster_nodes_total<br/>veltrixdb_replication_lag_nanoseconds<br/>veltrixdb_server_active_connections</p>
         </div>
       </div>
       <div class="dash-foot">
-        <span><b>Cache hit rate</b> 94.2% · <b>Write amp</b> 1.0× · <b>SLA breaches</b> 0</span>
-        <span>Exposed via <code style="font-family:var(--mono);color:var(--ink-2)">/metrics</code> · Prometheus + Grafana ship in the Helm chart</span>
+        <span><b>Histograms</b> give P50 / P95 / P99 with <code style="font-family:var(--mono);color:var(--ink-2)">histogram_quantile()</code></span>
+        <span><code style="font-family:var(--mono);color:var(--ink-2)">native_index_bytes</code> is 0 on the Go map index (native index, since v1.6)</span>
       </div>
     </div>
   </div>
@@ -176,9 +174,9 @@
 <!-- ============ ACTIVE DEVELOPMENT ============ -->
 <section id="research">
   <div class="wrap">
-    <span class="eyebrow rd-eyebrow-live"><span class="rd-live-dot"></span>Active Development · June 2026</span>
-    <h2 class="sh">What's new <span class="em">in the engine.</span></h2>
-    <p class="sh-sub">Five features live in the current build — each one targeting a specific latency or cost problem. Every change ships with a benchmark gate so you can see exactly what it does to the numbers.</p>
+    <span class="eyebrow rd-eyebrow-live"><span class="rd-live-dot"></span>Active Development · September 2026</span>
+    <h2 class="sh">What we're working on <span class="em">in the engine.</span></h2>
+    <p class="sh-sub">All of this has shipped: v1.6 and v1.7, with v1.8 the latest release. Each item lists what we measured and under which conditions, including the result that did not go our way. No dates are promised.</p>
 
     <div class="rd-grid" id="rdGrid">
 
@@ -188,17 +186,13 @@
           <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
         </div>
         <div class="rd-item-body">
-          <div class="rd-cat">I/O Engine</div>
-          <div class="rd-title">Zero-interrupt polling I/O</div>
-          <div class="rd-desc">VeltrixDB's I/O layer runs in polling mode — the engine continuously monitors the completion queue rather than waiting for kernel interrupts. Under sustained write load this eliminates wakeup overhead entirely, flattening tail latency at the I/O boundary where most databases lose P99 predictability.</div>
-          <div class="rd-prog-wrap">
-            <div class="rd-prog-track"><div class="rd-prog-fill done" data-pct="100"></div></div>
-            <span class="rd-prog-pct">100%</span>
-          </div>
+          <div class="rd-cat">Index</div>
+          <div class="rd-title">Off-heap native index</div>
+          <div class="rd-desc">On cgo builds (macOS included, and the Docker image) each shard&rsquo;s index lives in a C++ table off the Go heap: 64 B records, 8 B tag|position slots, a per-shard key arena. Go&rsquo;s garbage collector no longer scans it. The cost is ~19 ns more per cache-miss lookup, and large key counts need <code>vm.max_map_count</code> &ge; 262144. <code>VELTRIXDB_INDEX=map</code> opts out. Since v1.6.</div>
         </div>
         <div class="rd-item-stat">
-          <div class="rd-stat-v"><span class="s-good">0</span></div>
-          <div class="rd-stat-l">syscalls<br/>per read op</div>
+          <div class="rd-stat-v"><span class="s-good">0.27</span> ms</div>
+          <div class="rd-stat-l">full GC at 5M keys<br/>(was 21 ms)</div>
         </div>
       </div>
 
@@ -208,17 +202,13 @@
           <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
         </div>
         <div class="rd-item-body">
-          <div class="rd-cat">Garbage Collection</div>
-          <div class="rd-title">Cold-aware garbage collection</div>
-          <div class="rd-desc">VeltrixDB's GC engine ranks VLog entries by access temperature before deciding what to compact. Hot data is never relocated during a GC pass — only cold entries move. GC runs without competing for the NVMe bandwidth live reads depend on, and emergency compaction runs have dropped to zero in sustained benchmarks.</div>
-          <div class="rd-prog-wrap">
-            <div class="rd-prog-track"><div class="rd-prog-fill done" data-pct="100"></div></div>
-            <span class="rd-prog-pct">100%</span>
-          </div>
+          <div class="rd-cat">Durability</div>
+          <div class="rd-title">Binary WAL</div>
+          <div class="rd-desc">A 48-byte little-endian header and a CRC32C over the whole record. It fixes a real bug: keys containing <code>|</code> or a newline truncated text-WAL replay, so acknowledged writes could be lost on a crash restart. The reader accepts binary and legacy text records mixed; <code>--wal-format=text</code> is the rollback. Since v1.6.</div>
         </div>
         <div class="rd-item-stat">
-          <div class="rd-stat-v"><span class="s-good">0</span></div>
-          <div class="rd-stat-l">GC emergency<br/>runs · bench verified</div>
+          <div class="rd-stat-v"><span class="s-accent">2.5</span>&times;</div>
+          <div class="rd-stat-l">faster replay<br/>4&times; faster encode</div>
         </div>
       </div>
 
@@ -228,57 +218,45 @@
           <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
         </div>
         <div class="rd-item-body">
-          <div class="rd-cat">CPU Scheduler</div>
-          <div class="rd-title">Dedicated compaction core</div>
-          <div class="rd-desc">VeltrixDB pins its compaction thread to a reserved CPU core. Compaction work never contends with request-handling threads for scheduler time — the intermittent P99 tail spikes that appear under heavy writes on shared-core designs simply don't exist in this architecture.</div>
-          <div class="rd-prog-wrap">
-            <div class="rd-prog-track"><div class="rd-prog-fill done" data-pct="100"></div></div>
-            <span class="rd-prog-pct">100%</span>
-          </div>
+          <div class="rd-cat">Write path</div>
+          <div class="rd-title">No skiplist re-insert on overwrite</div>
+          <div class="rd-desc">Overwriting a live key no longer re-inserts it into the ordered index; only absent or tombstoned keys are inserted. Measured on server batch writes (8 clients &times; 1024-key MPUT, 1M-key space, macOS): 1.45M &rarr; 3.54M keys/s, P99 9.6 &rarr; 4.2 ms.</div>
         </div>
         <div class="rd-item-stat">
-          <div class="rd-stat-v">±<span class="s-accent">3</span>%</div>
-          <div class="rd-stat-l">P99 jitter<br/>under load</div>
+          <div class="rd-stat-v"><span class="s-good">3.54</span>M</div>
+          <div class="rd-stat-l">keys/s batch writes<br/>macOS</div>
         </div>
       </div>
 
       <div class="rd-item">
         <div class="rd-item-idx">
           <div>04</div>
-          <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
+          <div class="rd-badge active-badge"><span class="rd-badge-dot"></span>Experimental</div>
         </div>
         <div class="rd-item-body">
-          <div class="rd-cat">Resource Control</div>
-          <div class="rd-title">eBPF-backed GC throttle</div>
-          <div class="rd-desc">A built-in BPF program watches CPU throttle counters in real time and signals VeltrixDB's GC scheduler before a throttle event hits the write path. Sustained write peaks stay smooth — hard stalls become gradual backpressure, and the GC emergency counter stays at zero even on resource-constrained nodes.</div>
-          <div class="rd-prog-wrap">
-            <div class="rd-prog-track"><div class="rd-prog-fill done" data-pct="100"></div></div>
-            <span class="rd-prog-pct">100%</span>
-          </div>
+          <div class="rd-cat">Network</div>
+          <div class="rd-title">C++ network front-end (<code>--net=cpp</code>)</div>
+          <div class="rd-desc">Opt-in, standalone mode only, binary PUT/GET/DEL/PING/MPUT/MGET only. On a 4-CPU CI runner it cut read P50 by ~45% (154 vs 286 µs) and poll read throughput rose 10%, but read P99 got worse (~3.0 vs 1.8 ms), batch writes were ~12% lower and io_uring did not beat poll. <b>It is not faster overall.</b> Since then, reads that need a disk read are finished off the event loop (deferred reads); that change has not been re-measured yet.</div>
         </div>
         <div class="rd-item-stat">
-          <div class="rd-stat-v"><span class="s-good">0</span></div>
-          <div class="rd-stat-l">stalls in<br/>60-min stress</div>
+          <div class="rd-stat-v"><span class="s-accent">154</span> µs</div>
+          <div class="rd-stat-l">read P50<br/>P99 worse</div>
         </div>
       </div>
 
       <div class="rd-item">
         <div class="rd-item-idx">
           <div>05</div>
-          <div class="rd-badge active-badge"><span class="rd-badge-dot"></span>Active</div>
+          <div class="rd-badge active-badge"><span class="rd-badge-dot"></span>Investigating</div>
         </div>
         <div class="rd-item-body">
-          <div class="rd-cat">Storage Tiering</div>
-          <div class="rd-title">Cloud cold-tier offload — S3, GCS, Azure</div>
-          <div class="rd-desc">VeltrixDB's tiering engine automatically moves data that hasn't been accessed in over 5 minutes to object storage, rate-limited to avoid I/O contention. The NVMe index stays hot. Cold data lands on S3, GCS, or Azure at a fraction of NVMe cost — no manual configuration required, and the GC engine is aware of tiered entries so it never relocates them unnecessarily.</div>
-          <div class="rd-prog-wrap">
-            <div class="rd-prog-track"><div class="rd-prog-fill wip" data-pct="88"></div></div>
-            <span class="rd-prog-pct">88%</span>
-          </div>
+          <div class="rd-cat">Storage</div>
+          <div class="rd-title">Bisecting the C++ storage layer</div>
+          <div class="rd-desc">On the same runner, the C++ storage extras all on (io_uring write bridge + SQPOLL, batch engine, native index) measured 1.12M keys/s batch writes vs 1.77M with them off. Which part costs what is not known yet; <code>scripts/net-bench.sh</code> runs each engine variant separately to find out. Meanwhile the io_uring write bridge is opt-in (<code>VELTRIXDB_URING_BRIDGE</code>, default off).</div>
         </div>
         <div class="rd-item-stat">
-          <div class="rd-stat-v">10<span class="s-accent">×</span></div>
-          <div class="rd-stat-l">cheaper cold<br/>storage vs NVMe</div>
+          <div class="rd-stat-v">1.12<span class="s-accent">M</span></div>
+          <div class="rd-stat-l">vs 1.77M keys/s<br/>attribution pending</div>
         </div>
       </div>
 
@@ -286,26 +264,24 @@
 
     <div class="rd-bench">
       <div class="rd-bench-cell">
-        <div class="rd-bench-lbl">Sustained writes</div>
-        <div class="rd-bench-val">110<span class="u">k ops/s</span></div>
-        <div class="rd-bench-sub">8 workers · 200K keys · 128B values</div>
+        <div class="rd-bench-lbl">Batch writes · macOS</div>
+        <div class="rd-bench-val">3.54<span class="u">M keys/s</span></div>
+        <div class="rd-bench-sub">8 clients &times; 1024-key MPUT · 1M-key space · P99 4.2 ms</div>
       </div>
       <div class="rd-bench-cell">
-        <div class="rd-bench-lbl">P99 write latency</div>
-        <div class="rd-bench-val">162<span class="u">ms</span></div>
-        <div class="rd-bench-sub">per 1024-key batch · 158µs/key amortised</div>
+        <div class="rd-bench-lbl">Batch writes · CI runner</div>
+        <div class="rd-bench-val">1.77<span class="u">M keys/s</span></div>
+        <div class="rd-bench-sub">4 CPUs · tmpfs · client on same host · Go front-end · P99 12.2&ndash;12.7 ms</div>
       </div>
       <div class="rd-bench-cell">
-        <div class="rd-bench-lbl">Packing density</div>
-        <div class="rd-bench-val">160<span class="u">B</span></div>
-        <div class="rd-bench-sub">bytes/record · gate ≤ 182.4 B</div>
-        <div class="rd-bench-pass">Gate PASS</div>
+        <div class="rd-bench-lbl">Reads · CI runner</div>
+        <div class="rd-bench-val">177&ndash;182<span class="u">K ops/s</span></div>
+        <div class="rd-bench-sub">same runner &amp; configuration · P99 1.8&ndash;2.0 ms</div>
       </div>
       <div class="rd-bench-cell">
-        <div class="rd-bench-lbl">GC emergency gate</div>
-        <div class="rd-bench-val">0</div>
-        <div class="rd-bench-sub">emergency runs in 60-min stress test</div>
-        <div class="rd-bench-pass">Gate PASS</div>
+        <div class="rd-bench-lbl">Mixed-workload write P99</div>
+        <div class="rd-bench-val">2.57<span class="u">ms</span></div>
+        <div class="rd-bench-sub">same runner · 1 ms flush window</div>
       </div>
     </div>
 
@@ -321,7 +297,7 @@
         <code style="font-family:var(--mono);font-size:13px;color:var(--ink-2);flex:1;overflow-x:auto;white-space:nowrap" id="reproCmd">git clone github.com/VeltrixDB/veltrixdb && ./scripts/bench.sh</code>
         <button class="btn" id="copyRepro" aria-label="Copy benchmark command" style="padding:6px 12px;font-size:12px">Copy</button>
       </div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:8px">Hard pass/fail gates on packing density and GC pressure &middot; exit 0 = the numbers held on your hardware</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:8px">Pass/fail gates on packing density and GC emergency runs &middot; the CI rows above come from <code>scripts/net-bench.sh</code> (see BENCHMARKING.md)</div>
     </div>
     <div class="cta-cta">
       <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Benchmark%20on%20our%20workload">Benchmark our workload for us <span class="arrow">&#8599;</span></a>
@@ -333,11 +309,11 @@
   <div class="wrap">
     <div class="ft">
       <div class="brand-block">
-        <a class="brand" href="#">
+        <a class="brand" href="index.html">
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
@@ -358,23 +334,22 @@
           <li><a href="docs/operations/security.html">Security model</a></li>
           <li><a href="blog-architecture.html">Blog · Architecture</a></li>
           <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
           <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#">Careers</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v1.1.0 · build 2026-07-18</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

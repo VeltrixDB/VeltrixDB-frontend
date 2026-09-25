@@ -1,6 +1,6 @@
 /* ============================================================
-   VeltrixDB — Confluent-style theme
-   Light canvas · deep-indigo hero · blue→purple→pink "data in motion"
+   VeltrixDB — homepage theme
+   Light canvas · deep-indigo hero · blue accent
    ============================================================ */
 :root{
   /* Surfaces */
@@ -19,7 +19,7 @@
   --ink-on-dark-2:#B9BEE6;
   --ink-on-dark-3:#8B90C9;
 
-  /* Brand — Confluent blue + gradient stream */
+  /* Brand — brand blue + gradient stream */
   --blue:#0B5CFF;
   --blue-600:#0A4FE0;
   --blue-700:#0940BC;
@@ -383,3 +383,35 @@ footer{background:var(--navy);color:var(--ink-on-dark-2);padding:72px 0 32px}
 
 /* CXO copy: allow wider section headings */
 .sh.wide{max-width:26ch}
+
+
+/* ============================================================
+   v4 — polish layer (mirrors the one at the end of site.css)
+   ============================================================ */
+:root{
+  --ink:#0B1026; --ink-2:#3B4262; --ink-3:#687090;
+  --line:#E6E9F2; --line-2:#D8DDEA; --line-strong:#C3CADC;
+}
+html,body{overflow-x:hidden}
+h1,h2,h3,h4{text-wrap:balance}
+p,li{text-wrap:pretty}
+.btn{border-radius:10px}
+.btn:focus-visible,a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:8px}
+
+/* the hero grid's children must be allowed to shrink, and the terminal's
+   long tokens (image names) must wrap, or the page scrolls sideways on phones */
+.hero-grid > *{min-width:0}
+.term-body .ln{overflow-wrap:anywhere}
+.term{max-width:100%}
+
+@media (max-width:760px){
+  .wrap{padding-left:16px;padding-right:16px}
+  .nav-inner{gap:12px}
+  .nav-cta{margin-left:auto;gap:10px}
+  .nav-cta .btn.primary{display:none}      /* the mobile menu carries the CTA */
+  .topbar{font-size:12px;padding:8px 12px}
+  .hero-grid{padding:48px 0 56px;gap:32px}
+  .hero-actions .btn{flex:1 1 auto}
+  .term-body{font-size:12.5px;padding:18px 16px}
+}
+@media (prefers-reduced-motion: reduce){.btn:hover{transform:none}}

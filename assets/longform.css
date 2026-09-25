@@ -1,0 +1,59 @@
+/* ============================================================
+   longform.css — v4 polish for the long-form pages
+   (whitepaper, redis-comparison, blog-*). Those pages carry
+   their own inline <style>; this file loads after it and brings
+   them onto the same type, accent and rhythm as assets/site.css.
+   ============================================================ */
+
+:root{
+  --sans:'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif:var(--sans);
+  --accent:#0B5CFF;
+}
+html,body{overflow-x:hidden}
+body{font-family:var(--sans)}
+h1,h2,h3,h4{text-wrap:balance}
+p,li{text-wrap:pretty}
+
+/* one accent treatment: no serif italics */
+.em,h1 .em,h2 .em,h3 .em{font-family:inherit !important;font-style:normal !important;font-weight:inherit !important;letter-spacing:inherit !important;color:var(--accent)}
+h1.ah-title,h1.wp-title{font-weight:800;letter-spacing:-.04em;line-height:1.05}
+.a-h,h2.sh{font-weight:800;letter-spacing:-.03em}
+.a-lede{font-family:var(--sans) !important;font-size:18px;font-style:normal}
+
+/* big section numerals: solid, calmer, sans */
+.a-num{font-family:var(--sans) !important;font-style:normal !important;font-weight:800 !important;font-size:64px !important;color:rgba(11,92,255,.14) !important;-webkit-text-stroke:0 !important;letter-spacing:-.05em}
+.toc-card .num{font-family:var(--sans) !important;font-style:normal !important;font-weight:800 !important}
+
+/* eyebrows and crumbs: sans labels, not letterspaced mono */
+.sec-eyebrow,.crumb,.ah-kind,.wp-eyebrow{font-family:var(--sans) !important;font-size:12px !important;font-weight:700;letter-spacing:.1em !important}
+.sec-eyebrow::before{width:16px;height:2px;border-radius:2px;opacity:1}
+
+/* whitepaper preview card: it is dark, so its ink must be light */
+.wp-doc{--ink:#FFFFFF;--ink-2:#C9CDF0;--ink-3:#A3A9D6;--ink-4:#8087BC;--line:rgba(255,255,255,.12)}
+.wp-doc h3{font-family:var(--sans) !important;font-style:normal !important;font-weight:800 !important;font-size:26px !important;letter-spacing:-.025em;color:#fff !important}
+
+/* rhythm */
+section{padding:96px 0}
+@media (max-width:1080px){section{padding:80px 0}}
+@media (max-width:760px){
+  section{padding:56px 0}
+  .wrap{padding-left:16px !important;padding-right:16px !important}
+  .nav-cta .btn.primary{display:none}          /* the mobile menu carries the CTA */
+  .nav-inner{justify-content:space-between !important}
+  .a-num{font-size:44px !important}
+}
+
+/* focus */
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+
+/* grid children must be allowed to shrink below their longest token,
+   or one long `code` span widens the column past a phone screen */
+.a-grid > *,.next-grid > *,.cta-mini > *,.a-pull > *,.wp-hero-inner > *,.schem-row > *{min-width:0}
+.a-body code,.a-body a{overflow-wrap:anywhere}
+.a-body pre,pre{overflow-x:auto;max-width:100%}
+.a-body table{display:block;overflow-x:auto}
+
+/* UI labels: small sans caps. Monospace stays for code, commands and data. */
+.ft h5, .pv-figure .fl, .pv-text .pk, .toc-card .ch, .toc-head .meta, .wp-doc .seal-l, .wp-doc .seal-r, .wp-doc .st .l, .a-foot .links a, .a-kicker, .a-pull .pl, .lat-table th, .matrix th, .next .kind, .next-up h4, .spec td:first-child, .cmp thead th, .schem-label, .ck-h, .timeline-h{font-family:var(--sans) !important;font-weight:700 !important;letter-spacing:.07em !important;font-size:11.5px}
+.brand b i{font-weight:800 !important}

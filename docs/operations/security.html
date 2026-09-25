@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -96,27 +96,27 @@
 <p>VeltrixDB encrypts stored values with <strong>AES-256-GCM</strong>. Encryption is off by default and is enabled per-node with a server flag:</p>
 <pre class="code-block"><code>veltrixdb -addr :9000 -data-dirs /mnt/nvme0,/mnt/nvme1 \
   -encrypt-at-rest</code></pre>
-<p>The encryption key is not passed on the command line. It is read from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable at startup:</p>
+<p>The key itself is never passed on the command line. It is read at startup from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64 of 32 bytes), or, if that is unset, from the file named by <code>-encryption-key-path</code> (raw or base64). Startup fails if the key is missing or not exactly 32 bytes:</p>
 <pre class="code-block"><code>export VELTRIXDB_ENCRYPTION_KEY=$(openssl rand 32 | base64)
 veltrixdb -encrypt-at-rest -data-dirs /mnt/nvme0,/mnt/nvme1</code></pre>
 <div class="callout warn">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">Key rotation is offline.</span> VeltrixDB does not support online re-keying. Rotating the encryption key requires stopping every node, generating a new key, and forcing a full rewrite of stored data at the new key (<code>veltrix migrate</code>). See the <a class="inline-link" href="disaster-recovery.html">Disaster Recovery</a> runbook for the exact sequence.</span>
+  <span><span class="callout-title">Key rotation is offline.</span> VeltrixDB does not support online re-keying. Rotating the encryption key requires stopping every node, generating a new key, updating the Secret, and forcing a full rewrite of stored data at the new key (<code>kubectl veltrix migrate</code>). See the <a class="inline-link" href="disaster-recovery.html">Disaster Recovery</a> runbook for the exact sequence.</span>
 </div>
 <p>On Kubernetes, supply the key through a Secret rather than a plain environment value baked into a manifest:</p>
 <pre class="code-block"><code>kubectl create secret generic veltrixdb-enc \
   --from-literal=key=BASE64_32B</code></pre>
-<p>If the encryption key is missing at startup, nodes fail to open the VLog with an error resembling <code>encryption: no key in VELTRIXDB_ENCRYPTION_KEY</code>. For HSM/KMS-backed key sourcing, mount the secret through a CSI driver (for example the AWS Secrets Manager CSI driver) so the raw key material is never stored in cluster state at rest.</p>
+<p>If the encryption key is missing at startup, nodes fail to open the VLog with an error resembling <code>encryption: enabled but no key in VELTRIXDB_ENCRYPTION_KEY and no EncryptionKeyPath set</code>. For HSM/KMS-backed key sourcing, mount the secret through a CSI driver (for example the AWS Secrets Manager CSI driver) so the raw key material is never stored in cluster state at rest.</p>
 
 <h2 id="tls-client-connections">TLS for client connections</h2>
 <p>The TCP data server can require TLS for client connections using a server certificate and key:</p>
-<pre class="code-block"><code>veltrixdb -addr :9000 \
+<pre class="code-block"><code>veltrixdb -addr :9000 -tls-addr :9443 \
   -tls-cert /etc/veltrixdb/tls/server.crt \
   -tls-key  /etc/veltrixdb/tls/server.key</code></pre>
-<p>VeltrixDB negotiates <strong>TLS 1.3</strong> and falls back to a restricted TLS 1.2 cipher suite list (<code>TLS_AES_256_GCM_SHA384</code>, <code>TLS_CHACHA20_POLY1305_SHA256</code>, <code>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</code>) — older ciphers are rejected. Without <code>-tls-cert</code>/<code>-tls-key</code>, the listener serves plaintext.</p>
+<p>TLS is served on a <strong>separate listener</strong>, <code>-tls-addr</code> (default <code>:9443</code>), which runs alongside the plaintext listener on <code>-addr</code>; the plaintext port stays open, so firewall it if clients must use TLS. The listener requires <strong>TLS 1.3</strong> (<code>MinVersion</code> is 1.3, so there is no TLS 1.2 fallback). Add <code>-tls-ca</code> to require client certificates signed by that CA.</p>
 
 <h2 id="cluster-mtls">Inter-node TLS and mutual TLS</h2>
-<p>Client-facing TLS and inter-node (Raft / replication) TLS are configured independently, because they usually terminate at different network boundaries. Use the <code>-cluster-tls-*</code> flags to secure Raft, replication, and gossip traffic between nodes:</p>
+<p>Client-facing TLS and inter-node (Raft / replication) TLS are configured independently, because they usually terminate at different network boundaries. Use the <code>-cluster-tls-*</code> flags to secure Raft, replication and partition-transfer (rebalance) traffic between nodes. The gossip listener is not covered by these flags; keep it on a private network:</p>
 <pre class="code-block"><code>veltrixdb -mode raft -node-id n1 -addr 127.0.0.1:9000 \
   -peers n1@127.0.0.1:9000,n2@127.0.0.1:9100,n3@127.0.0.1:9200 \
   -cluster-tls-cert /etc/veltrixdb/tls/cluster.crt \
@@ -129,8 +129,8 @@ veltrixdb -encrypt-at-rest -data-dirs /mnt/nvme0,/mnt/nvme1</code></pre>
 <thead><tr><th>Flag</th><th>Applies to</th><th>Effect</th></tr></thead>
 <tbody>
 <tr><td><code>-tls-cert</code> / <code>-tls-key</code></td><td>Client-facing TCP data port</td><td>Server-side TLS for application connections</td></tr>
-<tr><td><code>-cluster-tls-cert</code> / <code>-cluster-tls-key</code> / <code>-cluster-tls-ca</code></td><td>Raft / replication / gossip listeners</td><td>TLS between nodes; CA enables client-cert verification</td></tr>
-<tr><td><code>-cluster-mtls</code></td><td>Raft / replication / gossip listeners</td><td>Requires and verifies peer certificates (mutual TLS)</td></tr>
+<tr><td><code>-cluster-tls-cert</code> / <code>-cluster-tls-key</code> / <code>-cluster-tls-ca</code></td><td>Raft / replication / partition-transfer listeners</td><td>TLS between nodes; CA enables peer verification</td></tr>
+<tr><td><code>-cluster-mtls</code></td><td>Raft / replication / partition-transfer listeners</td><td>Requires and verifies peer certificates (mutual TLS)</td></tr>
 </tbody>
 </table>
 </div>
@@ -158,6 +158,10 @@ veltrixdb -encrypt-at-rest -data-dirs /mnt/nvme0,/mnt/nvme1</code></pre>
 <pre class="code-block"><code>AUTH alice secretpassword
 OK</code></pre>
 <p>The binary protocol carries the same operation as command <code>0x09</code> with a length-prefixed username and password. Password hashes are compared with a constant-time comparison, and lookups against unknown usernames run a dummy constant-time comparison as well, to reduce user-enumeration via timing. When <code>-auth-config</code> is not supplied, authentication is disabled and every connection is granted full permissions — do not expose an unauthenticated data port to an untrusted network.</p>
+<div class="callout warn">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">The C++ network front-end has no AUTH <span class="badge good">New in v1.7</span></span> The experimental <code>-net=cpp|uring|poll</code> front-end does not implement <code>AUTH</code>, so the server refuses to start when it is combined with <code>-auth-config</code> (<code>--net=cpp does not implement AUTH; run without --auth-config or use --net=go</code>). TLS on <code>-tls-addr</code> stays on the Go server. Use the default <code>-net=go</code> for any deployment that needs RBAC.</span>
+</div>
 <div class="callout note">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
   <span><span class="callout-title">Loading an auth config with zero users is rejected.</span> VeltrixDB refuses to enable auth enforcement from an empty user list, to avoid silently locking out (or silently permitting) every connection.</span>
@@ -199,6 +203,12 @@ curl -H "X-Admin-Token: $VELTRIX_ADMIN_TOKEN"        http://localhost:2112/admin
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
   <span><span class="callout-title">The audit log is not tamper-evident.</span> Entries are appended locally in plain JSONL — they are not cryptographically chained. Value payloads are deliberately excluded from records (only operation, key, namespace, actor, and outcome are logged). If your compliance framework requires hash-chained or immutable audit trails, ship the log to an external, write-once backend (for example S3 Object Lock or a WORM-mounted volume).</span>
 </div>
+
+<h2 id="backups-and-pitr">Backups and PITR archives hold plaintext</h2>
+<p>With <code>-encrypt-at-rest</code>, values are encrypted in the VLog, but the continuous WAL archive written to <code>-archive-dir</code> holds <strong>decrypted (plaintext) values</strong>. Protect the archive location (and anything it is copied to) with the same controls as the data itself: filesystem permissions, encrypted volumes or bucket-side encryption, and restricted access.</p>
+
+<h2 id="container-image">Container image</h2>
+<p>The official Dockerfile builds on a <code>gcr.io/distroless/cc-debian12</code> runtime base (no shell or package manager; the <code>cc</code> variant carries the C/C++ runtime libraries the cgo build needs). The image is built with <code>CGO_ENABLED=1</code> for the native index; pass <code>--build-arg CGO_ENABLED=0</code> for a static pure-Go image.</p>
 
 <h2 id="compliance">Compliance posture</h2>
 <p>VeltrixDB ships a control mapping document (<code>docs/SOC2_CONTROLS.md</code>) that maps its built-in capabilities — encryption at rest, RBAC, mTLS, the audit log, Prometheus-based monitoring, and backup/restore — to SOC 2 Trust Service Criteria (CC6.x, CC7.x, CC8.1, A1.x, C1.x, PI1.x).</p>

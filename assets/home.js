@@ -1,4 +1,4 @@
-/* VeltrixDB homepage — Confluent-style interactions */
+/* VeltrixDB homepage — interactions */
 (function () {
   'use strict';
 
@@ -15,41 +15,53 @@
     });
   }
 
-  /* ---- Terminal typing ---- */
-  var body = document.getElementById('termBody');
-  if (body) {
-    var steps = [
-      { cmd: 'docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb', out: 'VeltrixDB v1.1.0 · 8192 shards · listening on :9000', ok: true },
-      { cmd: 'PUT session:8f3a {"uid":42,"cart":3}', out: 'OK · durable in 0.4ms' },
-      { cmd: 'GET session:8f3a', out: '{"uid":42,"cart":3}  · 0.28ms (DRAM hit)' },
-      { cmd: 'STATS p99', out: 'read p99 4.9ms · writeamp 1.0x · gc 0 events', ok: true }
-    ];
-    var i = 0;
-    function line(step, done) {
-      var ln = document.createElement('div');
-      ln.className = 'ln';
-      var p = document.createElement('span'); p.className = 'p'; p.textContent = '$ ';
-      var cmd = document.createElement('span'); cmd.className = 'cmd';
-      ln.appendChild(p); ln.appendChild(cmd);
-      body.appendChild(ln);
-      var t = 0;
-      (function type() {
-        cmd.textContent = step.cmd.slice(0, t);
-        if (t++ <= step.cmd.length) { setTimeout(type, 22); }
-        else {
-          var out = document.createElement('span');
-          out.className = 'out' + (step.ok ? ' ok' : '');
-          out.textContent = step.out;
-          ln.appendChild(out);
-          done();
-        }
+  /* ---- Terminal typing ----
+     The session is written in the HTML (so it reads correctly with JS off or
+     reduced motion); this only re-types those same lines once, when the
+     terminal scrolls into view. Nothing here invents output. */
+  var body = document.querySelector('#heroTerm .term-body');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (body && !reduced && 'IntersectionObserver' in window) {
+    var steps = Array.prototype.map.call(body.querySelectorAll('.ln'), function (ln) {
+      var c = ln.querySelector('.cmd');
+      return {
+        cmd: c ? c.textContent : '',
+        outs: Array.prototype.map.call(ln.querySelectorAll('.out'), function (o) {
+          return { text: o.textContent, ok: o.classList.contains('ok') };
+        })
+      };
+    });
+    var played = false;
+    var play = function () {
+      if (played) return; played = true;
+      body.style.minHeight = body.offsetHeight + 'px';
+      body.innerHTML = '';
+      var i = 0;
+      (function next() {
+        if (i >= steps.length) return;
+        var step = steps[i++];
+        var ln = document.createElement('div'); ln.className = 'ln';
+        var p = document.createElement('span'); p.className = 'p'; p.textContent = '$ ';
+        var cmd = document.createElement('span'); cmd.className = 'cmd';
+        ln.appendChild(p); ln.appendChild(cmd); body.appendChild(ln);
+        var t = 0;
+        (function type() {
+          cmd.textContent = step.cmd.slice(0, t);
+          if (t++ < step.cmd.length) return setTimeout(type, 18);
+          step.outs.forEach(function (o) {
+            var out = document.createElement('span');
+            out.className = 'out' + (o.ok ? ' ok' : '');
+            out.textContent = o.text;
+            ln.appendChild(out);
+          });
+          setTimeout(next, 520);
+        })();
       })();
-    }
-    function run() {
-      if (i >= steps.length) { setTimeout(function () { body.innerHTML = ''; i = 0; run(); }, 3600); return; }
-      line(steps[i++], function () { setTimeout(run, 620); });
-    }
-    run();
+    };
+    var io = new IntersectionObserver(function (es) {
+      if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); setTimeout(play, 300); }
+    }, { threshold: 0.4 });
+    io.observe(body);
   }
 
   /* ---- Copy button ---- */

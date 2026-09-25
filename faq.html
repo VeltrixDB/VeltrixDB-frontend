@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -53,35 +53,35 @@
     <div class="faq">
       <details open>
         <summary>Is VeltrixDB a drop-in replacement for Redis or DynamoDB?</summary>
-        <div class="answer">For <b>point-lookup workloads</b> — yes. We ship a Redis-wire-compatible mode and a native client. If your application uses <code>GET</code>, <code>SET</code>, <code>DEL</code>, <code>HGET</code>-style commands, swap the connection string and you're running. If you rely on range scans, secondary indexes, or full-text search, VeltrixDB is the wrong tool — we'll tell you that in the demo.</div>
+        <div class="answer">Not drop-in. VeltrixDB does <b>not</b> speak the Redis protocol (RESP); it has its own text and binary protocols and client SDKs for Go, Python, Node.js, Java, Rust, and C++. The command set is deliberately familiar — <code>PUT</code>/<code>SET</code>, <code>GET</code>, <code>DEL</code>, <code>HSET</code>/<code>HGET</code>, <code>INCR</code>, <code>CAS</code>, <code>MPUT</code>/<code>MGET</code>, plus ordered scans with <code>RANGE</code> and <code>SCANCUR</code> — so for <b>point-lookup workloads</b> the change is a client swap, not a redesign. If you need joins, SQL, or full-text search, VeltrixDB is the wrong tool — we'll tell you that in the demo.</div>
       </details>
       <details>
-        <summary>How do you actually achieve sub-5ms P99 on disk-backed reads?</summary>
-        <div class="answer">Three things: <code>io_uring</code> SQPOLL eliminates syscalls on the hot path, a 256 GB LIRS cache absorbs ~94% of reads, and key-value separation means compaction never touches the values — so background work never competes with your user requests for NVMe bandwidth.</div>
+        <summary>How fast are reads, really?</summary>
+        <div class="answer">The reproducible number: <b>427,697 reads/s, P99 2.8 ms</b> (avg 461 µs) on YCSB workload C — 100M keys, 200 threads, one AWS node with 4× NVMe. The whole dataset fit in the 400 GB cache, so those were cache hits; we have not published a reproducible run where most reads miss to NVMe, or one at a billion keys. How it works: a sharded, scan-resistant LIRS cache serves hot keys (~92 ns in-process); a miss is one 4 KB-aligned Go <code>pread</code> from the value log, CRC32C-checked; and with no LSM compaction, value-log GC runs off the read path and backs off when read latency rises. Full conditions are on the <a href="performance.html">performance page</a>.</div>
       </details>
       <details>
         <summary>What does the bill actually look like at scale?</summary>
-        <div class="answer">You pay for the infrastructure (NVMe nodes), not per million operations. A 3-node Growth cluster serving 2M ops/sec typically lands between <b>$2,490 and $4,800/month</b> in cloud costs — customers migrating from DynamoDB usually see 3–5× reduction. We'll model your workload during the demo.</div>
+        <div class="answer">VeltrixDB is free and self-hosted, so the bill is your hardware — RAM, NVMe, and network — not a per-operation meter. RAM covers the index (~142 B/key measured at 5M keys with the native index, plus ~90 B/key for the ordered index unless disabled) and whatever cache you choose; NVMe holds the values. See <a href="pricing.html#calc">how to size a node</a>, and we'll model your workload during the demo. We don't quote savings percentages we haven't measured.</div>
       </details>
       <details>
         <summary>How does data durability and replication work?</summary>
-        <div class="answer">Synchronous WAL with group-commit fsync. Multi-region clusters replicate over QUIC with active-active conflict resolution. RPO is zero for single-region failures, &lt;30s for cross-region. The 99.99% SLA is contractual on Growth and Enterprise tiers.</div>
+        <div class="answer">A write is acknowledged only after it is <code>fdatasync</code>'d: the value to the value log and its record to a group-commit WAL, which shares one <code>write(2)</code> and one <code>fdatasync</code> across all writers in the window (15 ms by default). WAL records are binary with a CRC32C over the whole record (binary is the default since v1.6; v1.5 and earlier wrote text records). A crash replays the WAL; a clean shutdown writes a compacted checkpoint. Across nodes: <code>--mode=raft</code> for quorum-committed writes, or <code>--mode=replicated</code> with <code>eventual</code>, <code>quorum</code>, or <code>strong</code> consistency; <code>--rack-id</code> keeps replicas in different zones. Cross-region, <code>repl-ship</code> forwards the change stream. There is no SLA — it's software you run.</div>
       </details>
       <details>
         <summary>What's the security and compliance story?</summary>
-        <div class="answer">SOC 2 Type II and ISO 27001 certified. AES-256 encryption at rest, TLS 1.3 in transit, mTLS between nodes. GDPR and HIPAA compliant. Enterprise customers get custom DPAs, BYOK / KMS, VPC peering, and air-gapped deployment options.</div>
+        <div class="answer">In the software: AES-256-GCM encryption at rest, TLS 1.3 for clients, mTLS between nodes, RBAC, and an append-only audit log. Because you run it in your own environment, compliance is scoped to your deployment — VeltrixDB itself holds no SOC 2 or ISO 27001 certification. Note that point-in-time-recovery archives hold decrypted values, so protect the archive location.</div>
       </details>
       <details>
         <summary>How long does production migration take?</summary>
-        <div class="answer">Median: <b>two sprints</b>. Helm install is 94 seconds. Then shadow-read traffic for 3–7 days to validate, then flip the connection. Enterprise migrations include a dedicated solutions architect end-to-end — no extra cost.</div>
+        <div class="answer">It depends on how much of your code talks to the store. The usual shape: one <code>helm install</code>, bulk-load with <code>veltrix-migrate</code> (JSONL import/export) or batched <code>MPUT</code>, shadow-read traffic for a few days to validate, then flip the connection. The <a href="blog-migration.html">migration guide</a> walks through dual writes, cutover, and rollback.</div>
       </details>
       <details>
-        <summary>What happens if I outgrow my plan?</summary>
-        <div class="answer">Clusters scale online — add nodes, the operator reshards automatically without read interruption. You can upgrade tiers any time with no data migration; we just unlock the additional capacity and support level on your existing cluster.</div>
+        <summary>What happens when I outgrow a cluster?</summary>
+        <div class="answer">Add nodes. The Kubernetes operator reshards when the replica count changes, and the cluster rebalances partitions to the new nodes. There are no plans or capacity tiers to upgrade — the open-source engine has no limits beyond your hardware.</div>
       </details>
       <details>
-        <summary>Is VeltrixDB open source?</summary>
-        <div class="answer">Yes — VeltrixDB is fully open source under <b>Apache 2.0</b>. The server and all core client libraries live on GitHub: clone it, run it, fork it, send PRs. No license keys, no trial limits, no feature-gated tiers — the whole engine is free to use in production.</div>
+        <summary>Is VeltrixDB open source? Is there a managed service?</summary>
+        <div class="answer">Yes — VeltrixDB is fully open source under <b>Apache 2.0</b>. The server and all core client libraries live on GitHub: clone it, run it, fork it, send PRs. No license keys, no trial limits, no feature-gated tiers — the whole engine is free to use in production. There is <b>no managed cloud service today</b>; VeltrixDB is self-hosted only. A managed service is planned, with no date announced.</div>
       </details>
     </div>
   </div>
@@ -92,30 +92,30 @@
   <div class="wrap">
     <span class="eyebrow">Resources</span>
     <h2 class="sh">Built for teams who <span class="em">read the docs</span>.</h2>
-    <p class="sh-sub">Every claim on this page has a benchmark, a paper, or a config file behind it. Go deep before you commit.</p>
+    <p class="sh-sub">Every claim should have a benchmark, a paper, or a config file behind it. Go deep before you commit.</p>
     <div class="resources">
       <a class="res" href="blog-benchmark.html">
         <span class="kind">Benchmark report</span>
-        <h4>The 1B-Key Benchmark — methodology &amp; raw data</h4>
-        <p>Hardware specs, workload generator config, percentile distributions, and replayable harness. 32 pages.</p>
-        <div class="meta"><span>PDF · 4.2 MB</span><span>Read →</span></div>
+        <h4>Benchmark methodology &amp; raw data</h4>
+        <p>Hardware specs, workload generator config, percentile distributions, and what is — and isn't — reproducible.</p>
+        <div class="meta"><span>Engineering blog</span><span>Read →</span></div>
       </a>
       <a class="res" href="blog-architecture.html">
         <span class="kind">Architecture deep-dive</span>
         <h4>Key-value separation &amp; why compaction shouldn't touch values</h4>
-        <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+        <p>How the value log, group-commit WAL, and LIRS cache keep background work off the read path.</p>
         <div class="meta"><span>Engineering blog · 18 min</span><span>Read →</span></div>
       </a>
       <a class="res" href="blog-migration.html">
         <span class="kind">Migration guide</span>
         <h4>Moving from DynamoDB to VeltrixDB in two sprints</h4>
-        <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan — with copy-pasteable Terraform.</p>
+        <p>Shadow reads, dual-write strategy, cutover checklist, and rollback plan.</p>
         <div class="meta"><span>Guide · 12 min</span><span>Read →</span></div>
       </a>
       <a class="res" href="redis-comparison.html">
         <span class="kind">Comparison guide</span>
         <h4>VeltrixDB vs Redis — honest comparison &amp; when to use each</h4>
-        <p>P99 latency, storage cost, write amplification, and the GC death spiral Redis can't fully solve. With migration code.</p>
+        <p>Storage cost, durability, latency, and where Redis is still the better choice. With migration code.</p>
         <div class="meta"><span>Guide · 12 min</span><span>Read →</span></div>
       </a>
     </div>
@@ -123,9 +123,9 @@
     <div class="news">
       <div>
         <h3>Get the <span class="em">benchmark report</span> in your inbox.</h3>
-        <p>One email. The full methodology, raw P99 distributions, and a side-by-side cost analysis vs DynamoDB, Redis Enterprise, and Cassandra at 1B keys.</p>
+        <p>One email. The full methodology, raw latency distributions, and the exact configuration, so you can rerun it on your own hardware.</p>
       </div>
-      <a class="news-mail" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20benchmark%20report&body=Hi%20—%20please%20share%20the%20full%20benchmark%20methodology%20and%20cost%20comparison%20PDF.%0A%0AName%3A%0ACompany%3A%0AScale%20(keys%2Fops)%3A%0A">
+      <a class="news-mail" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20benchmark%20report&body=Hi%20—%20please%20share%20the%20full%20benchmark%20methodology%20and%20raw%20results.%0A%0AName%3A%0ACompany%3A%0AScale%20(keys%2Fops)%3A%0A">
         <span class="news-mail-l">Email us on</span>
         <span class="news-mail-v">veltrixdb@gmail.com</span>
         <span class="news-mail-a">↗</span>
@@ -144,8 +144,8 @@
     <div class="origin-body">
       <p>VeltrixDB started the night a flash sale buried our Redis cluster under 8 GB of session state. The on-call channel filled with screenshots of P99 climbing past 400 ms. The bill that quarter was already 3× what we'd budgeted.</p>
       <p>We tried every workaround you've tried — read replicas, write batching, a DynamoDB migration that ended with <span class="si">a quarter of unpredictable per-op billing</span>. None of it solved the actual problem.</p>
-      <p>The real problem was that <b>every popular database rewrites your values during compaction</b>. It's a 10× amplification tax on storage and a guaranteed spike in tail latency exactly when you can least afford it.</p>
-      <p>So we built VeltrixDB the way we wished a database had been built when we were on call: <b>key–value separation so compaction never touches values</b>, <b>io_uring so the kernel never gets in the way</b>, and <b>fixed cluster pricing so the bill never surprises you</b>.</p>
+      <p>The real problem was structural: <b>keep every value in RAM</b> and the bill scales with your data; <b>use an LSM tree</b> and compaction rewrites your values over and over, taxing NVMe and tail latency exactly when you can least afford it.</p>
+      <p>So we built VeltrixDB the way we wished a database had been built when we were on call: <b>key–value separation so values are written once</b>, <b>the index in DRAM and the values on NVMe</b>, and <b>open source on your own hardware so the bill never surprises you</b>.</p>
       <p>Now we ship it to teams who recognise their own war stories in ours.</p>
       <div class="origin-sig">
         <div class="avatar">AG</div>
@@ -174,11 +174,11 @@
   <div class="wrap">
     <div class="ft">
       <div class="brand-block">
-        <a class="brand" href="#">
+        <a class="brand" href="index.html">
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
@@ -199,23 +199,22 @@
           <li><a href="docs/operations/security.html">Security model</a></li>
           <li><a href="blog-architecture.html">Blog · Architecture</a></li>
           <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
           <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#">Careers</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v1.1.0 · build 2026-07-18</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

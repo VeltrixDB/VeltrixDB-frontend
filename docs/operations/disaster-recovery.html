@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -90,7 +90,7 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Disaster Recovery</div>
     <h1>Disaster Recovery</h1>
-<p class="page-lede">A runbook-style summary of VeltrixDB's disaster recovery procedures, covering pod crash loops, data corruption, write outages, GC death-spirals, backup/restore, and encryption key rotation. Assumes <code>kubectl</code> admin access with pods labeled <code>app.kubernetes.io/name=veltrixdb</code> in the <code>veltrixdb</code> namespace.</p>
+<p class="page-lede">A runbook-style summary of VeltrixDB's disaster recovery procedures, covering pod crash loops, data corruption, write outages, GC death-spirals, backup/restore, encryption key rotation, failed disks, metadata repair and WAL-format rollback. Assumes <code>kubectl</code> admin access with pods labeled <code>app.kubernetes.io/name=veltrixdb</code> in the <code>veltrixdb</code> namespace.</p>
 
 <h2 id="severity">Severity classes</h2>
 <div class="table-wrap">
@@ -113,10 +113,10 @@ kubectl describe pod -n veltrixdb POD</code></pre>
 <table>
 <thead><tr><th>Log line</th><th>Cause</th><th>Fix</th></tr></thead>
 <tbody>
-<tr><td><code>WAL replay corruption at offset N</code></td><td>Partial write on crash</td><td>Restart the pod once; if recurring, run <code>kubectl veltrix sync-from REPLICA_POD</code></td></tr>
-<tr><td><code>cannot allocate memory</code> (vlog open)</td><td>Hugepages missing</td><td><code>kubectl exec POD -- sysctl vm.nr_hugepages</code> — must be &ge; 512</td></tr>
-<tr><td><code>bad magic at offset O</code></td><td>Silent disk corruption</td><td>Drain the node, replace the disk, re-join</td></tr>
-<tr><td><code>encryption: no key in VELTRIXDB_ENCRYPTION_KEY</code></td><td>Missing secret</td><td><code>kubectl create secret generic veltrixdb-enc --from-literal=key=BASE64_32B</code></td></tr>
+<tr><td><code>[wal] replay of &hellip;/wal.log stopped at byte N of M after K records</code></td><td>Torn final write on crash (small <code>M &minus; N</code>), or WAL damage (large). Every record is CRC32C-checked and replay stops at the first bad one.</td><td>Restart the pod once. If it recurs or <code>M &minus; N</code> is large, treat it as corruption: wipe the node's data and let replication refill it (section 2), or restore from backup (section 5).</td></tr>
+<tr><td><code>panic: native index: insert failed (out of memory?)</code> <span class="badge good">New in v1.6</span></td><td><code>vm.max_map_count</code> too low for the off-heap native index (cgo builds, including the Docker image)</td><td>Apply <code>scripts/sysctl.conf</code> (<code>vm.max_map_count = 262144</code>) on the <strong>node</strong>; or set <code>VELTRIXDB_INDEX=map</code> to use the Go map index</td></tr>
+<tr><td><code>vlog bad magic at offset O</code></td><td>Silent disk corruption</td><td>Drain the node, replace the disk, re-join</td></tr>
+<tr><td><code>encryption: enabled but no key in VELTRIXDB_ENCRYPTION_KEY &hellip;</code></td><td>Missing secret</td><td><code>kubectl create secret generic veltrixdb-enc --from-literal=key=BASE64_32B</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -127,10 +127,10 @@ kubectl describe pod -n veltrixdb POD</code></pre>
 <pre class="code-block"><code>kubectl exec -n veltrixdb POD -- curl -s localhost:2112/metrics | \
   grep -E 'scrub_corruption_total|vlog_gc_read_errors_total'</code></pre>
 </li>
-<li>Find the bad disk: <code>kubectl logs -n veltrixdb POD | grep '[scrub] disk='</code></li>
+<li>Find the bad disk: <code>kubectl logs -n veltrixdb POD | grep '\[scrub\] disk='</code> (lines report <code>MAGIC MISMATCH</code> or <code>CRC MISMATCH</code> with the disk and offset)</li>
 <li>Quarantine the pod: <code>kubectl label pod -n veltrixdb POD veltrixdb.io/quarantine=true --overwrite</code></li>
 <li>Wipe the affected files and restart — replication refills automatically:
-<pre class="code-block"><code>kubectl exec -n veltrixdb POD -- rm -rf /mnt/nvme*/vlog_active.dat /mnt/nvme*/wal_*
+<pre class="code-block"><code>kubectl exec -n veltrixdb POD -- rm -rf /mnt/nvme*/vlog_active.dat /mnt/nvme*/wal.log*
 kubectl delete pod -n veltrixdb POD</code></pre>
 </li>
 <li>After replay completes, remove the quarantine label: <code>kubectl label pod -n veltrixdb POD veltrixdb.io/quarantine- --overwrite</code></li>
@@ -155,10 +155,7 @@ kubectl exec -n veltrixdb POD -- curl -s localhost:2112/metrics | grep wal_flush
 <h2 id="gc-death-spiral">4. GC death-spiral / garbage ratio &gt; 65% (SEV-2)</h2>
 <ol>
 <li>Throttle writes immediately: <code>kubectl veltrix quota-set tenant_42 1000 5000000</code></li>
-<li>If hardware has headroom, raise the GC budget:
-<pre class="code-block"><code>kubectl set env statefulset/veltrixdb -n veltrixdb \
-  VELTRIXDB_GC_CRITICAL_BPS=300000000   # 300 MB/s</code></pre>
-</li>
+<li>Do not look for a runtime GC-budget knob: the GC bandwidth tiers (60&nbsp;MB/s throttled, 200&nbsp;MB/s critical at &ge; 50% garbage, uncapped emergency mode at &ge; 65%) are compile-time constants in <code>storage/defrag.go</code>, and there is no environment variable that overrides them. <code>-gc-threshold</code> only sets when normal GC starts.</li>
 <li>Long-term: add disks (scale <code>volumeClaimTemplates</code>, re-roll the StatefulSet).</li>
 </ol>
 <div class="callout note">
@@ -181,7 +178,7 @@ veltrixdb-backup restore --chain=/tmp/restore --data-dirs=/data-new</code></pre>
 <p>Or restore from Kubernetes volume snapshots:</p>
 <pre class="code-block"><code>kubectl create volumesnapshot veltrixdb-disk-0 -n veltrixdb \
   --persistentvolumeclaim=data-veltrixdb-0</code></pre>
-<p>For the full backup/incremental/PITR model, see <a class="inline-link" href="backup-and-restore.html">Backup &amp; Restore</a>.</p>
+<p>Backups and PITR restores write a binary WAL; restoring into a build that predates the binary WAL (v1.5 and earlier) needs the <a class="inline-link" href="#wal-format-rollback">WAL rollback procedure</a> first. For the full backup/incremental/PITR model, see <a class="inline-link" href="backup-and-restore.html">Backup &amp; Restore</a>.</p>
 
 <h2 id="key-rotation">6. Encryption key rotation</h2>
 <div class="callout warn">
@@ -204,7 +201,7 @@ kubectl exec -n veltrixdb POD -- curl -s -o /dev/null -w '%{http_code}\n' localh
 # Which disks tripped
 kubectl exec -n veltrixdb POD -- curl -s localhost:2112/readyz     # degraded: disks [2] failed
 kubectl logs -n veltrixdb POD | grep '\[disk\]'                    # "disk=2 marked FAILED after 5 consecutive ... errors"</code></pre>
-<p><code>INFO</code> (text protocol) also appends <code>FAILED_DISKS=[2]</code> for a degraded node, and the engine's <code>DiskFailures</code> metric counts breaker trips.</p>
+<p><code>INFO</code> (text protocol) also appends <code>FAILED_DISKS=[2]</code> for a degraded node, and the engine's internal <code>DiskFailures</code> counter records breaker trips (not exported to Prometheus).</p>
 <div class="callout warn">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
   <span><span class="callout-title">The breaker does not auto-reset.</span> A failed disk is never automatically un-failed — even if later I/O on it would succeed. Recovery is always drain / replace / restart, which matches how hardware is actually swapped.</span>
@@ -215,6 +212,25 @@ kubectl logs -n veltrixdb POD | grep '\[disk\]'                    # "disk=2 mar
 <li><strong>Replace:</strong> swap the failed device (see section 1's <code>bad magic</code> row and section 2 for corruption handling on the same disk).</li>
 <li><strong>Restart:</strong> restart the pod/process — the breaker state is in-memory, so a restart with a healthy disk comes back clean and replication refills the data.</li>
 </ol>
+
+<h2 id="transform-metadata">8. Value-transform metadata damage from a pre-fix build (SEV-1) <span class="badge good">Fixed in v1.3</span></h2>
+<p>Affects nodes that ran a build predating the value-transform WAL fix with compression (zstd is the default) or <code>-encrypt-at-rest</code>, and that restarted since writing. After a <strong>clean</strong> restart, reads succeed but silently return the raw compressed or encrypted blob (a 1040-byte value comes back as ~51 bytes starting <code>02 28 b5 2f fd</code>, the zstd magic); after a <strong>crash</strong>, reads fail with <code>vlog CRC32C mismatch</code>. Upgrading alone does not fix it; the VLog bytes are intact, so it is repaired in place:</p>
+<pre class="code-block"><code># 1. Assess, read-only (whole fleet; exits non-zero if any node needs work)
+./scripts/repair-scan-fleet.sh --hosts hosts.txt --data-dirs /mnt/nvme0,/mnt/nvme1
+
+# 2. Repair each node with the server STOPPED
+kubectl scale statefulset veltrixdb --replicas=0
+veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
+<p>Each <code>wal.log</code> is copied to <code>wal.log.prerepair.&lt;timestamp&gt;</code> first. The repair is exact: it accepts only the interpretation of each blob that reproduces the stored plaintext CRC, and is idempotent. Verify by reading back values larger than 256 bytes and re-running the scan. Encrypted deployments need the key (<code>VELTRIXDB_ENCRYPTION_KEY</code> plus <code>--encrypt-at-rest</code>), or those records report as unresolved. See <a class="inline-link" href="../reference/cli-reference.html#veltrix-repair">veltrix-repair</a>.</p>
+
+<h2 id="wal-format-rollback">9. WAL format: upgrade and rollback <span class="badge good">New in v1.6</span></h2>
+<p>WAL records are binary by default. Replay reads binary and legacy text records in any mix, so <strong>upgrading needs no step</strong>: the new build replays the existing text WAL and appends binary records after it. A build that predates the binary WAL cannot read it. To roll back:</p>
+<ol>
+<li>On the <em>current</em> build, restart once with <code>--wal-format=text</code> (add it to the StatefulSet args and re-roll). The server logs <code>[wal] WARNING: --wal-format=text &hellip;</code>.</li>
+<li>Stop it <strong>cleanly</strong> (SIGTERM, not SIGKILL): <code>kubectl scale statefulset/veltrixdb --replicas=0 -n veltrixdb</code>. The shutdown checkpoint writes a compacted <code>wal.log.ckpt</code> and renames it over <code>wal.log</code>, now in text.</li>
+<li>Deploy the older build.</li>
+</ol>
+<p>If the node crashed instead of stopping cleanly, repeat steps 1&ndash;2. While running with <code>--wal-format=text</code>, keys containing <code>|</code> or a newline are not crash-safe: a crash can drop every acknowledged write after such a key.</p>
 
 <h2 id="contact">Contact</h2>
 <ul>

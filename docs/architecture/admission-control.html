@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -105,17 +105,17 @@
 <p>As read latency rises, VeltrixDB escalates through a small set of protective actions:</p>
 
 <div class="table-wrap"><table><thead><tr><th>Read EWMA</th><th>Action</th></tr></thead><tbody>
-<tr><td>&lt; 3 ms</td><td>Normal — GC runs at full speed</td></tr>
-<tr><td>≥ 3 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
-<tr><td>≥ 4 ms</td><td>GC paused entirely, and each <code>PUT</code> sleeps 2 ms before submitting to WAL/VLog</td></tr>
-<tr><td>&lt; 2 ms</td><td>Everything resumes — throttle cleared, GC unpaused</td></tr>
+<tr><td>&lt; 15 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>≥ 15 ms</td><td>GC bandwidth capped at 60 MB/s (<code>gcLatencyThresholdNs</code>)</td></tr>
+<tr><td>&gt; 20 ms</td><td>GC paused entirely, and each <code>PUT</code> sleeps 2 ms before submitting to WAL/VLog (<code>admissionThrottleNs</code>)</td></tr>
+<tr><td>&lt; 10 ms</td><td>Everything resumes — throttle cleared, GC unpaused (<code>admissionResumeNs</code>)</td></tr>
 <tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale — GC resumes automatically</td></tr>
 </tbody></table></div>
 
 <p>Two things are worth calling out about this ladder:</p>
 <ul>
-<li><strong>The GC bandwidth cap fires before the full write throttle.</strong> At 3 ms EWMA, GC is capped to 60 MB/s — a soft signal that gives GC a chance to back off before things get bad enough to touch client-visible write latency. Only at 4 ms does the system start actively slowing down <code>PUT</code> calls.</li>
-<li><strong>The resume threshold (2 ms) is lower than the trigger threshold (4 ms).</strong> This hysteresis gap prevents the system from flapping in and out of throttled mode when latency is oscillating right around a single threshold.</li>
+<li><strong>The GC bandwidth cap fires before the full write throttle.</strong> At 15 ms EWMA, GC is capped to 60 MB/s — a soft signal that gives GC a chance to back off before things get bad enough to touch client-visible write latency. Only above 20 ms does the system start actively slowing down <code>PUT</code> calls.</li>
+<li><strong>The resume threshold (10 ms) is lower than the trigger threshold (20 ms).</strong> This hysteresis gap prevents the system from flapping in and out of throttled mode when latency is oscillating right around a single threshold.</li>
 </ul>
 
 <h3>The staleness guard</h3>
@@ -129,7 +129,7 @@
 <tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s</td><td>Yes</td><td>60 s</td></tr>
 <tr><td>≥ 65% (emergency)</td><td>Unlimited</td><td><strong>No</strong></td><td>30 s</td></tr>
 </tbody></table></div>
-<p>In plain terms: as long as garbage is below 65%, a paused-by-admission-control state (read EWMA ≥ 4 ms) is <strong>honored</strong> — GC stands down and gives reads the full disk. Only once garbage crosses the 65% emergency threshold does GC override that pause. This ordering is deliberate: below 65%, protecting read latency is the priority; above 65%, the system is already in enough trouble that continuing to defer GC would make things categorically worse.</p>
+<p>In plain terms: as long as garbage is below 65%, a paused-by-admission-control state (read EWMA &gt; 20 ms) is <strong>honored</strong> — GC stands down and gives reads the full disk. Only once garbage crosses the 65% emergency threshold does GC override that pause. This ordering is deliberate: below 65%, protecting read latency is the priority; above 65%, the system is already in enough trouble that continuing to defer GC would make things categorically worse.</p>
 
 <h2 id="emergency-tier">The emergency tier: breaking the death spiral</h2>
 <p>The scenario the emergency tier exists to prevent: read latency rises → admission control pauses GC → garbage keeps accumulating because nothing reclaims it → VLog grows → cache hit rate drops (more cold data to page through) → read latency rises further → GC stays paused indefinitely. This is a genuine death spiral — without an escape hatch, a transient latency spike can turn into a permanent, self-reinforcing degradation.</p>
@@ -149,7 +149,7 @@
 </tbody></table></div>
 
 <h3>Healthy pattern</h3>
-<p>In a well-provisioned cluster, the garbage ratio oscillates within the 30–50% band, GC bandwidth stays at the normal cap, the write-admission-throttle counter is flat at zero (or increments only briefly during isolated traffic spikes and then stops), and the emergency-runs counter never moves. Read EWMA stays comfortably under the 3 ms first-tier threshold under normal load.</p>
+<p>In a well-provisioned cluster, the garbage ratio oscillates within the 30–50% band, GC bandwidth stays at the normal cap, the write-admission-throttle counter is flat at zero (or increments only briefly during isolated traffic spikes and then stops), and the emergency-runs counter never moves. Read EWMA stays comfortably under the 15 ms first-tier threshold under normal load.</p>
 
 <h3>Unhealthy pattern</h3>
 <p>Watch for these signals together, since any one in isolation can be a false alarm but the combination is not:</p>

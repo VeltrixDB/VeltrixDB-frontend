@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -94,6 +94,7 @@
 
 <h2 id="what-gets-backed-up">What gets backed up</h2>
 <p>VeltrixDB stores two files per disk: <code>wal.log</code> (a compacted write-ahead log — one entry per live key, holding the key and its VLog offset) and <code>vlog_active.dat</code> (the append-only value bytes). Backup captures both. The in-memory index is <strong>not</strong> backed up — it is rebuilt from the WAL on startup, so backing up the WAL and VLog is sufficient to reconstruct full key-value state.</p>
+<p><strong>WAL encoding.</strong> <span class="badge good">New in v1.6</span> The backed-up <code>wal.log</code> and PITR archive segments use the binary WAL format (48-byte header, magic <code>0xB1</code>, CRC32C over the whole record): the <code>veltrixdb-backup</code> CLI, which opens the engine itself, always writes binary, and <code>restore-pitr</code> always appends binary records. Any build that reads binary also reads legacy text records, so restoring into the same or a newer build always works. A pre-binary build (v1.5 and earlier) cannot read binary records: to restore into one, restore with the current build, start the server once with <code>--wal-format=text</code> and stop it cleanly (the shutdown checkpoint rewrites <code>wal.log</code> as text), then start the older build. Keys containing <code>|</code> or a newline are not crash-safe in the text format.</p>
 
 <h2 id="full-backup">Full backup</h2>
 <p>A full backup captures a consistent snapshot of the entire dataset as of the moment it runs, while the engine keeps serving traffic. It checkpoints the WAL, then copies each disk's VLog up to its snapshotted end offset (using <code>pread64</code>, safe alongside concurrent appends) plus the compacted WAL, and writes a <code>manifest.json</code> describing the result.</p>
@@ -127,7 +128,7 @@ veltrixdb-backup download --provider=s3 --bucket=my-bucket \
 
 # List everything in cloud storage
 veltrixdb-backup list-cloud --provider=s3 --bucket=my-bucket --region=us-east-1</code></pre>
-<p>Cloud credentials are read from the provider's standard environment variables rather than passed as flags: <code>AWS_ACCESS_KEY_ID</code> / <code>AWS_SECRET_ACCESS_KEY</code> / <code>AWS_REGION</code> / <code>AWS_SESSION_TOKEN</code> for S3, <code>GOOGLE_APPLICATION_CREDENTIALS</code> (or <code>GCS_ACCESS_TOKEN</code>) for GCS, and <code>AZURE_STORAGE_ACCOUNT</code> / <code>AZURE_STORAGE_KEY</code> / <code>AZURE_STORAGE_CONTAINER</code> for Azure.</p>
+<p>Credentials can be passed as flags (<code>--aws-access-key</code>, <code>--aws-secret-key</code>, <code>--region</code>, <code>--gcs-token</code>, <code>--gcs-cred-file</code>, <code>--azure-account</code>, <code>--azure-key</code>), but prefer the provider's standard environment variables, which are used when the flags are empty (flags end up in shell history and process listings): <code>AWS_ACCESS_KEY_ID</code> / <code>AWS_SECRET_ACCESS_KEY</code> / <code>AWS_REGION</code> / <code>AWS_SESSION_TOKEN</code> for S3, <code>GOOGLE_APPLICATION_CREDENTIALS</code> (or <code>GCS_ACCESS_TOKEN</code>) for GCS, and <code>AZURE_STORAGE_ACCOUNT</code> / <code>AZURE_STORAGE_KEY</code> / <code>AZURE_STORAGE_CONTAINER</code> for Azure.</p>
 
 <h2 id="restore">Restore</h2>
 <div class="callout danger">
@@ -140,13 +141,13 @@ veltrixdb-backup restore \
   --data-dirs=/mnt/nvme0,/mnt/nvme1
 
 # Download from cloud, then restore
-veltrixdb-backup download --bucket s3://my-bucket/veltrix/ \
-  --backup-id full-1748001600000000000 --out /backups/full
+veltrixdb-backup download --provider=s3 --bucket=my-bucket \
+  --cloud-path=veltrix/full-1748001600000000000 --dest=/backups/full
 veltrixdb-backup restore --chain=/backups/full --data-dirs=/data-new</code></pre>
 <p>Restore copies the full backup's VLog into the destination, appends each incremental delta in order, and copies the WAL from the latest backup in the chain onto the destination. Once restore completes, start the engine normally — <code>replayWAL()</code> rebuilds the in-memory index from the restored WAL, and the engine begins serving traffic with a cold cache but correct data.</p>
 
 <h2 id="point-in-time-recovery">Point-in-time recovery (PITR)</h2>
-<p>For recovery finer than backup granularity, VeltrixDB supports continuous WAL archiving. A background <code>WALArchiver</code> copies newly durable WAL entries (with their value bytes resolved inline, so each archived segment is self-contained and safe from VLog GC) into an archive directory as they're fsynced. Enable archiving <em>before</em> taking the base full backup, since restore needs archive coverage from the backup point forward:</p>
+<p>For recovery finer than backup granularity, VeltrixDB supports continuous WAL archiving, enabled on the server with <code>-archive-dir</code> (plus <code>-archive-interval-ms</code>, default 1000, and the retention flags <code>-archive-max-age-sec</code> / <code>-archive-max-bytes</code>, 0 = unlimited). A background <code>WALArchiver</code> copies newly durable WAL entries (with their value bytes resolved inline, so each archived segment is self-contained and safe from VLog GC) into an archive directory as they're fsynced. Enable archiving <em>before</em> taking the base full backup, since restore needs archive coverage from the backup point forward:</p>
 <pre class="code-block"><code># Inspect what's in the archive
 veltrixdb-backup archive-status --archive=/backup/wal-archive
 
@@ -163,11 +164,16 @@ veltrixdb-backup restore-pitr \
   --archive=/backup/wal-archive \
   --until=version:123456 \
   --data=/data-new</code></pre>
-<p><code>restore-pitr</code> requires the engine to be stopped and the target <code>--data</code> directories to be fresh and empty — it refuses to touch a directory that already contains engine files. Archive segments are verified with per-segment CRC32C before replay; a corrupted segment aborts the restore rather than silently applying a torn record.</p>
+<p><code>restore-pitr</code> requires the engine to be stopped and the target <code>--data</code> directories to be fresh and empty — it refuses to touch a directory that already contains engine files. Archive segments are verified with per-segment CRC32C before replay; a corrupted segment aborts the restore rather than silently applying a torn record. Binary records also carry their own CRC32C, checked on decode. The archiver, PITR restore and crash replay all decode WAL bytes with the same reader, which accepts binary and legacy text records mixed.</p>
+<p>The archive is laid out per disk as <code>&lt;archive-dir&gt;/disk&lt;N&gt;/seg-&lt;seq&gt;.wal</code> with a <code>seg-&lt;seq&gt;.json</code> sidecar (version range, first/last entry time in UnixNano, entry count, size, CRC32C). <code>restore-pitr</code> appends the selected records to the restored <code>wal.log</code>; the next engine start replays them.</p>
+<div class="callout warn">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">PITR archives hold plaintext values</span> The archiver undoes compression and encryption so that each segment is self-contained, which means archived values are <strong>plaintext even when <code>-encrypt-at-rest</code> is on</strong>. Protect the archive directory (and any copy of it) accordingly.</span>
+</div>
 
 <h2 id="strategy">Recommended backup strategy</h2>
 <p>A common pattern is a daily full backup plus hourly incrementals, which lets you restore to any hour by applying the full plus N incrementals. For finer recovery, run continuous WAL archiving alongside a daily full and use <code>restore-pitr</code> to land on an exact timestamp or write version.</p>
-<p>Retention guidance: keep at least 7 daily full backups plus all incrementals for the latest full — older incrementals are useless once their base full is deleted. Size the archive's <code>MaxArchiveAgeSec</code> / <code>MaxArchiveBytes</code> so it always spans back to the oldest full backup you intend to restore from.</p>
+<p>Retention guidance: keep at least 7 daily full backups plus all incrementals for the latest full — older incrementals are useless once their base full is deleted. Size the archive's retention (<code>-archive-max-age-sec</code> / <code>-archive-max-bytes</code>) so it always spans back to the oldest full backup you intend to restore from.</p>
 <p>After every backup run, verify: <code>manifest.json</code> exists and its <code>engine_version</code> matches the live engine, <code>vlog_end_off</code> per disk has increased, and each disk's <code>wal.log</code> size is proportional to the number of live keys.</p>
 
 <h2 id="not-backed-up">What is not backed up</h2>

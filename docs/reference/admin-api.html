@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -347,6 +347,11 @@ curl http://localhost:2112/traces</code></pre>
 <tr><td><span class="badge">GET</span></td><td><code>/admin/ui</code>, <code>/admin/*</code> (catch-all)</td><td><span class="badge good">loopback / token</span></td><td>Web dashboard</td></tr>
 </tbody>
 </table>
+</div>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Profiling is not on this port <span class="badge good">New in v1.7</span></span> <code>/debug/pprof/</code> (<code>profile?seconds=N</code>, <code>trace?seconds=N</code>, <code>heap</code>, <code>goroutine</code>, &hellip;) is served only when the server is started with <code>-pprof-addr</code>, on its own listener and mux &mdash; never on <code>-metrics-addr</code>. It has no auth; bind it to loopback. See <a class="inline-link" href="server-configuration.html#network">Server Configuration</a>.</span>
 </div>
 
 <div class="card-grid">

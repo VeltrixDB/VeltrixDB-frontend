@@ -17,8 +17,8 @@
     --warm:#F4A65A;
     --good:#46D391;
     --grid:1280px;
-    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    --serif:'Newsreader', 'Times New Roman', serif;
+    --sans:'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:var(--sans);
     --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   *{box-sizing:border-box}
@@ -1063,9 +1063,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{o
 @media (max-width:880px){.how-strip{grid-template-columns:1fr}}
 
 /* ============================================================
-   CONFLUENT LIGHT THEME OVERRIDE  (all sibling pages)
-   Homepage uses its own home.css and is unaffected by this block.
-   Flips the palette to light + blue/purple; keeps the RED icon;
+   LIGHT THEME (all sibling pages; the homepage uses home.css)
+   Flips the dark base palette above to light + blue, and
    re-scopes ink variables inside dark regions so text stays visible.
    ============================================================ */
 :root{
@@ -1095,7 +1094,7 @@ nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180
 .brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 55%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.28) !important}
 .brand b i{color:#0B5CFF}
 
-/* buttons → Confluent blue */
+/* buttons → brand blue */
 .btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
 .btn.primary:hover{background:#0A4FE0}
 
@@ -1149,3 +1148,89 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 .subnav .subnav-inner{max-width:var(--grid);margin:0 auto}
 .subnav{top:68px !important}
 .wrap{padding-left:24px;padding-right:24px}
+
+
+/* ============================================================
+   v4 — UNIFIED POLISH LAYER
+   One type family (Manrope + JetBrains Mono) across every page,
+   one accent treatment (no serif italics), a calmer section rhythm,
+   consistent cards / tables / buttons, and mobile overflow guards.
+   Loaded last on purpose: it is the single place the look is tuned.
+   ============================================================ */
+:root{
+  --sans:'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif:var(--sans);
+  --accent:#0B5CFF;
+  --ink:#0B1026; --ink-2:#3B4262; --ink-3:#687090; --ink-4:#9CA2BD;
+  --line:#E6E9F2; --line-2:#D8DDEA; --line-strong:#C3CADC;
+  --radius:12px; --radius-lg:16px;
+  --shadow-sm:0 1px 2px rgba(11,16,38,.05), 0 1px 3px rgba(11,16,38,.06);
+  --shadow-md:0 10px 30px -12px rgba(11,16,38,.14), 0 2px 6px rgba(11,16,38,.05);
+}
+html{scroll-behavior:smooth;scroll-padding-top:128px}
+html,body{overflow-x:hidden}
+body{font-family:var(--sans);font-size:16px;line-height:1.6;color:var(--ink-2)}
+h1,h2,h3,h4{text-wrap:balance}
+p,li{text-wrap:pretty}
+
+/* one accent treatment: the old serif-italic highlight becomes a weight-matched blue */
+.em,.si,h1 .em,h2 .em,h3 .em{font-family:inherit !important;font-style:normal !important;font-weight:inherit !important;letter-spacing:inherit !important;color:var(--accent)}
+.hero .em,.hero .si{color:#8FB2FF}
+.pain q,.article-lede{font-family:var(--sans) !important;font-style:normal !important}
+.article-lede{font-size:18px;color:var(--ink-2)}
+
+/* section rhythm */
+section{padding:104px 0}
+section.tight{padding:72px 0}
+@media (max-width:1080px){section{padding:84px 0}section.tight{padding:60px 0}}
+@media (max-width:760px){section{padding:60px 0}section.tight{padding:44px 0}}
+
+/* eyebrow + section headings */
+.eyebrow{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.12em;gap:10px;color:var(--accent)}
+.eyebrow::before{width:16px;height:2px;border-radius:2px;opacity:1}
+h2.sh{font-weight:800;letter-spacing:-.035em;line-height:1.08;max-width:24ch;color:var(--ink)}
+.sh-sub{font-size:17px;line-height:1.65;color:var(--ink-2);max-width:64ch}
+
+/* sticky subnav: readable sans labels, clear active state */
+.subnav a{font-family:var(--sans) !important;font-size:13px !important;font-weight:600 !important;letter-spacing:0 !important;text-transform:none !important;color:var(--ink-3) !important}
+.subnav a:hover{color:var(--ink) !important}
+.subnav a.active{color:var(--accent) !important}
+
+/* buttons */
+.btn{border-radius:10px;font-weight:700;letter-spacing:-.005em}
+.btn:not(.primary){background:#fff;border-color:var(--line-2);color:var(--ink)}
+.btn:not(.primary):hover{border-color:var(--line-strong);background:#F7F8FC}
+.hero .btn:not(.primary),footer .btn:not(.primary){background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.22);color:#fff}
+.btn.primary{box-shadow:0 1px 0 rgba(255,255,255,.2) inset, 0 8px 20px -10px rgba(11,92,255,.65)}
+.btn:focus-visible,a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+
+/* cards and panels: one radius, one border, a quiet shadow */
+.stats-grid,.outcomes,.table-wrap,.metric-row,.lat-wrap,.path-demo,.faq,.news,.calc,.honest,.wp-callout,.rd-grid,.fit,.how-card,.cloud{
+  border-radius:var(--radius-lg);border-color:var(--line);box-shadow:var(--shadow-sm)}
+.cloud,.how-card{transition:border-color .2s, box-shadow .2s, transform .2s}
+.cloud:hover,.how-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+@media (prefers-reduced-motion: reduce){.cloud:hover,.how-card:hover{transform:none}}
+
+/* comparison table */
+table.cmp thead th{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--ink-3);background:#F7F8FC}
+table.cmp td.criteria{color:var(--ink)}
+table.cmp tbody tr:hover td{background:#FAFBFE}
+table.cmp tbody tr:hover td.us{background:linear-gradient(180deg,rgba(11,92,255,.12),rgba(11,92,255,.05))}
+
+/* mono is for code and data, not UI labels */
+.rd-badge,.bar-label{letter-spacing:.06em}
+
+/* mobile: nothing may push the page wider than the screen */
+.wrap > *,.hero-grid > *,.path-demo > *{min-width:0}
+pre,code{overflow-wrap:anywhere}
+pre{overflow-x:auto}
+.table-wrap{overflow-x:auto}
+@media (max-width:760px){
+  .wrap{padding-left:16px;padding-right:16px}
+  table.cmp th,table.cmp td{padding:12px 14px}
+  .nav-cta .btn.primary{padding:0 14px}
+}
+
+/* UI labels: small sans caps. Monospace stays for code, commands and data. */
+.article-kicker, .article-links a, .article-pull .pl, .calc-card .nm, .calc-savings, .case .cap, .ft h5, .globe-info .gx, .globe-stats .gs .l, .hero-kinetic .caption, .hero-kinetic .old, .honest-head .tag, .how-card .hc-k, .lat-table th, .news-mail-l, .outcome .idx, .pain .src, .path-eyebrow, .pf-label, .pill, .price .fine, .price .ribbon, .price .tier, .ptab, .rd-badge, .rd-bench-lbl, .rd-cat, .res .kind, .stat .l, .wp-callout-kicker, table.cmp thead th{font-family:var(--sans) !important;font-weight:700 !important;letter-spacing:.07em !important;font-size:11.5px}
+.brand b i{font-weight:800 !important}

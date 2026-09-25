@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -183,11 +183,11 @@ kubectl exec -n veltrixdb veltrixdb-0 -- \
 <tr><td><code>storage.disksPerNode</code></td><td><code>8</code></td><td>NVMe disks per pod; must match <code>--local-ssd-count</code> on GKE.</td></tr>
 <tr><td><code>storage.diskSizeGi</code></td><td><code>375</code></td><td>Capacity per NVMe disk (GKE local SSD = 375 GiB).</td></tr>
 <tr><td><code>storage.storageClassName</code></td><td><code>local-nvme</code></td><td>StorageClass created by the infra provisioner.</td></tr>
-<tr><td><code>storage.numShards</code></td><td><code>1024</code></td><td>Index shard count; must be a power of 2 matching the compiled C++ constant.</td></tr>
+<tr><td><code>storage.numShards</code></td><td><code>1024</code></td><td>Has no effect on the server: the index always uses its compile-time shard count (8192), and the server exposes no shard flag. Leave it alone.</td></tr>
 <tr><td><code>storage.keyValueSeparation</code></td><td><code>true</code></td><td>WiscKey-style KV separation — keys in SSTables, values in per-disk VLog.</td></tr>
 <tr><td><code>storage.vlogGCThreshold</code></td><td><code>0.30</code></td><td>VLog garbage fraction that triggers defragmentation.</td></tr>
-<tr><td><code>storage.walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit window (ms). Must equal <code>vlogFlushWindowMs</code>.</td></tr>
-<tr><td><code>storage.vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms).</td></tr>
+<tr><td><code>storage.walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit window (ms), passed as <code>-wal-flush-window-ms</code>. Must equal <code>vlogFlushWindowMs</code>. The chart's value overrides the server's own default of 15&nbsp;ms.</td></tr>
+<tr><td><code>storage.vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms), passed as <code>-vlog-flush-window-ms</code> (server default 15&nbsp;ms).</td></tr>
 <tr><td><code>storage.walMaxBatchEntries</code></td><td><code>4096</code></td><td>Max WAL entries per group-commit flush before early timer fire.</td></tr>
 <tr><td><code>storage.rawVlog.enabled</code></td><td><code>false</code></td><td>Write VLog directly to <code>/dev/nvmeXnY</code>, bypassing XFS. Saves ~25 µs P99 read tail / ~70 µs P99 write tail. Adds <code>SYS_RAWIO</code> capability and a <code>/dev</code> hostPath mount.</td></tr>
 <tr><td><code>storage.rawVlog.devices</code></td><td><code>[]</code></td><td>Explicit block-device paths; when empty, inferred as <code>/dev/nvme0n1</code> ... <code>/dev/nvme(N-1)n1</code> from <code>disksPerNode</code>.</td></tr>
@@ -200,7 +200,7 @@ kubectl exec -n veltrixdb veltrixdb-0 -- \
 <tr><td><code>cluster.replicationFactor</code></td><td><code>3</code></td><td>Desired replica count per shard.</td></tr>
 <tr><td><code>resources.requests.memory</code></td><td><code>480Gi</code></td><td>Memory request per pod.</td></tr>
 <tr><td><code>resources.requests.cpu</code></td><td><code>64</code></td><td>CPU request per pod.</td></tr>
-<tr><td><code>resources.requests.hugepages-2Mi</code></td><td><code>2Gi</code></td><td>Hugepages for the C++ allocator and io_uring SQPOLL fixed buffers. Requires <code>vm.nr_hugepages &gt;= 1024</code> on the host.</td></tr>
+<tr><td><code>resources.requests.hugepages-2Mi</code></td><td><code>2Gi</code></td><td>Reserves hugepages for the pod. The server does not currently use them: the C++ hugepage slab allocator and the io_uring scheduler that would, have no Go call site. You can drop this request (and the host <code>vm.nr_hugepages</code> requirement) unless your chart version needs it for scheduling.</td></tr>
 <tr><td><code>autoTune.enabled</code></td><td><code>false</code></td><td>Auto-detect hardware and self-size cache/shards/compaction threads.</td></tr>
 <tr><td><code>autoTune.sysTune</code></td><td><code>true</code></td><td>Apply sysctl/hugepages/scheduler tuning; requires <code>CAP_SYS_ADMIN</code> or root.</td></tr>
 <tr><td><code>auth.enabled</code></td><td><code>false</code></td><td>Enable RBAC authentication.</td></tr>
@@ -223,9 +223,16 @@ kubectl exec -n veltrixdb veltrixdb-0 -- \
 <pre class="code-block"><code>storage:
   walFlushWindowMs: 5
   vlogFlushWindowMs: 5</code></pre>
-<p>For maximum cache hit rate, size the cache to roughly 85% of node RAM:</p>
+<p>For maximum cache hit rate, give the cache most of the node's RAM, leaving headroom for the index (~142&nbsp;B/key with the native index), the Go heap and the OS (the server's <code>-auto-tune</code> uses 85% of 80% of RAM):</p>
 <pre class="code-block"><code>cache:
   maxSizeMB: 409600  # 400 GB on a 512 GB node</code></pre>
+
+<h2 id="node-requirements">Node, seccomp and image notes</h2>
+<ul>
+<li><strong>Image.</strong> The official image is built with <code>CGO_ENABLED=1</code> on a <code>gcr.io/distroless/cc-debian12</code> base, so it uses the off-heap native index by default. <span class="badge good">New in v1.6</span> Build with <code>--build-arg CGO_ENABLED=0</code> for the old static pure-Go image (Go map index). cgo code is compiled for <code>-march=x86-64-v2</code> on amd64, never <code>-march=native</code>.</li>
+<li><strong><code>vm.max_map_count</code> must be set on the node.</strong> The native index needs <code>vm.max_map_count &ge; 262144</code> at large key counts. It is a node-level sysctl that a container cannot set, so configure it in the node pool / node image or with a privileged DaemonSet (<code>scripts/sysctl.conf</code> has the value). Otherwise set <code>VELTRIXDB_INDEX=map</code> in the pod env.</li>
+<li><strong>seccomp and io_uring.</strong> The Kubernetes <code>RuntimeDefault</code> seccomp profile blocks <code>io_uring_setup</code>. That only matters if you opt in to the io_uring VLog write bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>; default off), and even then the bridge falls back to <code>pwrite</code>. To actually use it, the pod needs a seccomp profile allowing <code>io_uring_setup</code>, <code>io_uring_enter</code> and <code>io_uring_register</code>. The default configuration and the native index need nothing special.</li>
+</ul>
 
 <h2 id="security-features">Security, audit, and data-integrity features</h2>
 <h3>TLS and RBAC auth</h3>
@@ -344,9 +351,10 @@ BULK_DUR=120 STRESS_DUR=300 \
 <h2 id="troubleshooting">Troubleshooting</h2>
 <div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead><tbody>
 <tr><td>Pods stuck in <code>Pending</code></td><td>Check PVs are <code>Available</code>; verify the nvme-prep DaemonSet pods are <code>Running</code>; confirm <code>--local-ssd-interface=NVME</code> was set on the node pool.</td></tr>
-<tr><td>Write throughput lower than expected on macOS / dev environments</td><td><code>F_FULLFSYNC</code> costs ~7-10 ms on macOS — a hardware limitation, not a bug. Use Linux NVMe in production.</td></tr>
-<tr><td>WAL batch size is 1 (no amortisation)</td><td>Compare <code>veltrixdb_wal_flushes_total</code> to <code>veltrixdb_writes_total</code>; if roughly equal, raise <code>storage.walFlushWindowMs</code> and <code>storage.vlogFlushWindowMs</code> together.</td></tr>
-<tr><td><code>io_uring</code> buffer registration fails at startup</td><td>Needs <code>RLIMIT_MEMLOCK</code> or <code>CAP_IPC_LOCK</code>; add <code>IPC_LOCK</code> to the pod's <code>securityContext.capabilities.add</code>.</td></tr>
+<tr><td>Write throughput lower than expected on macOS / dev environments</td><td>Do not size from macOS at all: the engine calls plain <code>fsync(2)</code> on Darwin, which returns at the drive cache (~0.02&nbsp;ms) without flushing it, so macOS write numbers are optimistic and not power-loss-safe. Loopback also caps round trips at ~60K/s. Benchmark on Linux NVMe.</td></tr>
+<tr><td>WAL batch size is 1 (no amortisation)</td><td>Compare <code>veltrixdb_storage_wal_flushes_total</code> to <code>veltrixdb_storage_writes_total</code>; if roughly equal, raise <code>storage.walFlushWindowMs</code> and <code>storage.vlogFlushWindowMs</code> together.</td></tr>
+<tr><td><code>io_uring</code> buffer registration fails at startup</td><td>Only possible if you opted in to the io_uring VLog bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>; default off). It needs <code>RLIMIT_MEMLOCK</code> or <code>CAP_IPC_LOCK</code> (add <code>IPC_LOCK</code> to <code>securityContext.capabilities.add</code>), and a seccomp profile that allows <code>io_uring_*</code> &mdash; see below.</td></tr>
+<tr><td><code>panic: native index: insert failed (out of memory?)</code></td><td>The node's <code>vm.max_map_count</code> is too low for the native index. Set it to 262144 on the node (see below), or set <code>VELTRIXDB_INDEX=map</code> in the pod env.</td></tr>
 <tr><td>VLog not being compacted</td><td>Check <code>vlog_gc</code> metrics via <code>curl localhost:2112/metrics</code> inside a pod.</td></tr>
 </tbody></table></div>
 

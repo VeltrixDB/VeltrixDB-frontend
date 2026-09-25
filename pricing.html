@@ -4,11 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Pricing - VeltrixDB</title>
-<meta name="description" content="Predictable cluster pricing with a cost calculator against DynamoDB-class per-request billing." />
+<meta name="description" content="VeltrixDB is free and open source (Apache 2.0), self-hosted. Engineering support is available; a managed service is planned but does not exist yet." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -48,110 +48,93 @@
 <section id="pricing">
   <div class="wrap">
     <span class="eyebrow">Pricing</span>
-    <h2 class="sh">Predictable pricing, <span class="em">no surprise bills</span>.</h2>
-    <p class="sh-sub">Fixed per-cluster pricing. No charge per million ops. No egress surprises. Scale your data, not your invoice.</p>
+    <h2 class="sh">Free to run. <span class="em">Help when you want it</span>.</h2>
+    <p class="sh-sub">VeltrixDB is Apache 2.0 and self-hosted: you run it on your own hardware or cloud account and pay your provider for the machines. There is no managed cloud service today — one is planned.</p>
     <div class="pricing">
       <div class="price">
-        <span class="tier">Starter</span>
-        <h3>For early-stage teams</h3>
-        <p class="for">Validate sub-5ms reads on your workload before committing.</p>
-        <div class="amt"><span class="v">$499</span><span class="u">/ month</span></div>
+        <span class="tier">Open source</span>
+        <h3>For every team</h3>
+        <p class="for">The whole engine, on your infrastructure. No feature gates, no per-op meter.</p>
+        <div class="amt"><span class="v">$0</span><span class="u">Apache 2.0</span></div>
         <ul>
-          <li>3-node cluster, single region</li>
-          <li>Up to 100M keys</li>
-          <li>64 GB cache · 1 TB NVMe per node</li>
-          <li>Community support · 8×5 response</li>
-          <li>50+ Prometheus metrics</li>
+          <li>Self-hosted: Docker, Helm chart, Kubernetes operator, bare metal</li>
+          <li>Standalone, replicated, or Raft cluster modes</li>
+          <li>AES-256-GCM at rest, RBAC, mTLS, audit log</li>
+          <li>60+ Prometheus metrics, Grafana dashboards, 22 alert rules</li>
+          <li>Community support on GitHub</li>
         </ul>
         <div class="pcta">
-          <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Starter">Start free 14-day trial</a>
+          <a class="btn" href="docs/getting-started/quickstart.html">Read the quickstart</a>
         </div>
       </div>
 
       <div class="price featured">
-        <span class="ribbon">Most popular</span>
-        <span class="tier">Growth</span>
-        <h3>For production workloads</h3>
-        <p class="for">Multi-region replication, SOC 2 controls, on-call support.</p>
-        <div class="amt"><span class="v">$2,490</span><span class="u">/ month</span></div>
+        <span class="ribbon">Available today</span>
+        <span class="tier">Engineering support</span>
+        <h3>For production rollouts</h3>
+        <p class="for">Direct access to the engineers who build the engine, for your self-hosted cluster.</p>
+        <div class="amt"><span class="v">Contact us</span></div>
         <ul>
-          <li>3-node cluster, multi-region replication</li>
-          <li>Up to 1B keys</li>
-          <li>256 GB cache · 3 TB NVMe per node</li>
-          <li>24×7 priority support · 1h SLA</li>
-          <li>SOC 2 + ISO 27001 controls</li>
-          <li>Custom Grafana dashboards</li>
+          <li>Architecture and sizing review on your workload</li>
+          <li>Benchmark run on your hardware with our published harness</li>
+          <li>Migration planning from Redis or DynamoDB</li>
+          <li>Upgrade and incident help</li>
+          <li>Terms agreed per engagement</li>
         </ul>
         <div class="pcta">
-          <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Growth">Book a demo <span class="arrow">↗</span></a>
+          <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Support">Book a demo <span class="arrow">↗</span></a>
         </div>
-        <div class="fine">Most teams break even vs DynamoDB in week one</div>
+        <div class="fine">You keep running open-source VeltrixDB on your own infrastructure</div>
       </div>
 
       <div class="price">
-        <span class="tier">Enterprise</span>
-        <h3>For Fortune 500 platforms</h3>
-        <p class="for">Dedicated capacity, custom security review, named TAM.</p>
-        <div class="amt"><span class="v">Custom</span></div>
+        <span class="tier">Managed service</span>
+        <h3>Planned — not available yet</h3>
+        <p class="for">A hosted VeltrixDB we operate for you. It does not exist today; we will not take money for it until it does.</p>
+        <div class="amt"><span class="v">Planned</span></div>
         <ul>
-          <li>Unlimited cluster size + global active-active</li>
-          <li>99.99% uptime SLA · contractual</li>
-          <li>Dedicated TAM + solutions architect</li>
-          <li>Custom security review + DPA</li>
-          <li>Bring-your-own-cloud or air-gapped</li>
-          <li>Migration services included</li>
+          <li>No launch date announced</li>
+          <li>No uptime SLA or compliance attestations today</li>
+          <li>Tell us your regions and requirements to shape it</li>
         </ul>
         <div class="pcta">
-          <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Enterprise">Talk to sales</a>
+          <a class="btn" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Managed%20Service%20interest">Register interest</a>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ COST CALCULATOR ============ -->
+<!-- ============ SIZING ============ -->
 <section id="calc">
   <div class="wrap">
-    <span class="eyebrow">Cost calculator</span>
-    <h2 class="sh">Move the slider. <span class="em">Watch the savings</span>.</h2>
-    <p class="sh-sub">Pricing assumes a 70/30 read/write workload. DynamoDB On-Demand is benchmarked at $1.00 per million blended ops (RCUs + WCUs + storage + IO).</p>
+    <span class="eyebrow">What you actually pay for</span>
+    <h2 class="sh">Your bill is <span class="em">your hardware</span>.</h2>
+    <p class="sh-sub">With no licence fee, cost comes down to how much RAM and NVMe you provision. The difference from an all-in-RAM store is where the values live.</p>
 
     <div class="calc">
       <div class="calc-head">
         <div>
-          <h3>How much would your team save <span class="em">per month</span>?</h3>
-          <p>Drag to see the gap. We'll model your exact workload during the demo — these are starter numbers.</p>
-        </div>
-        <div class="calc-savings">
-          You save
-          <span class="v" id="calcSavings">$7,260</span>
-          <span style="font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-4)" id="calcMultiplier">3.6× cheaper</span>
+          <h3>How to size a node <span class="em">before you price it</span></h3>
+          <p>Plug your key count and value size into your cloud provider's price sheet. We will size it with you on a demo call — these are the rules we use, not a quote.</p>
         </div>
       </div>
       <div class="calc-body">
-        <div class="calc-slider-wrap">
-          <div class="calc-slider-label">
-            <span>Monthly operations</span>
-            <b><span id="calcOps">10</span> billion ops/mo</b>
-          </div>
-          <input type="range" class="calc-slider" id="calcSlider" min="1" max="100" step="1" value="10">
-          <div class="calc-ticks"><span>1B</span><span>25B</span><span>50B</span><span>75B</span><span>100B</span></div>
-        </div>
         <div class="calc-cards">
           <div class="calc-card">
-            <div class="nm"><span>DynamoDB On-Demand</span><span class="tag">AWS</span></div>
-            <div class="price"><span id="ddbPrice">$10,000</span><span class="u">/ mo</span></div>
-            <div class="breakdown" id="ddbBreakdown">$1.00 / M blended ops · 10B ops → $10,000</div>
+            <div class="nm"><span>All-in-RAM store</span><span class="tag">DRAM</span></div>
+            <div class="price"><span>RAM ≥ data</span></div>
+            <div class="breakdown">Every key and value held in memory, plus per-key overhead. RAM grows with the dataset.</div>
           </div>
           <div class="calc-card us">
-            <div class="nm"><span>VeltrixDB</span><span class="tag">FIXED</span></div>
-            <div class="price"><span id="vdbPrice">$2,740</span><span class="u">/ mo</span></div>
-            <div class="breakdown" id="vdbBreakdown">Growth tier $2,490 + 5B overflow · same NVMe hardware</div>
+            <div class="nm"><span>VeltrixDB</span><span class="tag">NVMe</span></div>
+            <div class="price"><span>RAM ≈ index + cache</span></div>
+            <div class="breakdown">NVMe holds the values. RAM holds the index — ~142 B/key measured at 5M keys with the native index (since v1.6; 168 B/key with the Go map), plus ~90 B/key for the ordered index unless disabled — plus whatever cache you choose (default 256 MB).</div>
           </div>
         </div>
         <div class="calc-foot">
-          <span>Numbers are illustrative · actual quote depends on read/write mix, payload, region.</span>
-          <a href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Cost%20Modeling">Get an exact quote for your workload →</a>
+          <span>Per-key figures are from an engine benchmark at 5M keys; measure with your own key lengths. No billion-key run has been published.</span>
+          <a href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Sizing">Get a sizing review for your workload →</a>
         </div>
       </div>
     </div>
@@ -161,12 +144,12 @@
 <!-- ============ CTA ============ -->
 <section class="cta">
   <div class="wrap cta-inner">
-    <h2>The slider is generic. <span class="em">Your workload isn't</span>.</h2>
+    <h2>Rules of thumb are generic. <span class="em">Your workload isn't</span>.</h2>
     <div class="cta-cta">
       <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20TCO%20model">Get a TCO model on your real traffic <span class="arrow">&#8599;</span></a>
       <a class="btn" href="faq.html">What the bill includes</a>
     </div>
-    <div class="cta-foot">We model RCU/WCU equivalents from your actual metrics <span class="sep">&middot;</span> No commitment</div>
+    <div class="cta-foot">We size RAM and NVMe from your actual key counts and traffic <span class="sep">&middot;</span> No commitment</div>
   </div>
 </section>
 
@@ -174,11 +157,11 @@
   <div class="wrap">
     <div class="ft">
       <div class="brand-block">
-        <a class="brand" href="#">
+        <a class="brand" href="index.html">
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
@@ -199,23 +182,22 @@
           <li><a href="docs/operations/security.html">Security model</a></li>
           <li><a href="blog-architecture.html">Blog · Architecture</a></li>
           <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
           <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#">Careers</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v1.1.0 · build 2026-07-18</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

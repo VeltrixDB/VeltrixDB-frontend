@@ -4,11 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>VeltrixDB Technical Whitepaper — Architecture, Durability &amp; Failure Modes</title>
-<meta name="description" content="The full 42-page architectural whitepaper for VeltrixDB — the storage engine, the sharding model, durability proofs, and the failure modes we test in chaos engineering." />
+<meta name="description" content="The architectural whitepaper for VeltrixDB — the storage engine, the read and write paths, the durability argument, the sharding model, and how the engine handles failure." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
@@ -18,8 +18,8 @@
     --red:#0B5CFF; --red-2:#2E8BFF; --red-glow:rgba(11,92,255,.35);
     --warm:#F4A65A; --good:#46D391;
     --grid:1280px;
-    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    --serif:'Newsreader', 'Times New Roman', serif;
+    --sans:'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:var(--sans);
     --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   *{box-sizing:border-box}
@@ -216,9 +216,9 @@
   .reveal.in{opacity:1;transform:none}
   @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
 
-/* injected: Confluent light theme */
+/* injected: light theme */
 /* ============================================================
-   CONFLUENT LIGHT THEME OVERRIDE  (all sibling pages)
+   LIGHT THEME OVERRIDE  (all sibling pages)
    Homepage uses its own home.css and is unaffected by this block.
    Flips the palette to light + blue/purple; keeps the RED icon;
    re-scopes ink variables inside dark regions so text stays visible.
@@ -250,7 +250,7 @@ nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180
 .brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 58%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.22) !important}
 .brand b i{color:#0B5CFF}
 
-/* buttons → Confluent blue */
+/* buttons → brand blue */
 .btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
 .btn.primary:hover{background:#0A4FE0}
 
@@ -303,6 +303,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 .nav-gh svg{width:17px !important;height:17px !important}
 .nav-gh:hover{color:#0B5CFF}
 </style>
+<link rel="stylesheet" href="assets/longform.css">
 </head>
 <body>
 
@@ -342,19 +343,18 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
   <div class="wrap">
     <div class="wp-hero-inner">
       <div>
-        <span class="wp-eyebrow">Technical whitepaper · v0.9.4</span>
+        <span class="wp-eyebrow">Technical whitepaper · v1.8</span>
         <h1 class="wp-title">The VeltrixDB <span class="em">whitepaper</span>.</h1>
-        <p class="wp-sub">42 pages of how the storage engine actually works — <b>block-by-block diagrams, the durability proof, the sharding model, and the failure modes we test in chaos engineering</b>. Written for the engineer who'll be on call for this in production.</p>
+        <p class="wp-sub">How the storage engine actually works — <b>the read and write paths, the durability argument and its limits, the sharding model, and how the engine handles failure</b>. Written for the engineer who'll be on call for this in production.</p>
 
         <div class="wp-cta">
           <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
           <a class="btn" href="#contents">See what's inside</a>
         </div>
         <div class="wp-meta">
-          <span><b>Pages</b> · 42</span>
-          <span><b>Author</b> · A. Gupta</span>
-          <span><b>Updated</b> · May 2026</span>
-          <span><b>License</b> · Apache 2.0 (open source) · reproducible benchmarks</span>
+          <span><b>Author</b> · Akanksha Gupta</span>
+          <span><b>Updated</b> · Sep 2026</span>
+          <span><b>License</b> · Apache 2.0 (open source) · benchmark conditions stated</span>
         </div>
       </div>
 
@@ -363,18 +363,18 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="seal">
           <div class="seal-l">
             <b>VeltrixDB</b> · technical reference<br/>
-            v0.9.4-beta · build cb44a1f<br/>
-            42 pages · classified <b>shareable</b>
+            covers v1.8 · versions marked<br/>
+            <b>shareable</b>
           </div>
-          <div class="seal-r">PDF · 4.8 MB</div>
+          <div class="seal-r">PDF on request</div>
         </div>
         <h3>The extreme point-lookup engine — architecture &amp; durability.</h3>
-        <p class="sub">A first-principles walk through the storage layer, the I/O model, the sharding scheme, and the proofs behind a 99.999% durability SLA on commodity NVMe.</p>
+        <p class="sub">A first-principles walk through the storage layer, the I/O model, the sharding scheme, and exactly when an acknowledged write is durable on commodity NVMe — and when it is not.</p>
         <div class="lines"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="stats">
-          <div class="st"><div class="v"><span class="red">42</span></div><div class="l">pages</div></div>
-          <div class="st"><div class="v">18</div><div class="l">diagrams</div></div>
-          <div class="st"><div class="v">9</div><div class="l">chapters</div></div>
+          <div class="st"><div class="v"><span class="red">v1.8</span></div><div class="l">covers</div></div>
+          <div class="st"><div class="v">8192</div><div class="l">index shards</div></div>
+          <div class="st"><div class="v">2.0</div><div class="l">Apache license</div></div>
         </div>
       </div>
     </div>
@@ -386,50 +386,50 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
   <div class="wrap reveal">
     <span class="sec-eyebrow">Why we wrote it</span>
     <h2 class="sh">Open source, <span class="em">documented to the last byte</span>.</h2>
-    <p class="sh-sub">VeltrixDB is open source under Apache 2.0 — every line is on GitHub. But reading 40k lines of Go isn't how most teams evaluate a database, so we also shipped this 42-page architectural document. It's the fastest way for a CTO or security-review team to understand exactly how the engine works — and the source is right there when they want to go deeper.</p>
+    <p class="sh-sub">VeltrixDB is open source under Apache 2.0 — every line is on GitHub. But reading the Go source isn't how most teams evaluate a database, so we also wrote this architectural document. It's the fastest way for a CTO or security-review team to understand exactly how the engine works — and the source is right there when they want to go deeper.</p>
 
     <div class="toc">
       <div class="toc-card">
         <span class="num">01</span>
         <span class="ch">Storage engine</span>
         <h3>Key–value separation, end to end.</h3>
-        <p>How VeltrixDB separates keys from values — index layout, VLog segment format, pointer encoding, and why compaction that never touches values is the only way to guarantee 1.0× write amplification at scale.</p>
-        <div class="meta"><span>Chapter 1–2</span><span>14 pages</span></div>
+        <p>How VeltrixDB separates keys from values — the 64 B index entry, the VLog record format (4 KB-aligned, magic + CRC32C), block packing for batched writes, and why write amplification stays near 1× when there is no LSM compaction.</p>
+        <div class="meta"><span>Chapter 1–2</span></div>
       </div>
       <div class="toc-card">
         <span class="num">02</span>
         <span class="ch">Kernel I/O</span>
-        <h3>io_uring SQPOLL on the hot path.</h3>
-        <p>How we structure the submission and completion queues per shard, why we use O_DIRECT, and the benchmarks comparing io_uring vs <code>pread</code> at our P99 targets.</p>
-        <div class="meta"><span>Chapter 3</span><span>6 pages</span></div>
+        <h3>pread, pwrite and fdatasync — and where io_uring fits.</h3>
+        <p>Reads are one Go <code>pread</code> per cache miss; a write batch is one <code>pwrite</code> and one <code>fdatasync</code>. Why the io_uring write bridge is opt-in (off by default), and what it measured on a 4-CPU CI runner.</p>
+        <div class="meta"><span>Chapter 3</span></div>
       </div>
       <div class="toc-card">
         <span class="num">03</span>
         <span class="ch">Durability</span>
-        <h3>The fsync chain and the 99.999% SLA proof.</h3>
-        <p>Group-commit WAL, replication invariants, the actual probability calculus behind the published durability number, and the conditions under which it does not hold.</p>
-        <div class="meta"><span>Chapter 4</span><span>5 pages</span></div>
+        <h3>The fsync chain, crash replay and checkpoints.</h3>
+        <p>Group-commit WAL (default 15 ms window), why VLog and WAL fdatasync run concurrently, full replay after a crash, the compacted checkpoint written on clean shutdown, and the conditions under which an acknowledged write can be lost.</p>
+        <div class="meta"><span>Chapter 4</span></div>
       </div>
       <div class="toc-card">
         <span class="num">04</span>
         <span class="ch">Sharding &amp; placement</span>
-        <h3>1024 shards · consistent hashing · zone-aware.</h3>
-        <p>Why 1024, how we rebalance without read interruption, the operator's reshard procedure, and the cap on individual shard ownership during partition events.</p>
-        <div class="meta"><span>Chapter 5</span><span>6 pages</span></div>
+        <h3>8192 index shards · consistent hashing · rack-aware.</h3>
+        <p>One FNV-1a hash drives three placements: 8192 index shards, up to 256 cache shards, and the disk. Cluster routing by consistent hashing, and <code>--rack-id</code> placement that keeps copies of a partition in different racks or zones.</p>
+        <div class="meta"><span>Chapter 5</span></div>
       </div>
       <div class="toc-card">
         <span class="num">05</span>
         <span class="ch">Cache (LIRS)</span>
         <h3>Why LRU lies — and what we replaced it with.</h3>
-        <p>The LIRS algorithm in detail, the priority-2 eviction-resistance tweak for small hot keys, and the measured hit-rate uplift on Zipfian workloads vs LRU.</p>
-        <div class="meta"><span>Chapter 6</span><span>4 pages</span></div>
+        <p>The LIRS algorithm in detail, the priority-2 eviction resistance for small values, and why the cache is split into up to 256 shards (one lock was 21.7% of CPU; a hit went from 711 ns to ~92 ns).</p>
+        <div class="meta"><span>Chapter 6</span></div>
       </div>
       <div class="toc-card">
         <span class="num">06</span>
         <span class="ch">Failure modes</span>
-        <h3>What we test in chaos engineering.</h3>
-        <p>The full failure-injection matrix — single-node loss, full-zone outage, NVMe bit-flip, kernel hang, network partition. Every test case, the expected behaviour, and the RTO/RPO numbers we hit.</p>
-        <div class="meta"><span>Chapter 7–8</span><span>7 pages</span></div>
+        <h3>How the engine handles failure.</h3>
+        <p>Crash restart, silent disk corruption, a slow disk, GC falling behind, node loss. For each: what the engine does, which metric shows it, and what is tested today (end-to-end failover, persistence and backup/restore suites).</p>
+        <div class="meta"><span>Chapter 7–8</span></div>
       </div>
     </div>
   </div>
@@ -440,43 +440,43 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
   <div class="wrap reveal">
     <span class="sec-eyebrow">A sneak peek</span>
     <h2 class="sh">The kind of detail <span class="em">you need</span> before you commit.</h2>
-    <p class="sh-sub">Two pulled-out figures from the document — the write path, and the failure-injection matrix. The full PDF has 18 diagrams of this density.</p>
+    <p class="sh-sub">Two pulled-out figures from the document — the write path, and the failure matrix.</p>
 
     <div class="preview">
       <div class="pv-row reveal">
         <div class="pv-text">
           <span class="pk">Figure 03 · Write path</span>
           <h3>Group-commit WAL with <span class="em">amortized fsync</span>.</h3>
-          <p>The five-stage write pipeline. Application code lands in a per-shard ring buffer; a dedicated commit thread wakes every <code>50µs</code> (or on batch-full), issues a single <code>fsync</code>, and unparks every blocked writer at once. The 80µs fsync cost is divided across the entire batch — at 2M ops/sec, that's roughly <code>~0.85µs per write</code> for full durability.</p>
-          <p>The full chapter covers the lock-free queue design, the futex-park behaviour, the WAL crash-recovery protocol, and a proof that the WAL never loses an acknowledged write under any single-node failure.</p>
+          <p>A <code>PUT</code> is compressed, then encrypted (if enabled), then appended to the VLog <b>and</b> the WAL concurrently. The caller waits for <code>max(WAL, VLog)</code>, not their sum. Writers inside one flush window (default <code>15 ms</code>) share a single <code>write(2)</code> and a single <code>fdatasync</code>; only then is the index entry installed, the cache updated and the write acknowledged.</p>
+          <p>The chapter covers the binary WAL record (48-byte header, CRC32C over the whole record; the default since v1.6, with <code>--wal-format=text</code> as rollback), crash replay, the compacted checkpoint written on clean shutdown, and the exact conditions under which an acknowledged write survives a single-node crash.</p>
         </div>
         <div class="pv-figure">
-          <div class="fl"><span>FIG 03 · WRITE PATH · POST-ACK</span><span><b>P99 0.21ms</b></span></div>
+          <div class="fl"><span>FIG 03 · WRITE PATH · SINGLE PUT</span><span><b>ACK after fdatasync</b></span></div>
           <div class="fig-stack">
-            <div class="fig-row"><div class="pre">01 · 12µs</div><div class="post"><span class="fig-node">App</span><span class="fig-arr">→</span><span class="fig-node">WAL ring</span></div></div>
-            <div class="fig-row"><div class="pre">02 · 80µs</div><div class="post"><span class="fig-node us">WAL fsync</span><span class="fig-arr">·</span><span class="fig-node">group-commit</span></div></div>
-            <div class="fig-row"><div class="pre">03 · 30µs</div><div class="post"><span class="fig-node us">VLog append</span><span class="fig-arr">·</span><span class="fig-node">O_DIRECT</span></div></div>
-            <div class="fig-row"><div class="pre">04 · 8µs</div><div class="post"><span class="fig-node">Index pointer</span><span class="fig-arr">·</span><span class="fig-node">ART insert</span></div></div>
-            <div class="fig-row"><div class="pre">05 · 5µs</div><div class="post"><span class="fig-node">Cache warm</span><span class="fig-arr">→</span><span class="fig-node">ack</span></div></div>
+            <div class="fig-row"><div class="pre">01 · route</div><div class="post"><span class="fig-node">FNV-1a</span><span class="fig-arr">→</span><span class="fig-node">shard / disk</span></div></div>
+            <div class="fig-row"><div class="pre">02 · transform</div><div class="post"><span class="fig-node">compress</span><span class="fig-arr">→</span><span class="fig-node">encrypt</span></div></div>
+            <div class="fig-row"><div class="pre">03 · in parallel</div><div class="post"><span class="fig-node us">VLog append</span><span class="fig-arr">·</span><span class="fig-node us">WAL group-commit</span></div></div>
+            <div class="fig-row"><div class="pre">04 · index</div><div class="post"><span class="fig-node">install entry</span><span class="fig-arr">·</span><span class="fig-node">version++</span></div></div>
+            <div class="fig-row"><div class="pre">05 · ack</div><div class="post"><span class="fig-node">cache insert</span><span class="fig-arr">→</span><span class="fig-node">OK</span></div></div>
           </div>
         </div>
       </div>
 
       <div class="pv-row r reveal">
         <div class="pv-text">
-          <span class="pk">Figure 14 · Chaos matrix</span>
-          <h3>Every failure mode we test, <span class="em">and the SLO it owns</span>.</h3>
-          <p>The chaos-engineering matrix lives in chapter 7. We run each of these injections nightly against a production-equivalent cluster. The chapter documents the exact <code>fault-injection</code> spec, the expected user-observable behaviour, and the recovery time we measured over a 90-day window.</p>
-          <p>The point of publishing this isn't to say nothing ever fails — it's to say <b>we know what does, and we test for it</b>. When you have an incident, the failure mode you'll hit is almost certainly already in the matrix.</p>
+          <span class="pk">Figure 14 · Failure matrix</span>
+          <h3>Every failure mode we handle, <span class="em">and the signal it raises</span>.</h3>
+          <p>The failure chapter maps each failure to what the engine does about it and the Prometheus metric that shows it happening. It also says what is tested today — the end-to-end suites cover node failover, persistence across restarts and backup/restore — and what is not.</p>
+          <p>The point of publishing this isn't to say nothing ever fails — it's to say <b>which failures we know about, and how you'll see them</b>. We don't publish recovery-time numbers we haven't measured reproducibly.</p>
         </div>
         <div class="pv-figure">
-          <div class="fl"><span>FIG 14 · FAILURE MATRIX</span><span><b>RTO &lt; 30s</b></span></div>
+          <div class="fl"><span>FIG 14 · FAILURE MATRIX</span><span><b>signal, not SLA</b></span></div>
           <div class="fig-stack">
-            <div class="fig-row"><div class="pre">single node</div><div class="post"><span class="fig-node">kill -9</span><span class="fig-arr">→</span><span class="fig-node us">RTO 8s</span></div></div>
-            <div class="fig-row"><div class="pre">full AZ</div><div class="post"><span class="fig-node">network drop</span><span class="fig-arr">→</span><span class="fig-node us">RTO 22s</span></div></div>
-            <div class="fig-row"><div class="pre">NVMe corrupt</div><div class="post"><span class="fig-node">bit-flip inject</span><span class="fig-arr">→</span><span class="fig-node us">detect &lt;1s</span></div></div>
-            <div class="fig-row"><div class="pre">kernel hang</div><div class="post"><span class="fig-node">CPU stall</span><span class="fig-arr">→</span><span class="fig-node us">eject 12s</span></div></div>
-            <div class="fig-row"><div class="pre">cross-region</div><div class="post"><span class="fig-node">QUIC partition</span><span class="fig-arr">→</span><span class="fig-node us">RPO &lt;30s</span></div></div>
+            <div class="fig-row"><div class="pre">crash</div><div class="post"><span class="fig-node">kill -9</span><span class="fig-arr">→</span><span class="fig-node us">WAL replay</span></div></div>
+            <div class="fig-row"><div class="pre">bit rot</div><div class="post"><span class="fig-node">CRC32C scrub</span><span class="fig-arr">→</span><span class="fig-node us">scrub_corruption_total</span></div></div>
+            <div class="fig-row"><div class="pre">slow disk</div><div class="post"><span class="fig-node">latency EWMA</span><span class="fig-arr">→</span><span class="fig-node us">vlog_disk_slow</span></div></div>
+            <div class="fig-row"><div class="pre">GC behind</div><div class="post"><span class="fig-node">65% garbage</span><span class="fig-arr">→</span><span class="fig-node us">emergency GC</span></div></div>
+            <div class="fig-row"><div class="pre">node loss</div><div class="post"><span class="fig-node">failure detector</span><span class="fig-arr">→</span><span class="fig-node us">replica serves</span></div></div>
           </div>
         </div>
       </div>
@@ -488,110 +488,110 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 <section id="contents">
   <div class="wrap reveal">
     <span class="sec-eyebrow">Table of contents</span>
-    <h2 class="sh">All 42 pages, <span class="em">in order</span>.</h2>
+    <h2 class="sh">Every chapter, <span class="em">in order</span>.</h2>
     <p class="sh-sub">Every section, every figure number, every page. If a chapter is what you're after, we'll send you the chapter — you don't have to take the whole PDF.</p>
 
     <div class="toc-doc">
       <div class="toc-head">
-        <h3>VeltrixDB · Technical Reference · v0.9.5</h3>
-        <span class="meta">46 pages · 20 figures · 10 chapters</span>
+        <h3>VeltrixDB · Technical Reference · v1.8</h3>
+        <span class="meta">11 sections · versions marked</span>
       </div>
       <div class="toc-list">
         <div class="toc-item"><span class="ch">00</span><span class="nm">Preface &amp; notation<span class="sub">Audience, scope, and how to read this paper</span></span><span class="pg">p. 1</span></div>
         <div class="toc-item"><span class="ch us">01</span><span class="nm">The case for key-value separation<span class="sub">Why LSM compaction is the silent tail-latency killer</span></span><span class="pg">p. 4</span></div>
-        <div class="toc-item"><span class="ch us">02</span><span class="nm">Storage engine internals<span class="sub">VLog segment format, ART index, garbage collection</span></span><span class="pg">p. 9</span></div>
-        <div class="toc-item"><span class="ch us">03</span><span class="nm">Kernel I/O — io_uring SQPOLL + O_DIRECT<span class="sub">Submission queues, completion polling, syscall accounting</span></span><span class="pg">p. 16</span></div>
-        <div class="toc-item"><span class="ch us">04</span><span class="nm">Durability &amp; the 99.999% SLA proof<span class="sub">Group-commit WAL, replication invariants, probability calculus</span></span><span class="pg">p. 22</span></div>
-        <div class="toc-item"><span class="ch us">05</span><span class="nm">Sharding &amp; placement<span class="sub">1024-shard consistent hash, zone-awareness, online reshard</span></span><span class="pg">p. 26</span></div>
+        <div class="toc-item"><span class="ch us">02</span><span class="nm">Storage engine internals<span class="sub">VLog record format, per-shard index (Go map, or off-heap native table since v1.6), garbage collection</span></span><span class="pg">p. 9</span></div>
+        <div class="toc-item"><span class="ch us">03</span><span class="nm">Kernel I/O — pread, pwrite, fdatasync<span class="sub">The Go read path, one pwrite per batch, the opt-in io_uring write bridge</span></span><span class="pg">p. 16</span></div>
+        <div class="toc-item"><span class="ch us">04</span><span class="nm">Durability &amp; its limits<span class="sub">Group-commit WAL, binary WAL format (v1.6), crash replay, checkpoints, replication</span></span><span class="pg">p. 22</span></div>
+        <div class="toc-item"><span class="ch us">05</span><span class="nm">Sharding &amp; placement<span class="sub">8192 index shards, consistent-hash routing, rack-aware placement, resharding</span></span><span class="pg">p. 26</span></div>
         <div class="toc-item"><span class="ch us">06</span><span class="nm">LIRS cache &amp; small-hot-key resistance<span class="sub">The eviction algorithm and the priority-2 tuning</span></span><span class="pg">p. 31</span></div>
-        <div class="toc-item"><span class="ch us">07</span><span class="nm">Chaos engineering &amp; failure modes<span class="sub">Fault-injection matrix, RTO/RPO numbers, runbooks</span></span><span class="pg">p. 34</span></div>
-        <div class="toc-item"><span class="ch us">08</span><span class="nm">Security model<span class="sub">mTLS, AES-256, BYOK, key rotation, audit log</span></span><span class="pg">p. 38</span></div>
-        <div class="toc-item"><span class="ch us">09</span><span class="nm">Engine improvements — 2026 Q2<span class="sub">Polling I/O mode, cold-aware GC, dedicated compaction core, eBPF throttle, cloud tiering</span></span><span class="pg">p. 39</span></div>
-        <div class="toc-item"><span class="ch">10</span><span class="nm">Appendix — wire protocol &amp; metrics reference<span class="sub">Binary protocol spec and the 50+ Prometheus metrics</span></span><span class="pg">p. 45</span></div>
+        <div class="toc-item"><span class="ch us">07</span><span class="nm">Failure modes<span class="sub">Failure matrix, the metric each one raises, what is tested today, runbooks</span></span><span class="pg">p. 34</span></div>
+        <div class="toc-item"><span class="ch us">08</span><span class="nm">Security model<span class="sub">TLS / mTLS, AES-256-GCM at rest, auth, plaintext PITR archives</span></span><span class="pg">p. 38</span></div>
+        <div class="toc-item"><span class="ch us">09</span><span class="nm">Engine work — 2026 (v1.6–v1.7)<span class="sub">Native index, binary WAL, ordered-index fix, experimental C++ front-end, what is not wired in</span></span><span class="pg">p. 39</span></div>
+        <div class="toc-item"><span class="ch">10</span><span class="nm">Appendix — wire protocol &amp; metrics reference<span class="sub">Binary protocol spec and the Prometheus metrics reference</span></span><span class="pg">p. 45</span></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ CHAOS / FAILURE MODES ============ -->
+<!-- ============ FAILURE MODES ============ -->
 <section>
   <div class="wrap reveal">
     <span class="sec-eyebrow">Chapter 7 · sample</span>
-    <h2 class="sh">Five failure modes <span class="em">we test nightly</span>.</h2>
-    <p class="sh-sub">A taste of what's in the chaos chapter — every one of these is exercised against a production-equivalent cluster every night, and the results are published to the same Prometheus we expose on customer clusters.</p>
+    <h2 class="sh">Six failure modes <span class="em">and how you'll see them</span>.</h2>
+    <p class="sh-sub">A taste of the failure chapter — what the engine does in each case and the Prometheus metric that shows it. Where something is covered by the end-to-end test suites, we say so; we don't quote recovery times we haven't measured reproducibly.</p>
 
     <div class="chaos">
       <div class="chaos-cell">
         <div class="ic">01</div>
-        <h4>Single-node loss</h4>
-        <p>We <code>kill -9</code> a healthy node at random under sustained 2M ops/sec load. Expected: reads continue from replica within 8 seconds, no acknowledged writes lost. <b>Measured RTO: 8.4s P99.</b></p>
+        <h4>Crash restart</h4>
+        <p>A crash (or <code>kill -9</code>) means a full replay of <code>wal.log</code> on start. Writes are acknowledged only after WAL and VLog fdatasync, so an acknowledged write is on disk. A clean shutdown instead writes a compacted checkpoint (one record per live key) and renames it over the WAL. <b>Covered by the persistence e2e suite.</b></p>
       </div>
       <div class="chaos-cell">
         <div class="ic">02</div>
-        <h4>Full availability-zone outage</h4>
-        <p>iptables-drop all traffic from a zone for 30 minutes. Expected: traffic shifts to remaining zones, write quorum maintained on 2/3 zones. <b>Measured RTO: 22s · zero data loss.</b></p>
+        <h4>Keys the old WAL could not replay</h4>
+        <p>The legacy text WAL truncated replay for keys containing <code>|</code> or a newline, so acknowledged writes could be lost on a crash restart. The binary WAL (default since v1.6) fixes this and reads old text records mixed in.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">03</div>
-        <h4>NVMe corruption</h4>
-        <p>Inject a deliberate bit-flip into a sealed VLog segment. Expected: checksum trips on next read, value re-fetched from replica, bad segment quarantined. <b>Detection &lt; 1s.</b></p>
+        <h4>Silent disk corruption</h4>
+        <p>Every VLog record carries a magic number and a CRC32C, checked on every read. A background scrubber walks the log; any mismatch increments <code>veltrixdb_scrub_corruption_total</code>. <b>Any non-zero rate means investigate.</b></p>
       </div>
       <div class="chaos-cell">
         <div class="ic">04</div>
-        <h4>Kernel CPU stall</h4>
-        <p>Stall a CPU running the io_uring SQPOLL thread for 30s. Expected: liveness probe trips, the node is auto-ejected from the read pool, traffic re-routes to healthy nodes. <b>Ejection in 12s.</b></p>
+        <h4>A slow or failing disk</h4>
+        <p>Per-disk read and write latency EWMAs are sampled continuously. A disk at &ge; 5&times; the median raises <code>veltrixdb_vlog_disk_slow</code>. Each disk has its own WAL and VLog, so a failure on one disk does not touch the others.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">05</div>
-        <h4>Cross-region partition</h4>
-        <p>Cut QUIC replication between two regions for 5 minutes. Expected: both regions continue serving local reads &amp; writes, conflict resolution applies on heal. <b>RPO &lt; 30s, no acknowledged writes lost.</b></p>
+        <h4>GC falling behind</h4>
+        <p>GC pauses under read pressure, which alone could stall it forever. It escalates in three tiers and at 65% garbage bypasses the pause unconditionally. Each bypass increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>; a persistent rate means writes exceed sustainable GC bandwidth.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">06</div>
-        <h4>Compaction storm</h4>
-        <p>Force every shard into aggressive GC simultaneously while serving peak load. Expected: GC respects its cgroup weight, P99 reads stay under 8ms. <b>Measured P99 during storm: 6.4ms.</b></p>
+        <h4>Node loss</h4>
+        <p>The failure detector marks unresponsive nodes and replicas keep serving, in async, quorum or strong replication or Raft mode. <code>--rack-id</code> keeps copies of a partition in different racks or zones. <b>Covered by the node-failover e2e suite</b>; we don't publish recovery times we haven't measured reproducibly.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ ENGINE IMPROVEMENTS — CHAPTER 9 ============ -->
+<!-- ============ ENGINE WORK — CHAPTER 9 ============ -->
 <section>
   <div class="wrap reveal">
     <span class="sec-eyebrow">Chapter 9 · sample</span>
-    <h2 class="sh">Five features, <span class="em">shipped in Q2 2026</span>.</h2>
-    <p class="sh-sub">Chapter 9 documents five features that shipped together in the v0.9.5 build cycle — each one targeting a specific latency or cost failure mode we observed in production. This is a sample of that chapter.</p>
+    <h2 class="sh">Engine work, <span class="em">v1.6–v1.7</span>.</h2>
+    <p class="sh-sub">Chapter 9 documents the engine changes that shipped in v1.6 and v1.7. Every number states its conditions, including the ones that did not go our way.</p>
 
     <div class="chaos">
       <div class="chaos-cell">
         <div class="ic">01</div>
-        <h4>Zero-interrupt polling I/O</h4>
-        <p>VeltrixDB's I/O layer switched to polling mode — the engine monitors the completion queue continuously rather than waiting for kernel interrupts. Under sustained write load, this eliminates wakeup overhead entirely. <b>Measured: 0 syscalls per read op.</b></p>
+        <h4>Off-heap native index</h4>
+        <p>Each shard&rsquo;s index moves into a C++ table off the Go heap on cgo builds (macOS included). Go&rsquo;s GC no longer scans it. <b>Measured at 5M keys: full GC 21 &rarr; 0.27 ms, settled RSS 168 &rarr; 142 B/key</b>, for ~19 ns more per cache-miss lookup. Needs <code>vm.max_map_count</code> &ge; 262144 at large key counts.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">02</div>
-        <h4>Cold-aware garbage collection</h4>
-        <p>The GC engine now ranks VLog entries by access temperature. Hot data is never relocated during a GC pass. Cold entries compact first. Result: GC runs without competing for the NVMe bandwidth live reads need. <b>GC emergency runs: 0 in 60-min stress.</b></p>
+        <h4>Binary WAL</h4>
+        <p>48-byte little-endian header, CRC32C over the whole record. Fixes lost writes on crash replay for keys with <code>|</code> or a newline. <b>Encoding 4&times; faster per record, replay 2.5&times; faster.</b> <code>--wal-format=text</code> writes the legacy format as a rollback.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">03</div>
-        <h4>Dedicated compaction core</h4>
-        <p>The compaction thread is pinned to a reserved CPU core on Linux. It never contends with request-handling threads for scheduler time. The intermittent P99 spikes under heavy write pressure — a known failure mode on shared-core designs — are eliminated. <b>P99 jitter: ±3% under load.</b></p>
+        <h4>Ordered-index overwrite fix</h4>
+        <p>Overwriting a live key no longer re-inserts it into the RANGE skiplist. <b>Server batch writes (8 clients &times; 1024-key MPUT, 1M keys, macOS): 1.45M &rarr; 3.54M keys/s, P99 9.6 &rarr; 4.2 ms.</b></p>
       </div>
       <div class="chaos-cell">
         <div class="ic">04</div>
-        <h4>eBPF-backed GC throttle</h4>
-        <p>A built-in BPF program watches CPU throttle counters in real time and signals the GC scheduler before a throttle event reaches the write path. Hard stalls become gradual backpressure. <b>0 hard stalls in 60-min sustained write stress.</b></p>
+        <h4>C++ network front-end — experimental</h4>
+        <p><code>--net=cpp</code>: an event loop per core, binary protocol only, standalone mode only, opt-in. On a 4-CPU CI runner: read P50 154 vs 286 µs, but read P99 ~3.0 vs 1.8 ms and batch writes ~12% lower. <b>Not faster overall.</b> Disk-bound reads now finish off the loop (deferred reads); not re-measured yet.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">05</div>
-        <h4>Cloud cold-tier offload</h4>
-        <p>VeltrixDB's tiering engine moves data inactive for &gt;5 minutes to S3, GCS, or Azure at 20 MB/s, rate-limited. The NVMe index stays hot. The GC engine is aware of tiered entries and never relocates them. <b>Cold storage cost: 10× lower than NVMe.</b></p>
+        <h4>io_uring write bridge — now opt-in</h4>
+        <p>It used to start on every Linux cgo build. A VLog batch is already one pwrite + one fdatasync, and with the C++ storage extras all on the CI runner measured <b>1.12M vs 1.77M keys/s</b> batch writes. Per-part attribution is pending; <code>scripts/net-bench.sh</code> bisects it. <code>VELTRIXDB_URING_BRIDGE</code> defaults to off.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">—</div>
-        <h4>Combined benchmark result</h4>
-        <p>All five improvements together, verified against a 200K-key sustained write benchmark: <b>110k ops/s sustained · P99 162ms per batch · density 160 B/record · 0 GC emergency runs.</b> Both packing density and GC gates pass.</p>
+        <h4>What is not wired in</h4>
+        <p><code>cpp/</code> also holds an ART index, a priority io_uring scheduler, an SQPOLL reader, a C++ VLog and an eBPF GC throttle. They compile, and <b>nothing in Go calls them</b>. The read path is Go <code>pread</code>. The chapter says so explicitly rather than listing them as features.</p>
       </div>
     </div>
   </div>
@@ -601,7 +601,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 <section class="download">
   <div class="wrap download-inner">
     <h2>Get the full <span class="em">whitepaper</span> in your inbox.</h2>
-    <p>One email gets you the 42-page PDF — including the chapter you skipped. If you want a specific chapter, mention it in the body and we'll send just that.</p>
+    <p>One email gets you the PDF — including the chapter you skipped. If you want a specific chapter, mention it in the body and we'll send just that.</p>
     <div class="actions">
       <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A%0AChapters%20of%20most%20interest%3A">Email me the whitepaper <span class="arrow">↗</span></a>
       <a class="btn" href="mailto:veltrixdb@gmail.com?subject=Whitepaper%20walkthrough&body=Hi%20—%20we'd%20like%20to%20schedule%20a%2030-minute%20call%20with%20the%20engineer%20who%20wrote%20the%20whitepaper.%0A%0AName%3A%0ACompany%3A%0AChapters%20of%20most%20interest%3A">Schedule a walkthrough</a>
@@ -618,39 +618,43 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
         <ul>
-          <li><a href="index.html#why">Platform</a></li>
-          <li><a href="performance.html#performance">Benchmark</a></li>
-          <li><a href="product.html#compare">Comparison</a></li>
-          <li><a href="product.html#how">Architecture</a></li>
+          <li><a href="product.html">Product</a></li>
+          <li><a href="performance.html">Performance</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
         </ul>
       </div>
       <div>
         <h5>Resources</h5>
         <ul>
-          <li><a href="blog-benchmark.html">Benchmark report</a></li>
-          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
-          <li><a href="blog-migration.html">Migration guide</a></li>
-          <li><a href="whitepaper.html">Whitepaper</a></li>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
+          <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
+          <li><a href="docs/operations/security.html">Security model</a></li>
+          <li><a href="blog-architecture.html">Blog · Architecture</a></li>
+          <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html#pricing">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v0.9.4-beta · build cb44a1f</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

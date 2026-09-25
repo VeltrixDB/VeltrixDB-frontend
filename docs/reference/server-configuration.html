@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -109,6 +109,9 @@
 <tr><td><code>-addr</code></td><td><code>:9000</code></td><td>TCP address for the plaintext client listener (text protocol + binary protocol, auto-detected per connection).</td></tr>
 <tr><td><code>-metrics-addr</code></td><td><code>:2112</code></td><td>HTTP address serving <code>/metrics</code>, <code>/healthz</code>, <code>/readyz</code>, <code>/admin/*</code>, and <code>/traces</code>. This is the "admin port" referenced throughout the docs.</td></tr>
 <tr><td><code>-tls-addr</code></td><td><code>:9443</code></td><td>TCP address for the TLS client listener. Only started when <code>-tls-cert</code> and <code>-tls-key</code> are both set; runs concurrently with the plaintext listener on <code>-addr</code>.</td></tr>
+<tr><td><code>-net</code></td><td><code>go</code></td><td><span class="badge good">New in v1.7</span> Network front-end for <code>-addr</code>: <code>go</code> (default; the Go server &mdash; every protocol and command, <code>AUTH</code>, all modes) | <code>cpp</code> (C++ event loops in <code>netfront/</code>: io_uring on Linux if available, else <code>poll()</code>) | <code>uring</code> (C++ with io_uring required; fails if unavailable) | <code>poll</code> (C++ with <code>poll()</code>, portable). The C++ front-end serves only the binary protocol's <code>PUT GET DEL PING MPUT MGET</code>, and the server refuses to start with it in <code>-mode raft</code>/<code>replicated</code> or with <code>-auth-config</code>. The text protocol, <code>AUTH</code>, extended binary commands and TLS (<code>-tls-addr</code>) stay on Go. Experimental: in CI measurements it lowered read P50 but had worse read P99 and lower batch-write throughput than <code>go</code> &mdash; see <a class="inline-link" href="../operations/performance-tuning.html">Performance Tuning</a>.</td></tr>
+<tr><td><code>-net-threads</code></td><td>NumCPU</td><td><span class="badge good">New in v1.7</span> Number of event loops for <code>-net=cpp|uring|poll</code> (one per core, each with its own <code>SO_REUSEPORT</code> listener). macOS runs a single poll loop.</td></tr>
+<tr><td><code>-pprof-addr</code></td><td><em>(empty = off)</em></td><td><span class="badge good">New in v1.7</span> Serves CPU, heap, goroutine and execution-trace profiles (pprof format) on this address, e.g. <code>127.0.0.1:6060</code>, under <code>/debug/pprof/</code> (<code>/debug/pprof/profile?seconds=N</code>, <code>/debug/pprof/trace?seconds=N</code>, <code>/debug/pprof/heap</code>, &hellip;). Uses its own HTTP mux, never the metrics port &mdash; profiles expose internals, so bind it to loopback.</td></tr>
 <tr><td><code>-node</code></td><td><code>node-1</code></td><td>Legacy node identifier flag. Superseded by <code>-node-id</code> when both are set.</td></tr>
 </tbody>
 </table>
@@ -129,6 +132,7 @@
 <tr><td><code>-auto-tune</code></td><td><code>false</code></td><td>Auto-detects hardware (RAM, CPU cores, disk types) and self-tunes cache size, memtable size, shard count, compaction threads, and SSTable size (the "80% RAM rule"), plus applies OS-level tuning (NVMe I/O scheduler, hugepages, CPU governor). Requires root or <code>CAP_SYS_ADMIN</code> on Linux for the sysctl/rlimit changes; falls back to defaults with a logged warning if hardware detection fails.</td></tr>
 <tr><td><code>-read-heavy</code></td><td><code>false</code></td><td>Applies the read-heavy preset: 400&nbsp;GB cache, LIRS ratio 0.95, 300s GC interval, 60s TTL scan interval. Tuned for P99 &lt; 5&nbsp;ms at 2M+ ops/sec on n2-highmem-64-class hardware. Overrides <code>DefaultStorageConfig</code> but not <code>-auto-tune</code> or explicit per-flag overrides applied afterward.</td></tr>
 <tr><td><code>-scrub-mb-per-sec</code></td><td><code>50</code></td><td>Background CRC32C integrity scrubber bandwidth cap, per disk, in MB/s. <code>0</code> disables the scrubber entirely.</td></tr>
+<tr><td><code>-disable-ordered-index</code></td><td><code>false</code></td><td>Stops maintaining the ordered key index (a skiplist mirroring every live key, ~90&nbsp;B of RAM per key). <strong>Breaking for ordered reads:</strong> <code>RANGE</code>, <code>SCANCUR</code> and any <code>RangeScan</code>/<code>ScanCursor</code> caller return <code>ErrOrderedIndexDisabled</code>. Point lookups, namespace prefix scans and every write path are unaffected. Worth it only for point-lookup-only workloads; measured &minus;21.8% allocations and &minus;5.1% wall time on MultiPut-1024. Reallocating the freed RAM to <code>-cache</code> is usually the better use.</td></tr>
 </tbody>
 </table>
 </div>
@@ -143,6 +147,7 @@
 <tr><td><code>-wal-flush-window-ms</code></td><td><code>15</code></td><td>WAL group-commit flush window in milliseconds. At the 15&nbsp;ms default, roughly 200 entries batch per <code>fdatasync</code> at 100K writes/s. Use a smaller window (e.g. 5&nbsp;ms) for latency-sensitive workloads at the cost of fewer entries per sync. <strong>Must match</strong> <code>-vlog-flush-window-ms</code> (an enforced invariant).</td></tr>
 <tr><td><code>-vlog-flush-window-ms</code></td><td><code>15</code></td><td>VLog <code>fdatasync</code> group-commit window in milliseconds. Must equal <code>-wal-flush-window-ms</code> &mdash; WAL and VLog flushes race concurrently, and end-to-end P99 is the max of the two.</td></tr>
 <tr><td><code>-wal-max-batch</code></td><td><code>4096</code></td><td>Maximum WAL entries per group-commit flush before the flush timer is forced to fire early. Raise this if sustained write rate exceeds <code>window &times; max_batch</code> (e.g., 100K/s &times; 0.005s = 500, so 4096 gives generous headroom).</td></tr>
+<tr><td><code>-wal-format</code></td><td><code>binary</code></td><td><span class="badge good">New in v1.6</span> Encoding for new WAL records: <code>binary</code> (default; 48-byte little-endian header, magic <code>0xB1</code>, CRC32C over the whole record) or <code>text</code> (legacy). Replay reads both, mixed in one file. <code>text</code> exists only to roll back to a pre-binary build: run once with <code>-wal-format=text</code>, stop cleanly (the shutdown checkpoint rewrites <code>wal.log</code> as text), then downgrade. The server logs a warning when <code>text</code> is selected, because keys containing <code>|</code> or a newline can lose acknowledged writes on crash replay in that format. Only <code>cmd/server</code> has this flag; <code>veltrixdb-backup</code> and <code>veltrix-repair</code> always write binary.</td></tr>
 <tr><td><code>-archive-dir</code></td><td><em>(empty)</em></td><td>Root directory for continuous WAL archiving used by point-in-time recovery. Empty disables archiving. When set, a background archiver copies newly-durable WAL entries into <code>&lt;dir&gt;/disk&lt;N&gt;/</code>.</td></tr>
 <tr><td><code>-archive-interval-ms</code></td><td><code>1000</code></td><td>Poll interval (ms) for the WAL archiver to check for newly durable entries.</td></tr>
 <tr><td><code>-archive-max-age-sec</code></td><td><code>0</code></td><td>Prune archived WAL segments older than this many seconds. <code>0</code> = keep forever.</td></tr>
@@ -167,7 +172,7 @@
 <tr><td><code>-encrypt-at-rest</code></td><td><code>false</code></td><td>Enables AES-256-GCM encryption of values stored in the VLog. The key is loaded from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64) or from <code>-encryption-key-path</code>. Startup fails fast if the key is missing or not exactly 32 bytes.</td></tr>
 <tr><td><code>-encryption-key-path</code></td><td><em>(empty)</em></td><td>Path to a file containing the 32-byte encryption key (raw or base64). Ignored if <code>VELTRIXDB_ENCRYPTION_KEY</code> is set in the environment.</td></tr>
 <tr><td><code>-audit-log</code></td><td><em>(empty)</em></td><td>Path to an append-only audit log (JSONL). Empty disables auditing. Covers <code>PUT</code>, <code>DEL</code>, and atomic ops; value bytes are never written to the audit log.</td></tr>
-<tr><td><code>-admin-token</code></td><td><em>(empty)</em></td><td><span class="badge">v1.1.0</span> Bearer token guarding every <code>/admin/*</code> endpoint on <code>-metrics-addr</code>. When unset, <code>/admin/*</code> accepts loopback connections only (non-loopback gets <code>403</code>). When set, every <code>/admin/*</code> request — loopback included — must send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code> or it gets <code>401</code>; comparison is constant-time. Also readable from the <code>VELTRIX_ADMIN_TOKEN</code> environment variable. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are never guarded. See <a class="inline-link" href="../operations/security.html">Security</a>.</td></tr>
+<tr><td><code>-admin-token</code></td><td><code>$VELTRIX_ADMIN_TOKEN</code>, else <em>(empty)</em></td><td><span class="badge">v1.1.0</span> Bearer token guarding every <code>/admin/*</code> endpoint on <code>-metrics-addr</code>. When unset, <code>/admin/*</code> accepts loopback connections only (non-loopback gets <code>403</code>). When set, every <code>/admin/*</code> request — loopback included — must send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code> or it gets <code>401</code>; comparison is constant-time. Also readable from the <code>VELTRIX_ADMIN_TOKEN</code> environment variable. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are never guarded. See <a class="inline-link" href="../operations/security.html">Security</a>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -212,6 +217,23 @@
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>-node</code></td><td><code>node-1</code></td><td>See <a class="inline-link" href="#network">Network</a> above &mdash; legacy node identifier, superseded by <code>-node-id</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="environment">Environment variables</h2>
+<p>These are read by the server process at startup (and, for the storage ones, by any process that embeds the storage engine). They are not flags.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>VELTRIX_ADMIN_TOKEN</code></td><td><em>(unset)</em></td><td>Default value of <code>-admin-token</code> (the flag wins when passed). Also the default of <code>repl-ship -src-token</code>.</td></tr>
+<tr><td><code>VELTRIXDB_ENCRYPTION_KEY</code></td><td><em>(unset)</em></td><td>Base64 32-byte key for <code>-encrypt-at-rest</code>. Takes precedence over <code>-encryption-key-path</code>.</td></tr>
+<tr><td><code>VELTRIXDB_INDEX</code></td><td>native on cgo builds</td><td><span class="badge good">New in v1.6</span> Key-index implementation. Unset: the off-heap C++ native index on every cgo build (the official Docker image included), the Go map on <code>CGO_ENABLED=0</code> builds. <code>map</code> opts out; <code>native</code> forces it (when compiled in) even if <code>VELTRIXDB_DISABLE_CGO_ENGINE</code> is set. At large key counts the native index needs <code>vm.max_map_count &ge; 262144</code> (see <code>scripts/sysctl.conf</code>) or inserts can fail with <code>ENOMEM</code>. The chosen implementation is reported in the startup log.</td></tr>
+<tr><td><code>VELTRIXDB_URING_BRIDGE</code></td><td><code>off</code></td><td><span class="badge good">New in v1.7</span> io_uring VLog write bridge on a Linux cgo build: <code>off</code> (default; <code>pwrite</code> + <code>fdatasync</code>) | <code>on</code> (io_uring, no SQPOLL) | <code>sqpoll</code> (io_uring with an SQPOLL kernel thread per ring). Opt in only after measuring on your hardware; unknown values are logged and treated as <code>off</code>.</td></tr>
+<tr><td><code>VELTRIXDB_DISABLE_CGO_ENGINE</code></td><td><em>(unset)</em></td><td>Set to <code>1</code>/<code>true</code> to skip the C++ layer on a cgo build: forces the io_uring bridge off, does not construct the C++ batch engine, and selects the Go map index (unless <code>VELTRIXDB_INDEX=native</code>). No effect on <code>CGO_ENABLED=0</code> builds.</td></tr>
+<tr><td><code>VELTRIXDB_NET_DEFER_READS</code></td><td><em>(unset = on)</em></td><td><span class="badge good">New in v1.7</span> C++ front-end only. <code>0</code> answers every <code>GET</code>/<code>MGET</code> inline on the loop thread, including keys that need a VLog read (the older behaviour, for A/B comparison). By default such keys are finished in a goroutine while the connection waits.</td></tr>
+<tr><td><code>AWS_*</code>, <code>GCS_ACCESS_TOKEN</code>, <code>GOOGLE_APPLICATION_CREDENTIALS</code>, <code>AZURE_STORAGE_*</code></td><td><em>(unset)</em></td><td>Cloud credentials used by backup upload/download when not given explicitly.</td></tr>
 </tbody>
 </table>
 </div>

@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="./resources/faq.html">FAQ</a>
     <a class="btn primary" href="./getting-started/quickstart.html">Quickstart</a>
@@ -92,7 +92,7 @@
     <div style="padding:8px 0 12px">
   <span class="badge red">NVMe-native</span><span class="badge">Key-value</span><span class="badge">Kubernetes-first</span><span class="badge good">Apache 2.0</span>
   <h1 style="margin-top:16px">VeltrixDB Documentation</h1>
-  <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database. Values live on NVMe in an append-only log with ~1.0× write amplification (WiscKey KV-separation); the index and hot values stay in DRAM. This is the complete reference for building, deploying, and operating it.</p>
+  <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database. Values live on NVMe in an append-only log with ~1× write amplification by design (WiscKey KV-separation); the index and hot values stay in DRAM. This is the complete reference for building, deploying, and operating it.</p>
 </div>
 
 <div class="table-wrap" style="margin-bottom:28px">
@@ -139,7 +139,7 @@
 </div>
 
 <h2 id="why-veltrixdb">Why VeltrixDB</h2>
-<p>Redis keeps everything in RAM — a billion 128-byte keys needs roughly 250 GB of memory, on the order of $3,000–5,000/month in cloud RAM. VeltrixDB keeps values on NVMe and only a 64-byte pointer per key in DRAM, so the same dataset fits in about 160 GB of NVMe for roughly $300–500/month. LSM-based stores like RocksDB typically see 10–30× write amplification from compaction; VeltrixDB's WiscKey-style KV-separation keeps that close to 1.0×.</p>
+<p>Redis keeps every value in RAM. VeltrixDB keeps values on NVMe and only the index in DRAM — about 142&nbsp;B/key with the native index, plus ~90&nbsp;B/key for the ordered index unless disabled. With 1&nbsp;KB values that is roughly 4–7× less RAM; with 128-byte values the index is about as large as the values, so the saving grows with value size. LSM-based stores like RocksDB typically see 10–30× write amplification from compaction; VeltrixDB's WiscKey-style KV-separation keeps that close to 1.0×.</p>
 <p>See the honest trade-offs in <a class="inline-link" href="resources/limitations-and-roadmap.html">Limitations &amp; Roadmap</a> and a feature-by-feature breakdown in <a class="inline-link" href="resources/redis-comparison.html">VeltrixDB vs. Redis</a>.</p>
 
     
