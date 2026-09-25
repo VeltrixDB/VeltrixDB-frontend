@@ -133,9 +133,9 @@
     <!-- The money slide -->
     <div class="cost-split reveal" style="margin-top:48px">
       <div class="cost-card bad">
-        <div class="ck">In-memory (Redis)</div>
-        <div class="cnum">$3,000–5,000</div>
-        <div class="cunit">/ month · ~250 GB DRAM</div>
+        <div class="ck">In-memory store (e.g. Redis)</div>
+        <div class="cnum">≥ 1 TB</div>
+        <div class="cunit">RAM · 1B keys × 1 KB values</div>
         <div class="cbar"><i></i></div>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="#8B93B0" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Every value pinned in memory, hot or cold</li>
@@ -143,20 +143,20 @@
           <li><svg viewBox="0 0 24 24" fill="none" stroke="#8B93B0" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Cost grows linearly with dataset size</li>
         </ul>
       </div>
-      <div class="cost-vs"><span class="badge">≈ 10× lower · illustrative</span></div>
+      <div class="cost-vs"><span class="badge">≈ 4–7× less RAM · 1 KB values</span></div>
       <div class="cost-card good">
         <div class="ck">VeltrixDB on NVMe</div>
-        <div class="cnum"><span class="g">$300–500</span></div>
-        <div class="cunit">/ month · ~160 GB NVMe</div>
+        <div class="cnum"><span class="g">142–232 GB</span></div>
+        <div class="cunit">RAM for the index · the ~1.4 TB of values sit on NVMe</div>
         <div class="cbar"><i></i></div>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Values on NVMe, only pointers in DRAM</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Values on NVMe, only the index in DRAM</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Value-log GC runs off the read path</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Fixed cluster pricing, no per-op meter</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>You pay for machines, not a per-op meter</li>
         </ul>
       </div>
     </div>
-    <div class="cost-foot">Illustrative list-price arithmetic, not a measurement — 1 billion keys × 128-byte values, public cloud list prices for DRAM vs NVMe capacity. It counts storage for the values only — VeltrixDB still needs RAM for its index (~142 B/key measured at 5M keys) and cache. A billion-key deployment has not been benchmarked reproducibly; size your own node with the <a href="pricing.html#calc">sizing rules</a>.</div>
+    <div class="cost-foot">Arithmetic from measured per-key costs, not a billion-key benchmark. VeltrixDB&rsquo;s index takes ~142&nbsp;B/key (native index, measured at 5M keys) plus ~90&nbsp;B/key for the ordered index unless <code>--disable-ordered-index</code>, plus whatever cache you give it; a 1&nbsp;KB value packs into ~1.37&nbsp;KB of NVMe. An in-memory store holds every value in RAM plus its own per-key overhead. The saving grows with value size: <b>at 128-byte values the index takes about as much RAM as the values do</b>, so small-value workloads save little. Size your own node with the <a href="pricing.html#calc">sizing rules</a>.</div>
   </div>
 </section>
 
@@ -177,7 +177,7 @@
       <div class="cell">
         <div class="cn">02 · Memory</div>
         <h3>Index in DRAM</h3>
-        <p>Only a 64-byte index record per key lives in memory — off the Go heap on cgo builds. A read is a cache hit (~92 ns in-process) or one 4 KB-aligned, CRC-checked NVMe read on a miss.</p>
+        <p>Only the index lives in memory &mdash; ~142&nbsp;B/key measured — off the Go heap on cgo builds. A read is a cache hit (~92 ns in-process) or one 4 KB-aligned, CRC-checked NVMe read on a miss.</p>
       </div>
       <div class="cell">
         <div class="cn">03 · Latency</div>
@@ -241,7 +241,7 @@
         </div>
         <h3>A bill that <span class="em">stops chasing your data</span>.</h3>
         <p>Your data sits on NVMe instead of RAM — capacity priced like SSD, on hardware you run, with no per-operation meter to model.</p>
-        <div class="metric"><span class="num"><span class="acc">~10×</span></span><span class="lbl">illustrative · list-price $/GB, NVMe vs DRAM</span></div>
+        <div class="metric"><span class="num"><span class="acc">4–7×</span></span><span class="lbl">less RAM at 1 KB values · per-key arithmetic, grows with value size</span></div>
       </div>
       <div class="outcome reveal">
         <div class="head">

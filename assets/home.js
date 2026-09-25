@@ -1,4 +1,4 @@
-/* VeltrixDB homepage — Confluent-style interactions */
+/* VeltrixDB homepage — interactions */
 (function () {
   'use strict';
 

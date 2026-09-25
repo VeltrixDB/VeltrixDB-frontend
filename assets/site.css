@@ -1094,7 +1094,7 @@ nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180
 .brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 55%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.28) !important}
 .brand b i{color:#0B5CFF}
 
-/* buttons → Confluent blue */
+/* buttons → brand blue */
 .btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
 .btn.primary:hover{background:#0A4FE0}
 

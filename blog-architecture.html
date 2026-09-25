@@ -226,9 +226,9 @@
   .reveal.in{opacity:1;transform:none}
   @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
 
-/* injected: Confluent light theme */
+/* injected: light theme */
 /* ============================================================
-   CONFLUENT LIGHT THEME OVERRIDE  (all sibling pages)
+   LIGHT THEME OVERRIDE  (all sibling pages)
    Homepage uses its own home.css and is unaffected by this block.
    Flips the palette to light + blue/purple; keeps the RED icon;
    re-scopes ink variables inside dark regions so text stays visible.
@@ -260,7 +260,7 @@ nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180
 .brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 58%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.22) !important}
 .brand b i{color:#0B5CFF}
 
-/* buttons → Confluent blue */
+/* buttons → brand blue */
 .btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
 .btn.primary:hover{background:#0A4FE0}
 
@@ -420,7 +420,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">The idea</div>
         <h2 class="a-h">WiscKey, <span class="em">production-hardened</span>.</h2>
         <p class="a-lede">In 2016, a paper out of Wisconsin proposed the separation we use today. We took the idea, kept its core insight, and rebuilt the engine end-to-end to make it survive in multi-cloud production.</p>
-        <p>The <b>WiscKey paper (FAST '16)</b> made one elegant observation: if you separate keys from values, only the keys have to participate in compaction. Values can live in an append-only log on disk — they're written once, never rewritten, and only touched again when garbage collection decides to reclaim space.</p>
+        <p>The <b>WiscKey paper (FAST '16)</b> made one elegant observation: if you separate keys from values, only the keys have to participate in compaction. Values can live in an append-only log on disk — they're written once and only touched again when garbage collection copies the still-live ones out of a mostly-dead region.</p>
         <p>The original WiscKey paper proved it worked in a research setting. VeltrixDB takes the idea further — we re-architected it around three production realities the paper sidestepped:</p>
         <ul>
           <li><b>Sharding and multiple disks</b> · the index is split into 8192 shards (low 13 bits of FNV-1a), each with its own RWMutex and Bloom filter. Each NVMe disk has one WAL and one VLog, and shard <code>i</code> lives on disk <code>i % numDisks</code></li>

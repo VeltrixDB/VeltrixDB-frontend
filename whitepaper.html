@@ -216,9 +216,9 @@
   .reveal.in{opacity:1;transform:none}
   @media (prefers-reduced-motion: reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
 
-/* injected: Confluent light theme */
+/* injected: light theme */
 /* ============================================================
-   CONFLUENT LIGHT THEME OVERRIDE  (all sibling pages)
+   LIGHT THEME OVERRIDE  (all sibling pages)
    Homepage uses its own home.css and is unaffected by this block.
    Flips the palette to light + blue/purple; keeps the RED icon;
    re-scopes ink variables inside dark regions so text stays visible.
@@ -250,7 +250,7 @@ nav.top{background:rgba(255,255,255,.82) !important;backdrop-filter:saturate(180
 .brand .mark{background:linear-gradient(135deg,#2E8BFF 0%,#0B5CFF 58%,#0A3FD1 100%) !important;box-shadow:0 6px 16px rgba(11,92,255,.32), inset 0 0 0 1px rgba(255,255,255,.22) !important}
 .brand b i{color:#0B5CFF}
 
-/* buttons → Confluent blue */
+/* buttons → brand blue */
 .btn.primary{background:#0B5CFF;color:#fff;border-color:#0B5CFF;box-shadow:0 12px 30px -10px rgba(11,92,255,.5)}
 .btn.primary:hover{background:#0A4FE0}
 
@@ -345,15 +345,14 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div>
         <span class="wp-eyebrow">Technical whitepaper · v1.8</span>
         <h1 class="wp-title">The VeltrixDB <span class="em">whitepaper</span>.</h1>
-        <p class="wp-sub">42 pages of how the storage engine actually works — <b>the read and write paths, the durability argument and its limits, the sharding model, and how the engine handles failure</b>. Written for the engineer who'll be on call for this in production.</p>
+        <p class="wp-sub">How the storage engine actually works — <b>the read and write paths, the durability argument and its limits, the sharding model, and how the engine handles failure</b>. Written for the engineer who'll be on call for this in production.</p>
 
         <div class="wp-cta">
           <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
           <a class="btn" href="#contents">See what's inside</a>
         </div>
         <div class="wp-meta">
-          <span><b>Pages</b> · 42</span>
-          <span><b>Author</b> · A. Gupta</span>
+          <span><b>Author</b> · Akanksha Gupta</span>
           <span><b>Updated</b> · Sep 2026</span>
           <span><b>License</b> · Apache 2.0 (open source) · benchmark conditions stated</span>
         </div>
@@ -365,17 +364,17 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
           <div class="seal-l">
             <b>VeltrixDB</b> · technical reference<br/>
             covers v1.8 · versions marked<br/>
-            42 pages · classified <b>shareable</b>
+            <b>shareable</b>
           </div>
-          <div class="seal-r">PDF · 4.8 MB</div>
+          <div class="seal-r">PDF on request</div>
         </div>
         <h3>The extreme point-lookup engine — architecture &amp; durability.</h3>
         <p class="sub">A first-principles walk through the storage layer, the I/O model, the sharding scheme, and exactly when an acknowledged write is durable on commodity NVMe — and when it is not.</p>
         <div class="lines"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="stats">
-          <div class="st"><div class="v"><span class="red">42</span></div><div class="l">pages</div></div>
-          <div class="st"><div class="v">18</div><div class="l">diagrams</div></div>
-          <div class="st"><div class="v">9</div><div class="l">chapters</div></div>
+          <div class="st"><div class="v"><span class="red">v1.8</span></div><div class="l">covers</div></div>
+          <div class="st"><div class="v">8192</div><div class="l">index shards</div></div>
+          <div class="st"><div class="v">2.0</div><div class="l">Apache license</div></div>
         </div>
       </div>
     </div>
@@ -395,42 +394,42 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <span class="ch">Storage engine</span>
         <h3>Key–value separation, end to end.</h3>
         <p>How VeltrixDB separates keys from values — the 64 B index entry, the VLog record format (4 KB-aligned, magic + CRC32C), block packing for batched writes, and why write amplification stays near 1× when there is no LSM compaction.</p>
-        <div class="meta"><span>Chapter 1–2</span><span>14 pages</span></div>
+        <div class="meta"><span>Chapter 1–2</span></div>
       </div>
       <div class="toc-card">
         <span class="num">02</span>
         <span class="ch">Kernel I/O</span>
         <h3>pread, pwrite and fdatasync — and where io_uring fits.</h3>
         <p>Reads are one Go <code>pread</code> per cache miss; a write batch is one <code>pwrite</code> and one <code>fdatasync</code>. Why the io_uring write bridge is opt-in (off by default), and what it measured on a 4-CPU CI runner.</p>
-        <div class="meta"><span>Chapter 3</span><span>6 pages</span></div>
+        <div class="meta"><span>Chapter 3</span></div>
       </div>
       <div class="toc-card">
         <span class="num">03</span>
         <span class="ch">Durability</span>
         <h3>The fsync chain, crash replay and checkpoints.</h3>
         <p>Group-commit WAL (default 15 ms window), why VLog and WAL fdatasync run concurrently, full replay after a crash, the compacted checkpoint written on clean shutdown, and the conditions under which an acknowledged write can be lost.</p>
-        <div class="meta"><span>Chapter 4</span><span>5 pages</span></div>
+        <div class="meta"><span>Chapter 4</span></div>
       </div>
       <div class="toc-card">
         <span class="num">04</span>
         <span class="ch">Sharding &amp; placement</span>
         <h3>8192 index shards · consistent hashing · rack-aware.</h3>
         <p>One FNV-1a hash drives three placements: 8192 index shards, up to 256 cache shards, and the disk. Cluster routing by consistent hashing, and <code>--rack-id</code> placement that keeps copies of a partition in different racks or zones.</p>
-        <div class="meta"><span>Chapter 5</span><span>6 pages</span></div>
+        <div class="meta"><span>Chapter 5</span></div>
       </div>
       <div class="toc-card">
         <span class="num">05</span>
         <span class="ch">Cache (LIRS)</span>
         <h3>Why LRU lies — and what we replaced it with.</h3>
         <p>The LIRS algorithm in detail, the priority-2 eviction resistance for small values, and why the cache is split into up to 256 shards (one lock was 21.7% of CPU; a hit went from 711 ns to ~92 ns).</p>
-        <div class="meta"><span>Chapter 6</span><span>4 pages</span></div>
+        <div class="meta"><span>Chapter 6</span></div>
       </div>
       <div class="toc-card">
         <span class="num">06</span>
         <span class="ch">Failure modes</span>
         <h3>How the engine handles failure.</h3>
         <p>Crash restart, silent disk corruption, a slow disk, GC falling behind, node loss. For each: what the engine does, which metric shows it, and what is tested today (end-to-end failover, persistence and backup/restore suites).</p>
-        <div class="meta"><span>Chapter 7–8</span><span>7 pages</span></div>
+        <div class="meta"><span>Chapter 7–8</span></div>
       </div>
     </div>
   </div>
