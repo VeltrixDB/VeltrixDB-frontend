@@ -74,18 +74,31 @@
     });
   }
 
-  /* ---- Scroll reveal + bar fill ---- */
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (!e.isIntersecting) return;
-      e.target.classList.add('in');
-      if (e.target.id === 'bars') {
-        e.target.querySelectorAll('.bar-fill').forEach(function (b) {
-          b.style.width = b.getAttribute('data-w') + '%';
-        });
-      }
-      io.unobserve(e.target);
+  /* ---- Scroll reveal + bar fill ----
+     Content must never stay hidden: whatever is on screen at load is shown at
+     once, and if the observer never reports (old browser, embedded preview,
+     throttled frame) everything is shown after 3 s. */
+  var fillBars = function (root) {
+    root.querySelectorAll('.bar-fill').forEach(function (b) { b.style.width = b.getAttribute('data-w') + '%'; });
+  };
+  var show = function (el) { el.classList.add('in'); if (el.id === 'bars') fillBars(el); };
+  var targets = document.querySelectorAll('.reveal, #bars');
+  if (reduced || !('IntersectionObserver' in window)) {
+    targets.forEach(show);
+  } else {
+    var reported = false;
+    var rio = new IntersectionObserver(function (entries) {
+      reported = true;
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        show(e.target);
+        rio.unobserve(e.target);
+      });
+    }, { threshold: 0.18 });
+    var fold = window.innerHeight * 0.9;
+    targets.forEach(function (el) {
+      if (el.getBoundingClientRect().top < fold) show(el); else rio.observe(el);
     });
-  }, { threshold: 0.18 });
-  document.querySelectorAll('.reveal, #bars').forEach(function (el) { io.observe(el); });
+    setTimeout(function () { if (!reported) { rio.disconnect(); targets.forEach(show); } }, 3000);
+  }
 })();

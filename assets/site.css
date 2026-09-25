@@ -1238,3 +1238,6 @@ pre{overflow-x:auto}
 /* header: when the nav links collapse, the CTA group still belongs on the
    right (it lost the push from .nav-links{margin-right:auto}) */
 .nav-cta{margin-left:auto}
+
+/* bar labels are never clipped: an unfilled or short bar still fits its text */
+.bar-fill{white-space:nowrap;min-width:max-content}
