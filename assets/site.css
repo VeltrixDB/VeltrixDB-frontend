@@ -1234,3 +1234,7 @@ pre{overflow-x:auto}
 /* UI labels: small sans caps. Monospace stays for code, commands and data. */
 .article-kicker, .article-links a, .article-pull .pl, .calc-card .nm, .calc-savings, .case .cap, .ft h5, .globe-info .gx, .globe-stats .gs .l, .hero-kinetic .caption, .hero-kinetic .old, .honest-head .tag, .how-card .hc-k, .lat-table th, .news-mail-l, .outcome .idx, .pain .src, .path-eyebrow, .pf-label, .pill, .price .fine, .price .ribbon, .price .tier, .ptab, .rd-badge, .rd-bench-lbl, .rd-cat, .res .kind, .stat .l, .wp-callout-kicker, table.cmp thead th{font-family:var(--sans) !important;font-weight:700 !important;letter-spacing:.07em !important;font-size:11.5px}
 .brand b i{font-weight:800 !important}
+
+/* header: when the nav links collapse, the CTA group still belongs on the
+   right (it lost the push from .nav-links{margin-right:auto}) */
+.nav-cta{margin-left:auto}
