@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
@@ -18,8 +18,8 @@
     --red:#0B5CFF; --red-2:#2E8BFF; --red-glow:rgba(11,92,255,.35);
     --warm:#F4A65A; --good:#46D391;
     --grid:1280px;
-    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    --serif:'Newsreader', 'Times New Roman', serif;
+    --sans:'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:var(--sans);
     --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   *{box-sizing:border-box}
@@ -303,6 +303,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 .nav-gh svg{width:17px !important;height:17px !important}
 .nav-gh:hover{color:#0B5CFF}
 </style>
+<link rel="stylesheet" href="assets/longform.css">
 </head>
 <body>
 
@@ -375,17 +376,21 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-body">
         <div class="a-kicker">Why teams migrate</div>
         <h2 class="a-h">Two reasons, <span class="em">always the same</span>.</h2>
+        <div class="callout">
+          <div class="ico">!</div>
+          <p><b>Update (Sept 2026):</b> parts of this playbook referred to tooling that does not exist, and those steps have been corrected. There is no <code>ddb-importer</code> image and no DynamoDB Streams sidecar. The bulk-load step now converts the DynamoDB export to JSONL and loads it with the repo's <code>veltrix-migrate import</code>. The cost (3–5×) and latency (12 ms → 4.9 ms) comparisons have no measured source and have been removed. The 4.9 ms figure comes from an internal, <b>unverified</b> run. VeltrixDB is self-hosted only; there is no managed service today. It speaks its own binary and text protocols, not RESP or the DynamoDB API, so your application has to use a VeltrixDB client.</p>
+        </div>
         <p class="a-lede">Every team that walked us through a DynamoDB-to-VeltrixDB migration showed up with the same two concerns. The bill, and the tail.</p>
-        <p>If you're reading this guide, you probably already know your <i>why</i>. But for the engineering manager you'll be selling this migration to, the case lands cleanest as two numbers:</p>
+        <p>If you're reading this guide, you probably already know your <i>why</i>. For the engineering manager you'll be selling this migration to, make the case with your own numbers:</p>
         <ul>
-          <li><b>Cost</b> · DynamoDB on-demand bills at roughly <code>$1.00 per million blended ops</code>. At 10 B ops/month that's $10K. Most VeltrixDB customers land between <b>3–5× lower</b> on the same workload. The <a class="inline" href="pricing.html#calc">cost calculator</a> is the fastest way to see the gap.</li>
-          <li><b>Tail latency</b> · DynamoDB's published P99 is ~10ms for single-key reads. Real-world it's closer to 12-18ms with throttling and burst-bucket effects. VeltrixDB is <code>4.9ms</code> sustained, with no throttling tier.</li>
+          <li><b>Cost</b> · take your current DynamoDB invoice and compare it with the cost of self-hosted nodes with local NVMe sized for your RAM and disk needs. VeltrixDB keeps every key in RAM. The <a class="inline" href="pricing.html#calc">cost calculator</a> gives an estimate, not a measurement.</li>
+          <li><b>Tail latency</b> · measure DynamoDB's P99 for your access pattern, then measure VeltrixDB's during the shadow-read phase (§06). The only reproducible VeltrixDB read figure we publish is a cache-resident YCSB run (P99 2.77 ms). Its conditions are in the <a class="inline" href="blog-benchmark.html">benchmark post</a>.</li>
         </ul>
 
         <div class="a-pull">
           <div class="pull"><div class="pl">Median migration time</div><div class="pv"><span class="red">2 sprints</span></div><div class="pd">across 4 prod migrations</div></div>
-          <div class="pull"><div class="pl">P99 latency drop</div><div class="pv">12 ms → 4.9 ms</div><div class="pd">~60% reduction</div></div>
-          <div class="pull"><div class="pl">Cost reduction</div><div class="pv"><span class="red">3-5×</span></div><div class="pd">on equivalent ops</div></div>
+          <div class="pull"><div class="pl">P99 latency drop</div><div class="pv">—</div><div class="pd">measure it in shadow reads</div></div>
+          <div class="pull"><div class="pl">Cost reduction</div><div class="pv">—</div><div class="pd">no measured figure · use your invoice</div></div>
         </div>
 
         <p>The rest of this guide is the actual playbook — the same one our solutions architects walk Enterprise customers through. Two sprints. No big-bang cutover. Rollback at every stage.</p>
@@ -404,7 +409,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="ck">
           <div class="ck-h">Workload fit</div>
           <ul>
-            <li>Your hot path is <b>point lookups</b> — GET / SET / DEL / HGET-style. No <code>Query</code> calls with sort-key range conditions or <code>Scan</code>.</li>
+            <li>Your hot path is <b>point lookups</b> — GET / PUT / DEL / HGET-style. Ordered range scans exist (<code>RANGE</code>, <code>SCANCUR</code>), but in cluster modes they read only the local node. So a critical path built on <code>Query</code> with sort-key ranges, or on <code>Scan</code>, needs a careful look.</li>
             <li>No global secondary indexes (GSIs) on the critical path. <b>Or</b> you can model the GSI access patterns as separate keys.</li>
             <li>You have a <b>partition key</b> in DynamoDB that can map 1:1 to a VeltrixDB key. Composite (PK + SK) keys map to <code>pk:sk</code> string concatenations.</li>
             <li>Values are <b>≤ 400 KB</b> (DynamoDB's own limit). VeltrixDB supports up to 64 MB, but smaller values keep your RAM budget honest.</li>
@@ -414,7 +419,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>If you're using DynamoDB Streams</b> · we ship a sidecar that consumes a CDC stream from your existing table during the migration window — you keep the rest of your event-driven architecture intact. Drop us a note before sprint 1 and we'll provision the right consumer for your event volume.</p>
+          <p><b>If you're using DynamoDB Streams</b> · we don't ship a Streams consumer. The dual-write phase (§05) keeps VeltrixDB current without one. If you'd rather mirror from Streams, write a small consumer (for example a Lambda) that applies each change with a VeltrixDB client. On the VeltrixDB side, CDC is available at <code>/admin/cdc</code>, and <code>repl-ship</code> forwards it to another VeltrixDB cluster.</p>
         </div>
       </div>
     </section>
@@ -434,7 +439,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             <div class="tl-day">Days 1–2 <span class="sub">Sprint 1 · Stage 1</span></div>
             <div class="tl-d">
               <div class="ti">Stand up the cluster</div>
-              <div class="td">Helm install in your VPC. 94-second deploy. Wire up Prometheus + Grafana. Validate health checks against an empty cluster. No production traffic yet.</div>
+              <div class="td">Deploy in your own VPC (self-hosted) with the Helm chart or operator described in the VeltrixDB README. Wire up Prometheus + Grafana to the metrics endpoint on <code>:2112</code>. Validate health checks against an empty cluster. No production traffic yet.</div>
             </div>
           </div>
 
@@ -442,7 +447,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             <div class="tl-day">Days 3–5 <span class="sub">Sprint 1 · Stage 2</span></div>
             <div class="tl-d">
               <div class="ti">Bulk-load the snapshot</div>
-              <div class="td">Use DynamoDB's <code>ExportTableToPointInTime</code> to S3, then run our bulk-importer. ~3M writes/sec sustained — a 1B-key table fills in about 5.5 minutes. Validate row count and a sample of values match.</div>
+              <div class="td">Use DynamoDB's <code>ExportTableToPointInTime</code> to S3, convert the export to JSONL, and pipe it into <code>veltrix-migrate import</code>. We have no measured import rate, so time a sample before you plan the window. Validate row count and a sample of values match.</div>
             </div>
           </div>
 
@@ -488,7 +493,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">Infrastructure</div>
         <h2 class="a-h">Terraform you can <span class="em">paste into your repo</span>.</h2>
         <p class="a-lede">Three resources, eight inputs. Drop into your existing EKS module, change the instance type to a local-NVMe SKU, run terraform apply.</p>
-        <p>This snippet provisions a 3-node EKS-hosted VeltrixDB cluster on <code>i3en.6xlarge</code> instances (the AWS equivalent of our reference GCP rig). Adjust node count, instance class, or replace the EKS bits with GKE/AKS modules as needed.</p>
+        <p>This snippet provisions a 3-node EKS-hosted VeltrixDB cluster on <code>i3en.6xlarge</code> instances with local NVMe. Adjust node count and instance class, or swap the EKS parts for GKE/AKS modules. The Helm chart is not in the main VeltrixDB repo. Check the chart repository listed in the VeltrixDB README and pin a chart version that exists there. Your <code>values.yaml.tpl</code> has to use that chart's own value names.</p>
 
         <div class="a-code">
           <div class="a-code-head">
@@ -498,15 +503,15 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 <pre><span class="c"># Helm release wrapping the VeltrixDB chart</span>
 <span class="k">resource</span> <span class="s">"helm_release"</span> <span class="s">"veltrixdb"</span> {
   name       = <span class="s">"veltrixdb"</span>
-  repository = <span class="s">"https://charts.veltrixdb.com"</span>
+  repository = <span class="s">"https://charts.veltrixdb.io"</span>
   chart      = <span class="s">"veltrixdb"</span>
-  version    = <span class="s">"0.9.4"</span>
+  <span class="c"># version = "…"  pin a chart version published in that repository</span>
   namespace  = <span class="s">"veltrixdb"</span>
   create_namespace = <span class="n">true</span>
 
   values = [<span class="k">templatefile</span>(<span class="s">"./values.yaml.tpl"</span>, {
     nodes          = <span class="n">3</span>
-    cache_gb       = <span class="n">256</span>
+    cache_mb       = <span class="n">131072</span>  <span class="c"># server flag -cache is in MB (default 256)</span>
     nvme_gb        = <span class="n">3000</span>
     storage_class  = <span class="s">"veltrixdb-nvme"</span>
     region         = <span class="s">"us-east-1"</span>
@@ -539,7 +544,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         </div>
 
         <h3>Bulk-import from DynamoDB</h3>
-        <p>The import runs as a Kubernetes Job that streams from your DynamoDB S3 export directly into the new VeltrixDB cluster. It's idempotent — safe to re-run if it crashes partway through.</p>
+        <p>There is no dedicated DynamoDB importer. The repo's <code>veltrix-migrate import</code> reads JSONL from stdin, one <code>{"k": "&lt;key&gt;", "v": "&lt;base64 value&gt;"}</code> per line, and PUTs each entry over the binary protocol. It's idempotent: re-runs overwrite, so it's safe to restart if it fails partway. The <code>jq</code> step below maps each DynamoDB item to a key (here, a partition key <code>pk</code> of string type) and stores the item's JSON as the value. Adapt it to your key schema, for example <code>pk:sk</code> for composite keys. In <code>--mode=raft</code>, point <code>--dst</code> at the current leader, because followers reject writes with a <code>MOVED</code> redirect.</p>
 
         <div class="a-code">
           <div class="a-code-head">
@@ -551,22 +556,14 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     --s3-bucket veltrix-migration-staging \
     --export-format DYNAMODB_JSON
 
-<span class="c">$</span> kubectl apply -f - &lt;&lt;EOF
-apiVersion: batch/v1
-kind: Job
-metadata: { name: veltrix-import, namespace: veltrixdb }
-spec:
-  template:
-    spec:
-      containers:
-      - name: importer
-        image: ghcr.io/veltrixdb/ddb-importer:0.9.4
-        args: ["--s3-prefix", "s3://veltrix-migration-staging/AWSDynamoDB/.../"]
-      restartPolicy: OnFailure
-EOF
+<span class="c">$</span> go build -o veltrix-migrate ./cmd/veltrix-migrate   <span class="c"># from the VeltrixDB repo</span>
 
-<span class="c">$</span> kubectl logs -f -n veltrixdb job/veltrix-import
-<span class="n">imported 247,308,124 rows · 5m23s · 0 mismatches · ✓</span></pre>
+<span class="c">$</span> aws s3 cp --recursive \
+    s3://veltrix-migration-staging/AWSDynamoDB/&lt;export-id&gt;/data/ ./export/
+
+<span class="c">$</span> gunzip -c ./export/*.json.gz \
+  | jq -c '{k: .Item.pk.S, v: (.Item | tojson | @base64)}' \
+  | ./veltrix-migrate import --dst veltrixdb-0.veltrixdb:9000</pre>
         </div>
       </div>
     </section>
@@ -585,7 +582,7 @@ EOF
 
         <div class="a-code">
           <div class="a-code-head">
-            <span class="ttl">repo/sessions/dual_writer.go</span>
+            <span class="ttl">repo/sessions/dual_writer.go · r.veltrix is a *client.Client (github.com/VeltrixDB/veltrixdb/client)</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
 <pre><span class="k">func</span> (r *Repo) Put(ctx context.Context, k string, v []byte) error {
@@ -608,7 +605,7 @@ EOF
 
         <div class="callout">
           <div class="ico">i</div>
-          <p><b>Watch the divergence metric.</b> A healthy dual-write phase should see <code>&lt;0.01%</code> mirror failures, almost entirely network blips. If you see &gt;0.1%, something is wrong — most often a payload that exceeds 400 KB in DynamoDB but fits in VeltrixDB's 64 MB envelope and gets corrupted during your encoder's roundtrip. Fix before proceeding.</p>
+          <p><b>Watch the divergence metric.</b> A healthy dual-write phase should see <code>&lt;0.01%</code> mirror failures, almost entirely network blips. If you see &gt;0.1%, something is wrong — most often an encoder that doesn't round-trip a value byte-for-byte (VeltrixDB accepts values up to 64 MB, well above DynamoDB's 400 KB item limit). Fix before proceeding.</p>
         </div>
       </div>
     </section>
@@ -628,7 +625,7 @@ EOF
             <li>Mismatch rate <code>&lt; 0.001%</code> over a full weekend cycle (catches any time-zone or weekend-batch effects)</li>
             <li>VeltrixDB P99 read latency <code>&lt; 8ms</code> for 4 hours straight under peak prod load</li>
             <li>Cache hit rate <code>&gt; 90%</code> in steady state — the LIRS cache should be warm by now</li>
-            <li>Zero <code>5xx</code> errors on the VeltrixDB endpoint during the window</li>
+            <li>Zero errors from the VeltrixDB client during the window (VeltrixDB speaks TCP, not HTTP, so there are no <code>5xx</code> codes to count)</li>
             <li>An incident runbook merged that documents the rollback procedure for the next stage</li>
           </ul>
         </div>
@@ -682,7 +679,7 @@ EOF
         <h2 class="a-h">Decommission, <span class="em">save the receipts</span>.</h2>
         <p class="a-lede">A week after cutover, drop the dual-write fan-out and put the DynamoDB table into read-only mode. Keep it warm for a month as cold storage. Then archive it.</p>
         <p>The decommission step is procedural — no surprises. Drop the <code>dual_writer.go</code> path from your repo, point the DynamoDB IAM role at a read-only policy, and schedule a calendar reminder for 30 days out to delete the table. Most teams keep the table around longer than they need to — that's fine, and the cost is trivial.</p>
-        <p>What's not trivial: <b>save the DynamoDB invoice from the month before cutover</b>. Compare it to the VeltrixDB invoice three months later. That delta is the receipt you bring to the next budget review. We've seen customers cut their annual database spend by <b>$340K to $1.2M</b>, and that's the number your CFO will want to see in writing.</p>
+        <p>What's not trivial: <b>save the DynamoDB invoice from the month before cutover</b>. Compare it to the VeltrixDB invoice three months later. Remember that VeltrixDB's side of that comparison is your own infrastructure bill, since it is self-hosted. The delta is the receipt you bring to the next budget review, and the number your CFO will want to see in writing. (An earlier version quoted customer savings figures that we cannot source, so we have removed them.)</p>
       </div>
     </section>
 
@@ -703,13 +700,13 @@ EOF
         <a class="next" href="blog-benchmark.html">
           <span class="kind">Benchmark report</span>
           <h5>The 1B-Key Benchmark — methodology &amp; raw data</h5>
-          <p>Hardware specs, workload generator config, percentile distributions, and replayable harness.</p>
+          <p>The reproducible YCSB run with its exact conditions, and which figures from the internal 1B-key run are unverified.</p>
           <div class="m"><span>PDF · 32 pages</span><span>Read →</span></div>
         </a>
         <a class="next" href="blog-architecture.html">
           <span class="kind">Architecture deep-dive</span>
           <h5>Key-value separation &amp; why compaction shouldn't touch values</h5>
-          <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+          <p>How the VLog, the group-commit WAL and the LIRS cache fit together in the storage engine.</p>
           <div class="m"><span>Engineering blog · 18 min</span><span>Read →</span></div>
         </a>
       </div>
@@ -737,39 +734,43 @@ EOF
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
         <ul>
-          <li><a href="index.html#why">Platform</a></li>
-          <li><a href="performance.html#performance">Benchmark</a></li>
-          <li><a href="product.html#compare">Comparison</a></li>
-          <li><a href="product.html#how">Architecture</a></li>
+          <li><a href="product.html">Product</a></li>
+          <li><a href="performance.html">Performance</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
         </ul>
       </div>
       <div>
         <h5>Resources</h5>
         <ul>
-          <li><a href="blog-benchmark.html">Benchmark report</a></li>
-          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
-          <li><a href="blog-migration.html">Migration guide</a></li>
-          <li><a href="whitepaper.html">Whitepaper</a></li>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
+          <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
+          <li><a href="docs/operations/security.html">Security model</a></li>
+          <li><a href="blog-architecture.html">Blog · Architecture</a></li>
+          <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html#pricing">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v0.9.4-beta · build cb44a1f</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

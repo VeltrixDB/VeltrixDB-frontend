@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -96,12 +96,12 @@
 <p>Every applied write or delete is published to an in-process CDC stream, exposed as newline-delimited JSON (NDJSON) over HTTP:</p>
 <pre class="code-block"><code>curl http://localhost:2112/admin/cdc?prefix=</code></pre>
 <p>The optional <code>prefix</code> query parameter filters the stream to keys starting with that prefix; an empty prefix streams every event. Each line is a JSON object describing the operation:</p>
-<pre class="code-block"><code>{"Op":"PUT","Key":"orders/4521","Value":"...","Timestamp":1751464805123456789}
-{"Op":"DEL","Key":"orders/4400","Timestamp":1751464806012345678}</code></pre>
-<p>This endpoint is a live subscription — the connection stays open and streams events as they happen, similar to tailing a log.</p>
+<pre class="code-block"><code>{"Op":"PUT","Key":"orders/4521","Value":"...","Timestamp":1751464805123456}
+{"Op":"DEL","Key":"orders/4400","Timestamp":1751464806012345}</code></pre>
+<p><code>Timestamp</code> is microseconds since the Unix epoch, and <code>Value</code> is base64 (JSON encoding of the raw bytes). This endpoint is a live subscription — the connection stays open and streams events as they happen, similar to tailing a log.</p>
 
 <h2 id="repl-ship">Cross-process forwarding with repl-ship</h2>
-<p>The <code>repl-ship</code> binary subscribes to a local node's <code>/admin/cdc</code> endpoint and forwards each event to a remote VeltrixDB cluster over its binary protocol — <code>PUT</code> events become <code>MultiPut</code> calls, <code>DEL</code> events become deletes:</p>
+<p>The <code>repl-ship</code> binary subscribes to a local node's <code>/admin/cdc</code> endpoint and forwards each event to a remote VeltrixDB cluster over its binary protocol — each <code>PUT</code> event becomes a binary <code>PUT</code> (<code>0x01</code>) and each <code>DEL</code> event a binary <code>DEL</code> (<code>0x03</code>), sent one at a time:</p>
 <pre class="code-block"><code>go build -o repl-ship ./cmd/repl-ship
 
 repl-ship --src http://primary:2112 \
@@ -115,7 +115,7 @@ repl-ship --src http://primary:2112 \
 <tbody>
 <tr><td><code>--src</code></td><td><code>http://127.0.0.1:2112</code></td><td>Local VeltrixDB metrics/admin URL (CDC source)</td></tr>
 <tr><td><code>--dst-tcp</code></td><td>—</td><td>Remote VeltrixDB binary-protocol address (required)</td></tr>
-<tr><td><code>--batch</code></td><td><code>64</code></td><td>Max events per remote <code>MultiPut</code></td></tr>
+<tr><td><code>--batch</code></td><td><code>64</code></td><td>Events buffered before a flush (a flush also runs every 200 ms). The flag help says "per remote MultiPut", but events in a flush are still sent as individual binary PUT/DEL requests.</td></tr>
 <tr><td><code>--max-retries</code></td><td><code>5</code></td><td>Retry budget per event (exponential backoff) before deadlettering</td></tr>
 <tr><td><code>--deadletter</code></td><td><code>/var/log/repl-ship/deadletter.jsonl</code></td><td>Path for events that exhaust their retry budget</td></tr>
 <tr><td><code>--prefix</code></td><td>empty</td><td>CDC key-prefix filter; empty ships everything</td></tr>
@@ -126,7 +126,7 @@ repl-ship --src http://primary:2112 \
 </table>
 </div>
 <p>When the source node's admin API is guarded (<code>-admin-token</code> — see <a class="inline-link" href="security.html#admin-api-access-control">Admin API access control</a>), pass the same token to <code>repl-ship</code> via <code>--src-token</code> or the <code>VELTRIX_ADMIN_TOKEN</code> environment variable so it can authenticate against <code>/admin/cdc</code> and <code>/admin/changes</code>.</p>
-<p><code>repl-ship</code> maintains one persistent TCP connection to the destination and reconnects on error. On remote-write failure it retries with exponential backoff up to <code>--max-retries</code>, then appends the event to the deadletter file for manual replay. Conflict resolution beyond last-write-wins relies on the remote cluster's own version-vector deduplication — <code>repl-ship</code> does not resolve conflicts itself.</p>
+<p><code>repl-ship</code> maintains one persistent TCP connection to the destination and reconnects on error. On remote-write failure it reconnects and retries with exponential backoff (100 ms, 200 ms, 400 ms, &hellip;) up to <code>--max-retries</code>, then appends the event to the deadletter file for manual replay. Conflict resolution beyond last-write-wins relies on the remote cluster's own version-vector deduplication — <code>repl-ship</code> does not resolve conflicts itself.</p>
 
 <h2 id="durable-catch-up">Durable cross-region catch-up</h2>
 <p>The live CDC stream is in-memory: a subscriber that is down misses every event published while it was away. The <strong><code>/admin/changes</code></strong> feed closes that gap. It is an index-backed catch-up feed — it scans the index for entries written at or after a microsecond cursor, so a restarted shipper can replay exactly the delta it missed before rejoining the live stream:</p>
@@ -154,7 +154,11 @@ repl-ship --src http://primary:2112 \
 <p>Treat <code>repl-ship</code>-based replication as asynchronous, eventually-consistent geo-distribution. For durability across copies within a cluster, use the <a class="inline-link" href="../architecture/cluster-and-consensus.html">Raft or replication-engine consistency modes</a> described below, and use <a class="inline-link" href="backup-and-restore.html">backup/PITR</a> for point-in-time recoverability.</p>
 
 <h2 id="replication-modes">Replication consistency modes</h2>
-<p>CDC and <code>repl-ship</code> are one of two replication mechanisms in VeltrixDB. The other — Raft consensus for linearizable writes, and the primary-copy replication engine with <code>eventual</code>/<code>quorum</code>/<code>strong</code> consistency levels — operates independently of CDC and is the primary durability and consistency mechanism for clustered deployments. Those modes, their guarantees, and their trade-offs are covered in full in <a class="inline-link" href="../architecture/cluster-and-consensus.html">Cluster &amp; Consensus</a>; this page only covers the CDC/forwarding path.</p>
+<p>CDC and <code>repl-ship</code> are one of two replication mechanisms in VeltrixDB. The other — Raft consensus for linearizable writes, and the primary-copy replication engine with <code>eventual</code>/<code>quorum</code>/<code>strong</code> consistency levels — operates independently of CDC and is the primary durability and consistency mechanism for clustered deployments. Those modes, their guarantees, and their trade-offs are covered in full in <a class="inline-link" href="../architecture/cluster-and-consensus.html">Cluster &amp; Consensus</a>; this page only covers the CDC/forwarding path. Raft mode also compacts its log: once the retained log reaches the snapshot threshold (8192 entries) the node writes <code>raft_snapshot.gob</code>, and a lagging follower is brought up to date with <code>InstallSnapshot</code>.</p>
+<div class="callout warn">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">The C++ network front-end is standalone-only <span class="badge good">New in v1.7</span></span> The experimental <code>-net=cpp|uring|poll</code> front-end writes straight to the local engine, bypassing Raft and replication routing, so the server refuses to start with it in <code>-mode raft</code> or <code>-mode replicated</code>. Clustered nodes must use the default <code>-net=go</code>. A standalone destination running the C++ front-end can still receive <code>repl-ship</code> traffic, since it serves binary <code>MPUT</code> and <code>DEL</code>.</span>
+</div>
 
 <div class="card-grid">
   <a class="card" href="../architecture/cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Raft consensus, replication engine, and consistency modes in depth.</div></a>

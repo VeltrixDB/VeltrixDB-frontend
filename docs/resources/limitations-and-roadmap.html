@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -104,7 +104,9 @@
 
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Replicated mode is not linearizable</span> <code>replicated</code> mode is primary-copy replication for durability across copies; it has no single-writer ordering, so concurrent writers to the same key are not linearizable. <strong>Workaround:</strong> use <code>raft</code> mode instead when you need write linearizability; reserve <code>replicated</code> mode for durability-across-copies use cases with a single writer per key or where eventual consistency is acceptable. <strong>On the roadmap:</strong> not listed as a planned change &mdash; this is a deliberate architectural trade-off between the two modes, not a temporary gap.</span></div>
 
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No Redis protocol (RESP)</span> You can't point a Redis client at VeltrixDB yet. <strong>Workaround:</strong> use VeltrixDB's own text protocol (<code>nc</code>-compatible) or one of the six native SDKs &mdash; the command surface (<code>PUT</code>/<code>GET</code>/<code>DEL</code>, atomic ops) is intentionally close to Redis's, so porting client code is mostly a find-and-replace. <strong>On the roadmap:</strong> yes &mdash; RESP compatibility is listed under "What's coming" in the changelog. Once it ships, migration will require only a connection-string change, not a code change.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No Redis protocol (RESP)</span> You can't point a Redis client at VeltrixDB yet. <strong>Workaround:</strong> use VeltrixDB's own text protocol (<code>nc</code>-compatible) or one of the six native SDKs &mdash; the command surface (<code>PUT</code>/<code>GET</code>/<code>DEL</code>, atomic ops) is intentionally close to Redis's, so porting client code is mostly a find-and-replace. <strong>On the roadmap:</strong> yes &mdash; RESP compatibility is listed under "What's coming" in the changelog; nothing in the current code implements it.</span></div>
+<div class="callout limitation"><span class="icon"></span><span><span class="callout-title">The C++ network front-end is experimental <span class="badge good">New in v1.7</span></span> <code>--net=cpp|uring|poll</code> serves only the binary protocol's <code>PUT GET DEL PING MPUT MGET</code>, only in standalone mode, and refuses <code>--auth-config</code>; the text protocol, <code>AUTH</code>, TLS and every other command stay on the default <code>--net=go</code>. In CI measurements it lowered read P50 but had worse read P99 and ~12% lower batch-write throughput than the Go front-end, so it is opt-in and not faster overall. <strong>Workaround:</strong> keep <code>--net=go</code> unless you have measured a benefit on your hardware with <code>scripts/net-bench.sh</code>.</span></div>
+<div class="callout limitation"><span class="icon"></span><span><span class="callout-title">Some C++ components are not wired in</span> The ART index, the priority io_uring scheduler, the C++ VLog reader (SQPOLL), the hugepage allocator, <code>mlockall</code> and the eBPF GC throttle exist under <code>cpp/</code> but have no Go call site, so they do not run. The VLog read path is Go <code>pread</code>. The io_uring VLog write bridge is opt-in (<code>VELTRIXDB_URING_BRIDGE</code>, default off).</span></div>
 
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No managed cloud offering</span> VeltrixDB is self-hosted only today &mdash; there is no VeltrixDB Cloud or equivalent hosted SaaS. <strong>Workaround:</strong> deploy via the Helm chart or the Kubernetes Operator on your own cluster (GKE, EKS, AKS with local NVMe). <strong>On the roadmap:</strong> yes &mdash; a managed offering is explicitly listed as planned.</span></div>
 
@@ -120,15 +122,26 @@
 <li><strong>List and set data types</strong> &mdash; <code>LPUSH</code>/<code>RPUSH</code>/<code>LPOP</code>/<code>RPOP</code>/<code>LLEN</code>/<code>LRANGE</code> and <code>SADD</code>/<code>SREM</code>/<code>SISMEMBER</code>/<code>SMEMBERS</code>/<code>SCARD</code>.</li>
 <li><strong>Distributed routing for all data types</strong> &mdash; namespace, hash-field, vector, secondary-index, and list/set ops now go through the coordinator in raft and replicated modes (the residual index-<em>metadata</em> and local-read gaps above are what's left).</li>
 <li><strong>Durable cross-DC catch-up</strong> &mdash; the <code>/admin/changes</code> feed plus <code>repl-ship --checkpoint</code>: a restarted shipper replays exactly the delta it missed before rejoining the live CDC stream. See <a class="inline-link" href="../operations/replication-and-cdc.html">Replication &amp; CDC</a>.</li>
+<li><strong>Ordered range scans</strong> &mdash; <code>RANGE</code> and <code>SCANCUR</code> run over an ordered skiplist of every live key (~90 B/key); point-lookup-only deployments can turn it off with <code>--disable-ordered-index</code>. (The changelog's "What's coming" list still names native range/prefix scans; they are in the code.)</li>
+<li><strong>Raft log snapshots</strong> &mdash; once the retained log reaches 8192 entries the node writes <code>raft_snapshot.gob</code> and compacts the log; lagging followers catch up via <code>InstallSnapshot</code>. (Also still listed under "What's coming" in the changelog.)</li>
 <li><strong>PBKDF2 password hashing</strong> &mdash; PBKDF2-HMAC-SHA256 (210,000 iterations, per-user random salt) with legacy-hash fallback and a load-time deprecation warning. See <a class="inline-link" href="../operations/security.html">Security</a>.</li>
 </ul>
 
+<h2 id="next-release">Shipped in v1.6–v1.7 <span class="badge good">New</span></h2>
+<p>Released after v1.1.0 (v1.8 is the latest release):</p>
+<ul>
+<li><strong>Off-heap native index</strong> on every cgo build (including the Docker image); <code>VELTRIXDB_INDEX=map</code> opts out. Needs <code>vm.max_map_count &ge; 262144</code> at large key counts.</li>
+<li><strong>Binary WAL</strong> by default, with <code>--wal-format=text</code> for rollback; keys containing <code>|</code> or a newline no longer truncate replay.</li>
+<li><strong>Ordered-index overwrite skip</strong> (server batch writes 1.45M &rarr; 3.54M keys/s on macOS).</li>
+<li><strong>io_uring VLog bridge made opt-in</strong> (<code>VELTRIXDB_URING_BRIDGE</code>, default off).</li>
+<li><strong>Experimental C++ network front-end</strong> (<code>--net</code>, <code>--net-threads</code>) with deferred disk reads and a shutdown stage-latency report.</li>
+<li><strong><code>--pprof-addr</code></strong>, <strong><code>loadtest --proto</code></strong>, <strong><code>scripts/net-bench.sh</code></strong>, and <strong><code>veltrix-repair</code></strong>.</li>
+</ul>
+
 <h2 id="roadmap">What's coming</h2>
-<p>From the project changelog's "What's coming" section (items that shipped in v1.1.0 are listed above instead):</p>
+<p>From the project changelog's "What's coming" section, minus items that already exist in the code (listed above instead):</p>
 <ul>
 <li><strong>RESP protocol (Redis compatibility)</strong> &mdash; point Redis clients at VeltrixDB without code changes.</li>
-<li><strong>Raft log snapshots</strong> &mdash; prevent slow restarts on large clusters with 100+ GB WALs.</li>
-<li><strong>Native range/prefix scans</strong> &mdash; remove the <code>NSSCAN</code> workaround for sorted-data use cases.</li>
 <li><strong>Managed cloud offering.</strong></li>
 <li><strong>Multi-region replication</strong> &mdash; automatic cross-datacenter failover.</li>
 </ul>

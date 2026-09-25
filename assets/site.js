@@ -433,20 +433,26 @@ function makePathShapes3D(){
 
 /* ============ Scroll-reveal animations (subtle, professional) ============ */
 (function(){
+  if (!('IntersectionObserver' in window)) return; // no observer: leave everything visible
+  // Only animate what starts below the fold. Tagging content that is already
+  // on screen hid the page heading until the observer fired (a blank first
+  // paint on product/pricing), and on a deep link it hid what was linked to.
+  const below = el => el.getBoundingClientRect().top > window.innerHeight * 0.9;
+  const add = (el, cls) => { if (below(el)) el.classList.add(cls); };
   function tag(){
-    document.querySelectorAll('section .eyebrow, section h2.sh, section .sh-sub, section .origin h2').forEach(el => el.classList.add('reveal'));
+    document.querySelectorAll('section .eyebrow, section h2.sh, section .sh-sub, section .origin h2').forEach(el => add(el, 'reveal'));
     [
       '.outcomes', '.pains', '.pricing', '.cases',
       '.resources', '.metric-row', '.stats-grid', '.deploy-pills',
       '.deep', '.dash-grid', '.calc-cards', '.honest-grid'
     ].forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => el.classList.add('reveal-stagger'));
+      document.querySelectorAll(sel).forEach(el => add(el, 'reveal-stagger'));
     });
     [
       '.table-wrap', '.lat-wrap', '.path-demo', '.deploy', '.faq', '.news',
       '.pipe-wrap', '.globe-wrap', '.dash', '.calc', '.origin-body'
     ].forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => el.classList.add('reveal'));
+      document.querySelectorAll(sel).forEach(el => add(el, 'reveal'));
     });
   }
   tag();
@@ -459,36 +465,6 @@ function makePathShapes3D(){
     });
   }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
   document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => io.observe(el));
-})();
-
-/* ============ Hero 4.9 counter rollback (33 -> 4.9) ============ */
-(function(){
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-    const n = document.querySelector('.hero .big .num');
-    if (n) n.textContent = '4.9';
-    return;
-  }
-  const numEl = document.querySelector('.hero-kinetic .big .num');
-  if (!numEl) return;
-  let started = false;
-  function animate(){
-    if (started) return; started = true;
-    const target = 4.9, start = 33.0;
-    const dur = 1400;
-    const t0 = performance.now();
-    function step(now){
-      const k = Math.min(1, (now - t0)/dur);
-      // ease-out cubic
-      const e = 1 - Math.pow(1 - k, 3);
-      const v = start + (target - start) * e;
-      numEl.textContent = v.toFixed(1);
-      if (k < 1) requestAnimationFrame(step);
-      else numEl.textContent = target.toFixed(1);
-    }
-    requestAnimationFrame(step);
-  }
-  // start shortly after load
-  setTimeout(animate, 450);
 })();
 
 /* ============ Cost Calculator ============ */
@@ -670,7 +646,7 @@ const vxReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced
     const notes = [];
     let level = 'yes';
     if (a.q3 === 'writep99'){ level = 'partial';
-      notes.push('Sub-1ms durable writes conflict with our fsync-per-write group commit (~5&ndash;15 ms P50). If replication-based durability is acceptable (Q4), batched MultiPut gets close &mdash; pressure-test this in the demo.'); }
+      notes.push('Sub-1ms durable writes conflict with group commit: an acknowledged write waits for its batch&rsquo;s fdatasync, so write latency tracks the flush window (15 ms default; the YCSB load averaged 11 ms at a 5 ms window). Batched MPUT amortises it across many keys &mdash; pressure-test this in the demo.'); }
     if (a.q5 === 'zone'){
       notes.push('Zero-loss across a zone outage: start each node with --rack-id=&lt;zone&gt; and v1.1.0&rsquo;s rack-aware placement keeps every copy of a partition in a distinct zone &mdash; no manual pinning. It&rsquo;s new in this release, so rehearse the zone-failure drill before you rely on it.'); }
     if (a.q4 === 'fsync') notes.push('Every write fsynced: that&rsquo;s our default posture &mdash; group-commit WAL, durable before ACK.');

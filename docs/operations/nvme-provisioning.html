@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -139,6 +139,21 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
   <span><span class="callout-title">Do not format raw VLog devices</span> The provisioner must not run <code>mkfs.xfs</code> on any device designated for raw VLog use. WAL/segment XFS partitions belong on a separate slice of the disk (<code>xfsPartitionPercent</code>, typically 20% in production) or on the boot disk.</span>
 </div>
 <p>When device paths aren't explicitly configured, both the Operator and the Helm chart infer them as <code>/dev/nvme0n1</code> … <code>/dev/nvme(disksPerNode-1)n1</code> — the standard GKE local-NVMe naming convention.</p>
+
+<h2 id="host-sysctls">Host kernel settings</h2>
+<p>The repository ships <code>scripts/sysctl.conf</code> (copy to <code>/etc/sysctl.d/99-veltrixdb.conf</code> and run <code>sysctl --system</code>). These are node-level settings: in Kubernetes they must be applied on the node (node pool config, a privileged init DaemonSet, or the node image), not in the VeltrixDB pod.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td><code>vm.max_map_count</code></td><td><code>262144</code></td><td><strong>Required at large key counts on cgo builds</strong> (the default, including the Docker image). The off-heap native index mmaps each shard array of a page or more: ~3 per shard &times; 8192 shards, ~25K mappings per engine. With the kernel default of 65530, <code>mmap</code> can fail with <code>ENOMEM</code> and the server panics on insert. <span class="badge good">New in v1.6</span></td></tr>
+<tr><td><code>fs.file-max</code></td><td><code>2097152</code></td><td>Segment and WAL files per disk plus one descriptor per client connection.</td></tr>
+<tr><td><code>net.core.rmem_max</code> / <code>wmem_max</code>, <code>net.ipv4.tcp_rmem</code> / <code>tcp_wmem</code>, <code>netdev_max_backlog</code>, <code>tcp_max_syn_backlog</code></td><td>see file</td><td>High-concurrency client connections.</td></tr>
+<tr><td><code>vm.nr_hugepages</code></td><td><code>512</code></td><td>Only used by the C++ ART slab allocator, which has no Go call site today &mdash; the server does not need it.</td></tr>
+</tbody>
+</table>
+</div>
+<p>RLIMIT_MEMLOCK (<code>ulimit -l</code>, set through <code>limits.conf</code>) only matters if you opt in to the io_uring VLog write bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>; default off). Set the NVMe I/O scheduler to <code>none</code> per device after boot (<code>echo none &gt; /sys/block/nvme0n1/queue/scheduler</code>).</p>
 
 <h2 id="troubleshooting">Troubleshooting</h2>
 <div class="table-wrap">

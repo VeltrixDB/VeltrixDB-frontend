@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -154,18 +154,18 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
 
 <h3>Storage engine tuning</h3>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>numShards</code></td><td><code>1024</code></td><td>Index shard count. Must be a power of 2 and match the compiled C++ <code>kNumShards</code> constant. Changing on a live cluster requires a full data migration.</td></tr>
+<tr><td><code>numShards</code></td><td><code>1024</code></td><td>Has no effect on the server: the index always uses its compile-time shard count (8192; <code>StorageConfig.NumShards</code> is vestigial) and the server has no shard flag. Leave it at the default.</td></tr>
 <tr><td><code>keyValueSeparation</code></td><td><code>true</code></td><td>Enables WiscKey-style KV separation — only key metadata lives in SSTables; values append to a per-disk VLog.</td></tr>
 <tr><td><code>vlogGCThreshold</code></td><td><code>"0.40"</code> (operator default; CRD doc states 0.30)</td><td>Decimal string in <code>[0.0, 1.0]</code>. VLog garbage fraction that triggers defragmentation.</td></tr>
 <tr><td><code>lirRatio</code></td><td><code>"0.90"</code></td><td>Fraction of the LIRS cache reserved for the high-locality (LIR) resident set.</td></tr>
 <tr><td><code>autoTune</code></td><td><code>false</code></td><td>When true, the binary runs hardware detection at startup and derives cache size, shard count, compaction threads, and I/O mode itself; the operator omits <code>-cache</code> and passes <code>-auto-tune</code> instead.</td></tr>
 <tr><td><code>sysTune</code></td><td><code>true</code></td><td>Host-level tuning (sysctl, hugepages, CPU governor, IRQ balance, <code>RLIMIT_NOFILE</code>) via <code>hardware.SysTune</code>. Linux only; only meaningful when <code>autoTune</code> is true. Requires <code>CAP_SYS_ADMIN</code> or root.</td></tr>
-<tr><td><code>checkpointIntervalMs</code></td><td><code>0</code> (disabled)</td><td>WAL checkpoint interval. When non-zero, passed as <code>-wal-checkpoint-interval-ms</code>; checkpoint always runs on clean shutdown regardless.</td></tr>
+<tr><td><code>checkpointIntervalMs</code></td><td><code>0</code> (disabled)</td><td>WAL checkpoint interval. When non-zero, passed as <code>-wal-checkpoint-interval-ms</code>. <strong>Keep it at 0:</strong> the current server defines no such flag, and Go's flag parser makes it exit at startup with "flag provided but not defined". A clean shutdown always writes a compacted checkpoint (<code>wal.log.ckpt</code>, renamed over <code>wal.log</code>).</td></tr>
 </tbody></table></div>
 
 <h3>WAL / VLog flush</h3>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit flush window (ms). <strong>Must equal</strong> <code>vlogFlushWindowMs</code>.</td></tr>
+<tr><td><code>walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit flush window (ms). <strong>Must equal</strong> <code>vlogFlushWindowMs</code>. Overrides the server's own default of 15&nbsp;ms.</td></tr>
 <tr><td><code>vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms). WAL and VLog are submitted concurrently; effective P99 is the max of the two.</td></tr>
 <tr><td><code>walMaxBatchEntries</code></td><td><code>4096</code></td><td>Caps the WAL group-commit batch size before the flush timer fires early. Min 1, max 65536.</td></tr>
 </tbody></table></div>
@@ -267,7 +267,7 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. The VeltrixDB binary is expected to watch these annotations via the downward API and recompute its consistent-hash partition map / trigger the actual shard rebalance — the operator's role is limited to <strong>triggering</strong> the reshard, not performing the data movement itself.</li>
 <li>Records <code>status.lastScaleTime</code> and a <code>status.partitionMap</code> summary string.</li>
 </ol>
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scale-down is not specially handled</span> The resharding trigger only fires when the new size is <em>greater</em> than the previous size. Scaling down updates the StatefulSet's replica count (removing the highest-ordinal pods) but does not go through the same annotate-and-wait resharding path.</span></span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scale-down is not specially handled</span> The resharding trigger only fires when the new size is <em>greater</em> than the previous size. Scaling down updates the StatefulSet's replica count (removing the highest-ordinal pods) but does not go through the same annotate-and-wait resharding path.</span></div>
 
 <h3>Self-healing — partially confirmed</h3>
 <p>The operator itself does not run a custom pod-replacement loop; it relies on the standard StatefulSet controller to recreate any pod that is deleted or fails its liveness probe, which is the same "self-healing" every StatefulSet gets from Kubernetes. What the operator adds on top:</p>
@@ -284,6 +284,13 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <pre class="code-block"><code>kubectl patch veltrixcluster my-cluster -n veltrixdb \
   --type merge --patch '{"spec":{"size":5}}'</code></pre>
 <p>Increasing <code>spec.size</code> triggers the StatefulSet to add pods and, once they are ready, the reshard-trigger flow described above.</p>
+
+<h2 id="node-requirements">Node, seccomp and image notes</h2>
+<ul>
+<li>The official image is built with <code>CGO_ENABLED=1</code> (distroless <code>cc-debian12</code> base), so the server uses the off-heap native index by default. <span class="badge good">New in v1.6</span> It needs <code>vm.max_map_count &ge; 262144</code> on the <strong>node</strong> at large key counts &mdash; a container cannot set it. Configure it in the node pool / node image or a privileged DaemonSet, or set <code>VELTRIXDB_INDEX=map</code> in the pod env.</li>
+<li>The <code>RuntimeDefault</code> seccomp profile blocks <code>io_uring_setup</code>. That only matters for the opt-in io_uring VLog write bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>; default off), which then falls back to <code>pwrite</code>. The <code>rawVLog.enabled</code> path above already sets <code>seccompProfile: Unconfined</code>.</li>
+<li>The experimental C++ network front-end (<code>-net=cpp|uring|poll</code>) is refused in <code>-mode raft</code> and <code>-mode replicated</code> and with <code>-auth-config</code>, so any multi-node or RBAC-enabled cluster must keep the default <code>-net=go</code>.</li>
+</ul>
 
 <h2 id="troubleshooting">Troubleshooting</h2>
 <div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead><tbody>

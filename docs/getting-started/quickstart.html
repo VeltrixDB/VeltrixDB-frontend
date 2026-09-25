@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -94,8 +94,15 @@
 
 <h2 id="run-with-docker">Run with Docker</h2>
 <p>No build required. Pull and run the published image, then talk to it over the text protocol using <code>nc</code>:</p>
-<pre class="code-block"><code>docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb:latest</code></pre>
+<pre class="code-block"><code>docker run -p 9000:9000 -p 2112:2112 ghcr.io/veltrixdb/veltrixdb:latest</code></pre>
+<p>Port <code>9000</code> is the storage protocol; <code>2112</code> serves metrics and health checks (used in <a class="inline-link" href="#verify-its-running">Verify it's running</a>). Among the startup log lines you should see:</p>
+<pre class="code-block"><code>[index] implementation=native (native = off-heap C++ table, invisible to the Go GC; set VELTRIXDB_INDEX=map to opt out)
+[server] plaintext listening on :9000
+[tls] disabled — TLS listener not started
+[server] ready — plain: :9000  tls: off</code></pre>
+<p>The <code>[index]</code> line appears on the current development build <span class="badge good">New in v1.6</span>; a <code>CGO_ENABLED=0</code> build uses the Go map index. Then send a few commands:</p>
 <pre class="code-block"><code>echo -e "PUT hello world\nGET hello\nPING" | nc localhost 9000</code></pre>
+<p>You should see <code>OK</code>, <code>world</code>, then <code>PONG</code> printed back.</p>
 
 <p>The same socket speaks every data type — counters, hashes, lists, sets, and vector search:</p>
 <pre class="code-block"><code># atomic counter
@@ -110,13 +117,11 @@ echo -e "RPUSH queue job-1\nLPOP queue\nSADD tags red\nSMEMBERS tags" | nc local
 # vector search (HNSW)
 echo -e "VSET doc:1 0.12 0.94 0.31\nVSEARCH 3 0.10 0.90 0.30" | nc localhost 9000</code></pre>
 <p>Full syntax for every command is in the <a class="inline-link" href="../concepts/wire-protocol.html">wire protocol reference</a>; the type semantics live in the <a class="inline-link" href="../concepts/data-model.html">data model</a>.</p>
-<p>You should see <code>OK</code>, <code>world</code>, then <code>PONG</code> printed back.</p>
-
 <h2 id="build-from-source">Build from source</h2>
-<p>VeltrixDB's Go layer is cross-platform and builds cleanly on macOS and Linux. You'll need <strong>Go 1.19+</strong>.</p>
-<pre class="code-block"><code>go build ./...
+<p>VeltrixDB builds on macOS and Linux. A default build uses cgo and needs a C++ compiler (and liburing on Linux); set <code>CGO_ENABLED=0</code> for a pure-Go build, which needs only <strong>Go 1.19+</strong>. See <a class="inline-link" href="installation.html#build-from-source">Installation</a> for details.</p>
+<pre class="code-block"><code>go build ./...                  # or: CGO_ENABLED=0 go build ./...
 go run ./cmd/server -addr :9000 -data ./dev-data -cache 256</code></pre>
-<p>This starts a single-node server listening on <code>:9000</code>, writing to a local <code>./dev-data</code> directory, with a 256 MB LIRS cache. On Linux, the optional C++ acceleration layer (io_uring, ART index, NUMA pinning) is used automatically for production-grade throughput; the Go path works everywhere else.</p>
+<p>This starts a single-node server listening on <code>:9000</code>, writing to a local <code>./dev-data</code> directory, with a 256 MB LIRS cache (the default). The network front-end is the Go server (<code>--net=go</code>) serving the text and binary protocols. On a cgo build the in-memory index uses off-heap C++ tables; everything else on the serving path — WAL, VLog reads and writes, the cache — is Go unless you opt in to the io_uring bridge or the experimental <code>--net=cpp</code> front-end.</p>
 
 <h3>8-disk production example</h3>
 <p>For production hardware with multiple NVMe disks, pass them as a comma-separated list via <code>-data-dirs</code> so shards fan out across all disks in parallel:</p>
@@ -152,7 +157,7 @@ curl http://localhost:2112/metrics   # Prometheus scrape endpoint</code></pre>
 </tbody>
 </table>
 </div>
-<p>You can also open the built-in web dashboard at <code>http://localhost:2112/admin/ui</code>.</p>
+<p>You can also open the built-in web dashboard at <code>http://localhost:2112/admin/ui</code>. Without <code>--admin-token</code> (or <code>VELTRIX_ADMIN_TOKEN</code>), <code>/admin/*</code> accepts only loopback connections — from outside a Docker container, set a token; <code>/metrics</code>, <code>/healthz</code> and <code>/readyz</code> are always unauthenticated.</p>
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Admin endpoints are powerful</span> The <code>/admin</code> surface can trigger destructive operations (checkpoints, cluster topology). Never expose port <code>2112</code> to untrusted networks.</span></div>
 
 <div class="card-grid">

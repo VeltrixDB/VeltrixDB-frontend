@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -90,7 +90,7 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Monitoring & Observability</div>
     <h1>Monitoring &amp; Observability</h1>
-<p class="page-lede">VeltrixDB exposes a Prometheus scrape endpoint, liveness/readiness probes, and a web dashboard, all served from the same admin HTTP port alongside 60+ Prometheus metrics.</p>
+<p class="page-lede">VeltrixDB exposes a Prometheus scrape endpoint, liveness/readiness probes, and a web dashboard, all served from the same admin HTTP port alongside 80+ Prometheus metrics.</p>
 
 <h2 id="endpoints">Endpoints</h2>
 <pre class="code-block"><code>curl http://localhost:2112/metrics   # Prometheus scrape endpoint
@@ -100,12 +100,12 @@ open http://localhost:2112/admin/ui  # web dashboard</code></pre>
 <p>All of these are served on the admin/metrics port (<code>2112</code> by default), separate from the client data port (<code>9000</code> by default). <code>/healthz</code> and <code>/readyz</code> are suitable as Kubernetes liveness and readiness probes respectively; the bundled Helm chart wires them in for you.</p>
 
 <h2 id="key-metrics">Key metrics to watch</h2>
-<p>VeltrixDB exposes <strong>60+ Prometheus metrics</strong> under the <code>veltrixdb_</code> prefix. The core set to alert on:</p>
+<p>VeltrixDB exposes <strong>80+ Prometheus metrics</strong> under the <code>veltrixdb_</code> prefix. The core set to alert on:</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Metric</th><th>Healthy value</th></tr></thead>
 <tbody>
-<tr><td><code>veltrixdb_writes_total</code> / <code>veltrixdb_reads_total</code></td><td>Growing under load</td></tr>
+<tr><td><code>veltrixdb_storage_writes_total</code> / <code>veltrixdb_storage_reads_total</code></td><td>Growing under load</td></tr>
 <tr><td><code>veltrixdb_cache_hits_total</code> / <code>veltrixdb_cache_misses_total</code></td><td>Hit rate &gt; 90%</td></tr>
 <tr><td><code>veltrixdb_storage_write_admission_throttles_total</code></td><td>0</td></tr>
 <tr><td><code>veltrixdb_vlog_garbage_ratio</code></td><td>&lt; 0.30</td></tr>
@@ -127,18 +127,21 @@ open http://localhost:2112/admin/ui  # web dashboard</code></pre>
 <tr><td><code>veltrixdb_vlog_file_bytes</code></td><td>VLog size per NVMe disk — also the numerator for capacity planning against PVC size</td></tr>
 <tr><td><code>veltrixdb_vlog_gc_runs_total</code> / <code>veltrixdb_vlog_gc_bytes_total</code></td><td>Background GC activity</td></tr>
 <tr><td><code>veltrixdb_storage_index_size_keys</code></td><td>In-memory index size (keys held in DRAM)</td></tr>
+<tr><td><code>veltrixdb_storage_native_index_bytes</code> <span class="badge good">New in v1.6</span></td><td>Bytes held off the Go heap by the native C++ index (0 when the Go map index is in use). Not included in <code>go_memstats_*</code>, so add it to heap metrics when sizing memory</td></tr>
+<tr><td><code>veltrixdb_vlog_disk_slow</code> / <code>veltrixdb_vlog_disk_read_latency_ewma_seconds</code></td><td>Per-disk slow-disk flag and smoothed read latency</td></tr>
+<tr><td><code>veltrixdb_scrub_corruption_total</code></td><td>CRC32C mismatches found by the background scrubber &mdash; should stay 0</td></tr>
 <tr><td><code>veltrixdb_cluster_nodes_total</code></td><td>Cluster topology size, for multi-node deployments</td></tr>
 </tbody>
 </table>
 </div>
 <p>Useful PromQL for day-to-day operation:</p>
-<pre class="code-block"><code>rate(veltrixdb_writes_total[1m])                                    # write throughput
-rate(veltrixdb_reads_total[1m])                                     # read throughput
+<pre class="code-block"><code>rate(veltrixdb_storage_writes_total[1m])                            # write throughput
+rate(veltrixdb_storage_reads_total[1m])                             # read throughput
 
 rate(veltrixdb_cache_hits_total[5m]) /
   (rate(veltrixdb_cache_hits_total[5m]) + rate(veltrixdb_cache_misses_total[5m])) # hit ratio
 
-rate(veltrixdb_writes_total[1m]) / rate(veltrixdb_wal_flushes_total[1m])          # WAL amortization
+rate(veltrixdb_storage_writes_total[1m]) / rate(veltrixdb_storage_wal_flushes_total[1m])  # WAL amortization
 
 histogram_quantile(0.99, rate(veltrixdb_storage_read_latency_seconds_bucket[5m])) # P99 read</code></pre>
 
@@ -149,7 +152,7 @@ histogram_quantile(0.99, rate(veltrixdb_storage_read_latency_seconds_bucket[5m])
 <li><strong>Reads still try the device</strong> — data may be partially readable — and are served from cache when possible.</li>
 <li><strong>GC and compaction skip the failed disk.</strong></li>
 <li><strong><code>/readyz</code> returns <code>503</code></strong> with a body like <code>degraded: disks [2] failed</code>, so orchestrators (Kubernetes readiness probes) stop routing new traffic to the node while reads keep being served.</li>
-<li><strong><code>INFO</code> reports <code>FAILED_DISKS=[2]</code></strong>, and the engine's <code>DiskFailures</code> metric counts breaker trips.</li>
+<li><strong><code>INFO</code> reports <code>FAILED_DISKS=[2]</code></strong>, and the engine's internal <code>DiskFailures</code> counter records breaker trips (it is not exported as a Prometheus series; alert on <code>/readyz</code> or <code>INFO</code>).</li>
 </ul>
 <div class="callout warn">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
@@ -166,7 +169,14 @@ curl    http://localhost:2112/admin/cluster     # topology: role, raft term/lead
 
 <h2 id="grafana">Grafana dashboards</h2>
 <p>The repository ships provisioned Grafana dashboards under <code>grafana/</code> — a Prometheus datasource definition, a dashboard provider config, and dashboard JSON including a full-stack operational dashboard (<code>veltrixdb_dashboard.json</code>) covering write/read throughput, write/read/delete latency percentiles, LIRS cache hit rate and evictions, per-disk VLog size and garbage ratio, and GC run rate. A separate CI-focused dashboard (<code>ci_dashboard.json</code>) is also included. These are ready to mount into a Grafana provisioning directory alongside the Prometheus scrape config.</p>
-<p>The Kubernetes deployment additionally installs a <code>ServiceMonitor</code> for automatic Prometheus scraping and a set of 22 <code>PrometheusRule</code> alerts covering slow disk, GC emergency, corruption detection, and replication lag conditions out of the box.</p>
+<p>The repository also ships <code>monitoring/servicemonitor.yaml</code> for automatic Prometheus scraping and <code>monitoring/prometheus-rules.yaml</code>, a <code>PrometheusRule</code> with 9 alerts: write throttling active, VLog GC stalled, VLog read errors, low cache hit rate, high read latency, node failed, partitions under-replicated, disk usage high, and process restarted. Review it before relying on it: the node-failed, under-replicated and disk-usage rules reference series the server does not currently export (<code>veltrixdb_fd_failed_nodes</code>, <code>veltrixdb_cluster_partitions_total</code>/<code>_healthy_partitions_total</code>, <code>veltrixdb_storage_segment_bytes_total</code>), so they never fire as written.</p>
+
+<h2 id="profiling">Profiling <span class="badge good">New in v1.7</span></h2>
+<p>Start the server with <code>-pprof-addr=127.0.0.1:6060</code> to serve CPU, heap, goroutine and execution-trace profiles on a separate listener (never the metrics port):</p>
+<pre class="code-block"><code>go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30   # CPU
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap                 # heap
+curl -o trace.out 'http://127.0.0.1:6060/debug/pprof/trace?seconds=5' # execution trace</code></pre>
+<p>When the experimental C++ network front-end (<code>-net=cpp|uring|poll</code>) is in use, the server also logs a per-stage latency report at shutdown (stages <code>iter</code>, <code>cb_enter</code>, <code>exec</code>, <code>put_sched</code>, <code>put_exec</code>, <code>wake</code>, <code>defer_sched</code>, <code>defer_exec</code>; log2 &micro;s buckets).</p>
 
 <div class="card-grid">
   <a class="card" href="performance-tuning.html"><div class="card-title">Performance Tuning →</div><div class="card-desc">Interpreting these metrics to tune cache, flush windows, and admission control.</div></a>

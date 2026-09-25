@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -103,30 +103,49 @@
 </div>
 
 <h2 id="system-diagram">System diagram</h2>
+<p>The serving path is Go, with two C++ exceptions on a cgo build: the per-shard index tables live off the Go heap in C++ (default on every cgo build, macOS included), and <code>--net=cpp</code> swaps in an opt-in C++ network front-end. Dashed boxes are optional / opt-in.</p>
 <pre class="code-block"><code>Client (any SDK or nc)
-        │  TCP — binary or text protocol
-        ▼
-┌─────────────────────────────────────────┐
-│  TCP Server (cmd/server)                │
-│  1 goroutine/conn · pipeline coalescing │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  Storage Engine (storage/engine.go)     │
-│                                         │
-│  In-Memory Index   LIRS Cache           │
-│  8192 shards       hot values in RAM    │
-│                                         │
-│  WAL (per disk)    VLog (per disk)      │
-│  group-commit      append-only values   │
-└──────────────────┬──────────────────────┘
-                   │ (Linux production only)
-                   ▼
-┌─────────────────────────────────────────┐
-│  C++ Layer                              │
-│  ART index · io_uring · NUMA pinning    │
-└─────────────────────────────────────────┘</code></pre>
+        │ TCP                                  ┆ TCP (opt-in)
+        ▼                                      ▼
+┌──────────────────────────────────┐  ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┐
+│ TCP Server (cmd/server)          │  ┆ C++ network front-end (netfront/)┆
+│ --net=go (default)               │  ┆ --net=cpp | uring | poll         ┆
+│ 1 goroutine per conn             │  ┆ event loop per core              ┆
+│ binary + text protocol           │  ┆ binary PUT GET DEL PING MPUT MGET┆
+│ PUT/GET coalescing, cap 256      │  ┆ disk-bound reads → goroutines    ┆
+│   → MultiPut / MultiGet          │  ┆ standalone only                  ┆
+└────────────────┬─────────────────┘  └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┬┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘
+                 │                                   ┆ vxnfExec, once per
+                 ▼                                   ┆ loop iteration
+┌────────────────────────────────────────────────────▼────────────┐
+│ Storage Engine (storage/engine.go)                              │
+│ Shard routing: FNV-1a(key) &amp; 0x1FFF → 0..8191                   │
+│                                                                 │
+│ Index Vault              Bloom filter       Sharded LIRS cache  │
+│ 8192 shards, RWMutex     lock-free,         up to 256 caches,   │
+│ 64 B entry, no values    per shard          keyed on high bits  │
+│ off-heap C++ table on cgo builds,                               │
+│ Go map when CGO_ENABLED=0                                       │
+│                                                                 │
+│ Value transform: compress → encrypt (single chokepoint)         │
+└────────────────────────────────┬────────────────────────────────┘
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Per NVMe disk — N independent sets                              │
+│ WAL: binary records, CRC32C, one write + one fdatasync / window │
+│ VLog: append-only, lock-free reservation,                       │
+│       one pwrite + one fdatasync per batch                      │
+│ Segment writer (O_DIRECT)                                       │
+│ ── Defragmenter + VLog GC (3-tier) · Scrubber (CRC32C walk)     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┐
+┆ C++ storage extras — Linux + CGO_ENABLED=1 (Docker image default)┆
+┆ batch engine + NUMA pinning (BatchPut / WriteBatcher only)       ┆
+┆ io_uring VLog write bridge — opt-in, VELTRIXDB_URING_BRIDGE      ┆
+┆ VELTRIXDB_DISABLE_CGO_ENGINE=1 turns these off                   ┆
+└┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘</code></pre>
+<p><span class="badge good">New in v1.6–v1.7</span> The native index default, the binary WAL, the opt-in io_uring bridge and the <code>--net</code> C++ front-end shipped in v1.6 (native index, binary WAL) and v1.7 (opt-in io_uring bridge, <code>--net</code> front-end).</p>
 
 <h2 id="sharding">Sharding</h2>
 <p>All data is split across <strong>8192 shards</strong>. Each shard has its own lock, so a read on shard 5 never blocks a read on shard 42.</p>
@@ -139,11 +158,11 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <table>
 <thead><tr><th>Component</th><th>Role</th></tr></thead>
 <tbody>
-<tr><td><strong>In-memory index</strong></td><td>A hash map per shard (Go) or an Adaptive Radix Tree (C++). Each entry stores disk offset, disk index, value size, flags, and a monotone version counter — about 64 bytes per key.</td></tr>
-<tr><td><strong>LIRS cache</strong></td><td>Scan-resistant eviction. Small values (≤256 B) get eviction priority 2 vs. priority 1 for larger values, so a big sequential scan can't push your hot working set out of RAM. Sized with <code>-cache &lt;MB&gt;</code>.</td></tr>
-<tr><td><strong>WAL (Write-Ahead Log)</strong></td><td>Group-commit: many concurrent writers share one <code>fdatasync</code> call per flush window (default 10 ms). One WAL file per disk.</td></tr>
-<tr><td><strong>VLog (Value Log)</strong></td><td>Append-only file per disk. Values live here; the index holds only metadata (this is the WiscKey KV-separation). Appends are lock-free via atomic offset reservation.</td></tr>
-<tr><td><strong>Block packing</strong></td><td>Batched writes (MultiPut) pack up to 26 records per 4&nbsp;KB VLog block. For 128 B values that's 152 bytes of overhead per record instead of 4096 — a 27× density improvement. A single <code>Put</code> stays on the unpacked fast path.</td></tr>
+<tr><td><strong>In-memory index</strong></td><td>One table per shard. On a cgo build it is an off-heap C++ table (<code>storage/native_index.cpp</code>) invisible to the Go GC; <code>CGO_ENABLED=0</code>, <code>VELTRIXDB_INDEX=map</code> or <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> select a Go map. Each entry stores disk offset, disk index, value size, flags, TTL and a monotone version counter — about 64 bytes per key, no value bytes. Large engines on the native table need <code>vm.max_map_count ≥ 262144</code>. A separate ordered skiplist serves <code>RANGE</code> / <code>SCANCUR</code>. (The C++ ART index under <code>cpp/</code> is not wired to Go.)</td></tr>
+<tr><td><strong>LIRS cache</strong></td><td>Scan-resistant eviction. Small values (≤256 B) get eviction priority 2 vs. priority 1 for larger values, so a big sequential scan can't push your hot working set out of RAM. Split across up to 256 independent caches, each with its own mutex. Sized with <code>-cache &lt;MB&gt;</code> (default 256 MB).</td></tr>
+<tr><td><strong>WAL (Write-Ahead Log)</strong></td><td>Group-commit: many concurrent writers share one <code>write(2)</code> and one <code>fdatasync</code> per flush window (default 15 ms). One WAL file per disk. Records are binary and checksummed with CRC32C.</td></tr>
+<tr><td><strong>VLog (Value Log)</strong></td><td>Append-only file per disk. Values live here; the index holds only metadata (this is the WiscKey KV-separation). Appends are lock-free via atomic offset reservation; a batch reserves its whole extent with one add and writes it with one <code>pwrite</code> and one <code>fdatasync</code>.</td></tr>
+<tr><td><strong>Block packing</strong></td><td>Batched writes (MultiPut) pack up to 26 records per 4&nbsp;KB VLog block. For 128 B values each record takes 152 bytes (24 B header + value) instead of a whole 4096-byte block — a 27× density improvement. A single <code>Put</code> stays on the unpacked fast path.</td></tr>
 </tbody>
 </table>
 </div>
@@ -163,18 +182,20 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
   <span>If the process crashes after step 2 but before step 3, the value is orphaned on disk but was never made visible to any reader — that's safe by construction, not an edge case that's merely tolerated.</span>
 </div>
+<p>The batch path (<code>MultiPut</code>) keeps the same order per disk, with one <code>pwrite</code> for the VLog extent and one WAL item for the batch. <span class="badge good">New in v1.6</span> It refreshes only keys already in the cache (<code>PutIfPresent</code>) instead of inserting, so bulk writes do not evict the read working set; a single <code>Put</code> stays write-through. The ordered (range-scan) index is touched only when a key becomes live, not on overwrites.</p>
 
 <h2 id="read-path">Read path</h2>
 <p>What happens on <code>GET user:42</code>:</p>
 <ol>
-<li>Hash the key → shard 307</li>
-<li>LIRS cache hit → return the value with no disk I/O (~220 ns)</li>
-<li>Cache miss → take a read lock on shard 307, look up the index entry</li>
-<li>Not in the index → <code>NOT_FOUND</code></li>
-<li>In the index → read the value from the VLog at the recorded disk offset (~400 µs on NVMe)</li>
-<li>Insert the value into the cache</li>
+<li>Hash the key once → cache shard (high bits) and index shard 307 (low 13 bits)</li>
+<li>LIRS cache hit → return the value with no disk I/O (~92 ns in-process)</li>
+<li>Cache miss → Bloom filter says "definitely absent" → <code>NOT_FOUND</code> with no index lookup</li>
+<li>Otherwise take a read lock on shard 307 and look up the index entry; absent → <code>NOT_FOUND</code>, expired TTL → expired</li>
+<li>Found → read the value from the VLog at the recorded disk offset: a Go 4 KB-aligned <code>pread</code> that verifies magic and CRC32C</li>
+<li>Decrypt → decompress, then insert the value into the cache</li>
 <li>Return the value</li>
 </ol>
+<p><span class="badge good">New in v1.7</span> <code>StorageEngine.GetNoIO</code> runs the same flow but stops before the VLog read and returns <code>needIO=true</code>; <code>GetAfterNoIO</code> finishes the key. The opt-in C++ network front-end uses it so disk reads never run on an event-loop thread.</p>
 
 <h2 id="admission-control">Admission control</h2>
 <p>Background garbage collection competes with foreground reads for NVMe bandwidth. VeltrixDB tracks an EWMA of read latency and throttles GC before reads degrade:</p>
@@ -182,30 +203,36 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <table>
 <thead><tr><th>Read EWMA</th><th>Action</th></tr></thead>
 <tbody>
-<tr><td>&lt; 3 ms</td><td>Normal — GC runs at full speed</td></tr>
-<tr><td>≥ 3 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
-<tr><td>≥ 4 ms</td><td>GC paused entirely; each <code>PUT</code> sleeps 2 ms to shed load</td></tr>
-<tr><td>&lt; 2 ms (recovery)</td><td>Everything resumes at full speed</td></tr>
+<tr><td>&lt; 15 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>≥ 15 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
+<tr><td>&gt; 20 ms</td><td>GC paused entirely; each <code>PUT</code> sleeps 2 ms to shed load</td></tr>
+<tr><td>&lt; 10 ms (recovery)</td><td>Everything resumes at full speed</td></tr>
 <tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale and GC resumes regardless</td></tr>
 </tbody>
 </table>
 </div>
 <p>See <a class="inline-link" href="admission-control.html">Admission Control &amp; GC</a> for the full escalation ladder, including the emergency GC tier that bypasses admission pauses to prevent a garbage death-spiral.</p>
 
-<h2 id="cpp-layer">C++ layer (Linux only)</h2>
-<p>On Linux, VeltrixDB loads an optional C++ acceleration layer for production throughput. The Go layer is fully functional on its own and is what runs on macOS and in development.</p>
+<h2 id="cpp-layer">C++ layer and network front-ends</h2>
+<p>The Go layer is fully functional on its own. C++ is optional, and less of it is wired up than the <code>cpp/</code> file tree suggests:</p>
 <div class="table-wrap">
 <table>
-<thead><tr><th>Component</th><th>Replaces</th><th>Why it's faster</th></tr></thead>
+<thead><tr><th>Component</th><th>Source</th><th>Reachable from Go?</th></tr></thead>
 <tbody>
-<tr><td>ART index</td><td>Go hash map</td><td>Faster range scans, prefix compression</td></tr>
-<tr><td>io_uring scheduler</td><td>Blocking <code>pwrite</code></td><td>3-tier I/O priority — foreground reads always beat background compaction</td></tr>
-<tr><td>SQPOLL VLog reader</td><td>Blocking <code>pread</code></td><td>Zero-syscall NVMe reads</td></tr>
-<tr><td>NUMA thread pinning</td><td>Default OS scheduler</td><td>Eliminates cross-socket memory latency</td></tr>
+<tr><td>Index Vault (off-heap shard tables) <span class="badge good">New in v1.6</span></td><td><code>storage/native_index.cpp</code></td><td>Yes — default on every cgo build, including macOS</td></tr>
+<tr><td>Vectorized batch put</td><td><code>batch_engine.cpp</code></td><td>Yes — only the fire-and-forget <code>BatchPut</code> / <code>WriteBatcher</code> path</td></tr>
+<tr><td>NUMA thread pinning</td><td><code>numa_topology.cpp</code></td><td>Yes — pins the batch engine's threads</td></tr>
+<tr><td>io_uring VLog write bridge <span class="badge good">New in v1.7</span></td><td><code>storage_bridge.cpp</code></td><td>Yes, opt-in (Linux) — <code>VELTRIXDB_URING_BRIDGE=on</code> or <code>sqpoll</code>; default off</td></tr>
+<tr><td>SQPOLL reader</td><td><code>uring_reader.cpp</code></td><td>No — compiled in, no Go call site</td></tr>
+<tr><td>ART index, priority io_uring scheduler, C++ VLog reader, LIRS cache, defragmenter, eBPF GC throttle</td><td><code>cpp/</code></td><td>No — compiled, no Go call site</td></tr>
 </tbody>
 </table>
 </div>
-<p>The C++ layer shaves roughly 25 µs off the NVMe read P99 on production hardware.</p>
+<p>The VLog read path is Go (<code>storage/vlog.go</code> <code>ReadValue</code>), not io_uring. <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> turns off the batch engine and bridge and selects the Go map index.</p>
+
+<h3>Network front-ends (<code>--net</code>) <span class="badge good">New in v1.7</span></h3>
+<p><code>--net=go</code> (default) is one goroutine per connection and serves every protocol and command. <code>--net=cpp</code> / <code>uring</code> / <code>poll</code> selects the C++ front-end in <code>netfront/</code>: one event loop per core (<code>--net-threads</code>, default NumCPU), each with its own <code>SO_REUSEPORT</code> listener, io_uring on Linux and <code>poll()</code> elsewhere. Each loop iteration calls Go once (<code>vxnfExec</code>) for all parsed requests. Reads that need no disk are answered inline via <code>GetNoIO</code>; reads that need a VLog read, and all writes, run on goroutines, and a connection with such a request in flight is not parsed further, so each connection stays strictly ordered. At shutdown the server logs a per-stage latency report.</p>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Experimental</span> The C++ front-end serves only the binary protocol's PUT, GET, DEL, PING, MPUT and MGET, only in <code>--mode=standalone</code>, and the server refuses it with <code>--auth-config</code>. TLS, AUTH, the text protocol and extended binary commands stay on <code>--net=go</code>. On a 4-CPU CI runner (measured before reads were deferred) it cut read P50 against <code>--net=go</code> but had a worse read P99 and ~12% lower batch-write throughput. It is not faster overall; benchmark it on your own hardware.</span></div>
 
 <h2 id="cluster-layer">Cluster layer at a glance</h2>
 <pre class="code-block"><code>cluster/      partition_map.go     consistent-hash ring (FNV-1a, 64 vnodes/node), epoch fencing

@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -94,6 +94,7 @@
 
 <h2 id="keys-and-values">Keys and values</h2>
 <p>A key is an arbitrary byte string and a value is an arbitrary byte string. VeltrixDB does not interpret or type-check value contents at the storage layer — encoding (JSON, protobuf, msgpack, raw binary) is entirely up to the application. Internally, every key maps to exactly one 64-byte <code>IndexEntry</code> in the in-memory index (the "Index Vault"), which stores the disk offset, segment ID, value size, write timestamp, TTL deadline, and a version counter. The value itself lives in the per-disk append-only Value Log (VLog); the index never holds value bytes, which is what keeps random-access lookups to a single cache-line fetch plus, at worst, one NVMe read.</p>
+<p><span class="badge good">New in v1.6</span> With the binary WAL format (the default since v1.6), keys containing <code>|</code> or <code>\n</code> are fully crash-safe. With the text WAL of v1.5 and earlier — and with <code>--wal-format=text</code> — such a key stops crash replay at its record, so later acknowledged writes can be lost on a crash restart; avoid those bytes in keys on v1.5 and earlier. See <a class="inline-link" href="../architecture/storage-engine.html#write-ahead-log">Storage Engine</a>.</p>
 
 <h2 id="ttl">Per-key TTL</h2>
 <p>Every <code>PUT</code> accepts an optional TTL in seconds. A key written with a TTL carries an absolute expiry timestamp (<code>TTLExpiryUs</code>) in its index entry; a TTL of <code>0</code> or a negative value means the key is immortal (no expiry). Expiry is checked lazily on read (a <code>GET</code> against an expired key returns not-found) and is also swept by a background TTL scanner so expired entries don't linger indefinitely and get reclaimed by VLog garbage collection.</p>

@@ -4,11 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>The 1B-Key Benchmark — Methodology &amp; Raw Data · VeltrixDB</title>
-<meta name="description" content="Full methodology, hardware specs, workload generator config and percentile distributions from the VeltrixDB 1-billion-key benchmark." />
+<meta name="description" content="Methodology and numbers from the internal (unverified) VeltrixDB 1-billion-key run, plus the reproducible 100M-key YCSB measurement with its exact conditions." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#07070B; --bg-2:#0D0D14; --bg-3:#13131C;
@@ -18,8 +18,8 @@
     --red:#0B5CFF; --red-2:#2E8BFF; --red-glow:rgba(11,92,255,.35);
     --warm:#F4A65A; --good:#46D391;
     --grid:1280px;
-    --sans:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    --serif:'Newsreader', 'Times New Roman', serif;
+    --sans:'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --serif:var(--sans);
     --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   *{box-sizing:border-box}
@@ -333,6 +333,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 .nav-gh svg{width:17px !important;height:17px !important}
 .nav-gh:hover{color:#0B5CFF}
 </style>
+<link rel="stylesheet" href="assets/longform.css">
 </head>
 <body>
 
@@ -380,7 +381,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <span class="ah-kind">Benchmark report · 32 pages</span>
     <h1 class="ah-title">The 1B-Key Benchmark <span class="em">— methodology &amp; raw data</span>.</h1>
-    <p class="ah-sub">How we measured 4.9ms P99 reads on a 3-node cluster holding one billion keys under sustained mixed load — hardware, workload mix, harness configuration, and every percentile we recorded.</p>
+    <p class="ah-sub">The setup and percentiles from our internal 3-node, one-billion-key run, which is <b>unverified</b> and not reproducible from published tooling, followed by the benchmark that is reproducible: 100M keys on YCSB, with every condition stated.</p>
     <div class="ah-meta">
       <div class="ah-author">
         <div class="av">AG</div>
@@ -392,7 +393,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="ah-meta-r">
         <span><b>Published</b> · May 21, 2026</span>
         <span><b>Read time</b> · 18 minutes</span>
-        <span><b>Reproducible</b> · Yes — harness on request</span>
+        <span><b>Reproducible</b> · YCSB run only (§05)</span>
       </div>
     </div>
   </div>
@@ -406,11 +407,15 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     <section class="a-section a-grid reveal">
       <div class="a-num">01</div>
       <div class="a-body">
+        <div class="callout">
+          <div class="ico">!</div>
+          <p><b>Update (Sept 2026):</b> we hold ourselves to this post's own title and apply it to the post. The 1B-key GKE run described in §02–§04 was never reproduced, and its harness was never published. Treat every figure from it as <b>internal and unverified</b>. That covers the 4.9 ms P99, 6.2M ops/s, 94.2% hit rate, 1.0× write amplification and the fill rate. The description of how cache misses were served was also wrong: disk reads are a Go <code>pread</code>, not io_uring SQPOLL across 1024 queues. The only reproducible headline numbers are in the <b>YCSB run in §05</b>. The reproduce steps in §06 now use tooling that exists in the repo.</p>
+        </div>
         <div class="a-kicker">Why we benchmark</div>
         <h2 class="a-h">If you can't reproduce it, <span class="em">it didn't happen</span>.</h2>
-        <p class="a-lede">Most database benchmarks are marketing in a lab coat. They run on hand-tuned hardware, with cherry-picked workloads, and they never release the harness. We did the opposite — and we'll send you the test rig.</p>
-        <p>VeltrixDB sells itself on three numbers — <b>4.9ms P99</b>, <b>1 billion keys</b>, <b>2M ops/sec per node</b>. Each one is a claim that breaks if you change the hardware or the workload. So before we go any further: every number on the <a class="inline" href="performance.html#performance">performance page</a> traces back to a Prometheus scrape, a flamegraph, or a histogram bucket we'd be happy to walk you through line by line.</p>
-        <p>This article documents the exact methodology — the cluster topology, the kernel tuning, the workload generator, the percentile distributions, and the surprises we found along the way. By the end, you should be able to set up your own rig in an afternoon and reproduce every number we publish to <b>within ±3%</b>.</p>
+        <p class="a-lede">Most database benchmarks are marketing in a lab coat. They run on hand-tuned hardware, with cherry-picked workloads, and they never release the harness. We meant to do the opposite, but for the 1B-key run we didn't manage it. See the update above.</p>
+        <p>This post originally led with three numbers: <b>4.9ms P99</b>, <b>1 billion keys</b> and <b>2M ops/sec per node</b>. None of them has been measured reproducibly, and each is a claim that breaks if you change the hardware or the workload. The numbers on the <a class="inline" href="performance.html#performance">performance page</a> are the ones we can back with a published run and its conditions.</p>
+        <p>This article documents the methodology of the internal run: the cluster topology, the workload and the percentile distribution. It is kept for the record and clearly labelled. It then gives the reproducible YCSB measurement, and the <code>loadtest</code> commands you can run against the current server yourself.</p>
         <p>If anything below smells like a marketing benchmark, we want to hear about it. <a class="inline" href="mailto:veltrixdb@gmail.com?subject=Benchmark%20question">Send us your questions</a> — we'll either fix the harness or write a follow-up explaining why a number is the way it is.</p>
       </div>
     </section>
@@ -422,21 +427,21 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">Hardware</div>
         <h2 class="a-h">Commodity NVMe, <span class="em">no exotic silicon</span>.</h2>
         <p class="a-lede">We deliberately picked the most boring infrastructure the cloud has to offer. If the numbers required Optane or custom FPGAs, they wouldn't be reproducible — and they wouldn't be cheap.</p>
-        <p>The cluster runs on <b>Google Cloud N2 instances with local NVMe SSDs</b>. Local NVMe is the only storage class we recommend for production VeltrixDB — EBS, Azure managed disks, and any other network-attached storage will break the latency model entirely. That's not us being precious; it's physics.</p>
+        <p><b>Internal run, unverified.</b> The cluster ran on <b>Google Cloud N2 instances with local NVMe SSDs</b>. Local NVMe is the only storage class we recommend for production VeltrixDB — EBS, Azure managed disks, and any other network-attached storage will break the latency model entirely. That's not us being precious; it's physics.</p>
 
         <div class="spec">
           <table>
             <tr><td>Instance type</td><td><b>n2-standard-64-lssd</b> · 64 vCPU, 256 GB RAM, 8 × 375 GB local NVMe</td></tr>
             <tr><td>Cluster topology</td><td><b>3 nodes</b>, single region (us-central1), three availability zones, anti-affinity enforced</td></tr>
             <tr><td>Storage layout</td><td>8 NVMe drives per node, <code>mdadm</code> RAID-0 striped, <code>ext4</code> with <code>noatime,nodiratime,discard=async</code></td></tr>
-            <tr><td>Kernel</td><td>Linux <b>6.1.0-21-cloud-amd64</b> · io_uring SQPOLL · AVX2 · transparent hugepages set to <code>madvise</code></td></tr>
+            <tr><td>Kernel</td><td>Linux <b>6.1.0-21-cloud-amd64</b> · AVX2 · transparent hugepages set to <code>madvise</code></td></tr>
             <tr><td>Network</td><td>gVNIC · 100 Gbps placement group · jumbo frames enabled (MTU 8896)</td></tr>
-            <tr><td>VeltrixDB build</td><td><b>v0.9.4-beta</b> · commit <code>cb44a1f</code> · 1024 shards, 256 GB LIRS cache, group-commit WAL fsync</td></tr>
+            <tr><td>VeltrixDB build</td><td><b>v0.9.4-beta</b> · commit <code>cb44a1f</code> (pre-release) · 256 GB LIRS cache, group-commit WAL fdatasync. (The original listed "1024 shards"; the index is fixed at 8192 shards.)</td></tr>
             <tr><td>Workload host</td><td><b>4 × n2-standard-32</b> instances generating load in parallel, same region, same placement group</td></tr>
           </table>
         </div>
 
-        <p>Total cluster spend at on-demand pricing: <b>~$5,800/month</b>. For comparison, DynamoDB at the same blended ops rate would have invoiced around <b>$28,500/month</b> for the same 30-day window — and that's before storage and egress.</p>
+        <p>Total cluster spend at on-demand pricing: <b>~$5,800/month</b>. (This post also compared that with a DynamoDB invoice estimate. We have removed it: it was never measured and rested on the unverified throughput figure.)</p>
       </div>
     </section>
 
@@ -447,7 +452,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">Workload</div>
         <h2 class="a-h">Realistic, <span class="em">not flattering</span>.</h2>
         <p class="a-lede">A benchmark that runs only point reads against a fully-cached working set will lie to you. Ours doesn't — we keep the writes coming, the cache pressure real, and the key distribution Zipfian.</p>
-        <p>We use a <b>70/30 read/write mix</b> with Zipfian key access (α = 0.99) — the same distribution you see in production session stores, ad-tech profile lookups, and rate-limiter buckets. About 6% of reads miss the cache and fall through to NVMe, which is the worst case we care about.</p>
+        <p>We use a <b>70/30 read/write mix</b> with Zipfian key access (α = 0.99) — the same distribution you see in production session stores, ad-tech profile lookups, and rate-limiter buckets. In that run, a reported ~6% of reads missed the cache and fell through to NVMe (unverified).</p>
 
         <h3>Workload profile</h3>
         <ul>
@@ -463,20 +468,20 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>What we did <i>not</i> do.</b> We did not pre-warm the cache with a "perfect" hit pattern, we did not pin clients to specific shards, and we did not disable background GC for the measurement window. The numbers below are with compaction and garbage collection running at full throttle, exactly as they would in production.</p>
+          <p><b>What we did <i>not</i> do.</b> We did not pre-warm the cache with a "perfect" hit pattern, we did not pin clients to specific shards, and we did not disable background GC for the measurement window. As reported, VLog garbage collection was left running under its normal admission control, as it would be in production.</p>
         </div>
 
         <h3>Load generator</h3>
-        <p>The harness is a Rust-based generator that talks the VeltrixDB binary protocol natively. It records every operation's wall-clock latency, the kernel's <code>tcp_rtt</code> at submission, and the cache-hit flag returned by the server. Histograms are HdrHistogram-based and merged across all four load hosts every 10 seconds.</p>
+        <p>The harness is an internal Rust-based generator that talks the VeltrixDB binary protocol natively. It has not been published, which is the main reason this run is unverified; the public load generator is <code>cmd/loadtest</code> (§06). It records every operation's wall-clock latency, the kernel's <code>tcp_rtt</code> at submission, and the cache-hit flag returned by the server. Histograms are HdrHistogram-based and merged across all four load hosts every 10 seconds.</p>
 
         <div class="a-code">
           <div class="a-code-head">
-            <span class="ttl">load-gen.toml · harness config</span>
+            <span class="ttl">load-gen.toml · internal harness config (not published)</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
 <pre><span class="c"># 1B-key benchmark · 70/30 mix · Zipfian α=0.99</span>
 <span class="k">[cluster]</span>
-endpoints  = <span class="s">["10.142.0.11:7100", "10.142.0.12:7100", "10.142.0.13:7100"]</span>
+endpoints  = <span class="s">["10.142.0.11:9000", "10.142.0.12:9000", "10.142.0.13:9000"]</span>
 protocol   = <span class="s">"binary"</span>
 keepalive  = <span class="n">true</span>
 
@@ -508,11 +513,11 @@ sample_hz     = <span class="n">1</span></pre>
         <div class="a-kicker">Results</div>
         <h2 class="a-h">The full <span class="em">percentile distribution</span>.</h2>
         <p class="a-lede">We don't publish an average. Averages hide tail latency, and tail latency is where databases earn — or lose — their keep.</p>
-        <p>Every number below is the merged percentile across the full 60-minute measurement window, sampled at 1Hz, with both load generators running. P99 is the headline. P99.9 is the number your SREs will actually page on.</p>
+        <p><b>Every number in this section comes from the internal GKE run and is unverified.</b> It was never reproduced and the harness is not published, so none of these is a headline figure. As reported, each is the merged percentile across the 60-minute measurement window, sampled at 1Hz.</p>
 
         <div class="pcts">
           <div class="pcts-h">
-            <span class="ttl">VeltrixDB · 70/30 mix · 1B keys · cache-miss path</span>
+            <span class="ttl">Internal GKE run · UNVERIFIED · 70/30 mix · 1B keys · cache-miss path</span>
             <span class="meta">Lower is better · ms</span>
           </div>
           <div class="pct-row"><span class="l">P50</span><div class="t"><div class="f" style="width:8%"></div></div><span class="v">0.42 ms</span></div>
@@ -525,72 +530,125 @@ sample_hz     = <span class="n">1</span></pre>
         </div>
 
         <div class="a-pull">
-          <div class="pull"><div class="pl">Sustained throughput</div><div class="pv"><span class="red">6.2M</span> ops/s</div><div class="pd">across 3 nodes · 70/30 mix</div></div>
-          <div class="pull"><div class="pl">Cache hit rate</div><div class="pv">94.2%</div><div class="pd">post-warmup · steady state</div></div>
-          <div class="pull"><div class="pl">Write amplification</div><div class="pv"><span class="red">1.0×</span></div><div class="pd">measured, not estimated</div></div>
+          <div class="pull"><div class="pl">Sustained throughput</div><div class="pv"><span class="red">6.2M</span> ops/s</div><div class="pd">internal run · unverified</div></div>
+          <div class="pull"><div class="pl">Cache hit rate</div><div class="pv">94.2%</div><div class="pd">internal run · unverified</div></div>
+          <div class="pull"><div class="pl">Write amplification</div><div class="pv">—</div><div class="pd">1.0× claim withdrawn · not measured</div></div>
         </div>
 
         <h3>Cache-hit reads — the easy case</h3>
-        <p>About 94% of reads in steady state never touch NVMe. They're served from the LIRS cache in <b>under 0.3 ms</b> end-to-end. The CDF is so steep here it's almost not worth charting — P99 cache-hit latency is <code>0.31 ms</code>, P99.9 is <code>0.42 ms</code>.</p>
+        <p>As reported for the internal run (unverified), about 94% of reads never touched NVMe and were served from the LIRS cache in <b>under 0.3 ms</b> end-to-end: P99 cache-hit latency <code>0.31 ms</code>, P99.9 <code>0.42 ms</code>. For comparison, a cache hit costs about 92 ns inside the engine; the rest is network and client.</p>
 
         <h3>Cache-miss reads — the only number that matters</h3>
-        <p>The interesting number is what happens when the LIRS cache misses and we have to go to disk. <code>io_uring</code> SQPOLL + <code>O_DIRECT</code> + <b>1024 dedicated NVMe submission queues</b> keep P99 at <b>4.9 ms</b> even when 6% of reads fall through and compaction is actively churning in the background.</p>
+        <p>The interesting number is what happens when the LIRS cache misses and we have to go to disk. The internal run reported a cache-miss P99 of <b>4.9 ms</b>, which is <b>unverified</b>. The original text credited io_uring SQPOLL and 1024 NVMe submission queues for it. That was wrong. A miss is served by one 4 KB-aligned Go <code>pread</code> from the VLog, checked with CRC32C (<code>O_DIRECT</code> on Linux), and the index has 8192 shards.</p>
 
         <h3>Writes — the durability path</h3>
-        <p>Group-commit WAL fsync amortizes the cost of durability across concurrent writers. P99 write latency was <code>0.21 ms</code>, of which roughly <b>~80 µs</b> is the actual fsync. Disk fsync latency is the floor — we just made sure not to add anything on top of it.</p>
+        <p>Group commit amortizes the cost of durability across concurrent writers: one WAL <code>write(2)</code> and one <code>fdatasync</code> per window. The internal run reported a P99 write latency of <code>0.21 ms</code> (unverified). The window setting for that run was not recorded. The current default window is 15 ms, and a writer waits up to one window for its sync. The reproducible write numbers in §05 were taken with 5 ms windows.</p>
       </div>
     </section>
 
-    <!-- Section 05: How to reproduce -->
+    <!-- Section 05: Measured (reproducible) -->
     <section class="a-section a-grid reveal">
       <div class="a-num">05</div>
       <div class="a-body">
-        <div class="a-kicker">How to reproduce</div>
-        <h2 class="a-h">Set up your own rig <span class="em">in an afternoon</span>.</h2>
-        <p class="a-lede">Every detail you need to validate these numbers on your own hardware — the Helm values, the load generator, the kernel sysctls. Email us and we'll ship the binaries.</p>
-        <p>You'll need a cloud account, three n2-standard-64-lssd instances, a Linux ≥ 5.10 kernel, and about three hours of patience. The full harness lives in a private repo today — drop us a note and we'll add you to it.</p>
+        <div class="a-kicker">Measured</div>
+        <h2 class="a-h">The run we can <span class="em">stand behind</span>.</h2>
+        <p class="a-lede">These are the only reproducible headline numbers we have: a single-node YCSB run on June 9, 2026. It is smaller than the 1B-key run, and every condition is stated.</p>
+        <p>This run is <b>historical</b>. It used a pure-Go build, before the off-heap native index, the binary WAL, the one-<code>write(2)</code> WAL flusher and the opt-in C++ network front-end. Those changes shipped later, in v1.5–v1.7.</p>
 
-        <h3>Step 1 — bring up the cluster</h3>
-        <p>The Helm chart sets up the StorageClass, StatefulSet, anti-affinity rules, and ServiceMonitor in a single command. With the right values file, you're 94 seconds from a healthy 3-node cluster:</p>
+        <div class="spec">
+          <table>
+            <tr><td>Tool</td><td><b>YCSB 0.17.0</b> · 200 client threads</td></tr>
+            <tr><td>Machine</td><td><b>AWS EC2 high-memory</b>, single node · 495 GB RAM</td></tr>
+            <tr><td>Storage</td><td>4 × NVMe, VLog on raw block devices</td></tr>
+            <tr><td>Dataset</td><td><b>100M keys × ~100 B values</b></td></tr>
+            <tr><td>Cache</td><td>400 GB LIRS · the <b>entire dataset fits in cache</b>, so reads are cache hits</td></tr>
+            <tr><td>Durability</td><td>WAL + <code>fdatasync</code> on every write · 5 ms WAL and VLog flush windows</td></tr>
+          </table>
+        </div>
+
+        <div class="pcts">
+          <div class="pcts-h">
+            <span class="ttl">YCSB workload C · 10M reads · 100M keys · 100% cache hits</span>
+            <span class="meta">Lower is better · µs</span>
+          </div>
+          <div class="pct-row"><span class="l">Min</span><div class="t"><div class="f" style="width:1%"></div></div><span class="v">10 µs</span></div>
+          <div class="pct-row"><span class="l">Avg</span><div class="t"><div class="f" style="width:17%"></div></div><span class="v">461 µs</span></div>
+          <div class="pct-row"><span class="l">P95</span><div class="t"><div class="f" style="width:75%"></div></div><span class="v">2,069 µs</span></div>
+          <div class="pct-row"><span class="l">P99</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">2,771 µs</span></div>
+        </div>
+
+        <div class="a-pull">
+          <div class="pull"><div class="pl">Reads · workload C</div><div class="pv"><span class="red">427,697</span> ops/s</div><div class="pd">10M ops · dataset in cache · 100% hit</div></div>
+          <div class="pull"><div class="pl">Load · durable writes</div><div class="pv">18,064 ops/s</div><div class="pd">avg 11.06 ms · P95 30.8 ms · P99 47.3 ms</div></div>
+          <div class="pull"><div class="pl">Failures</div><div class="pv">0</div><div class="pd">across the 100M-key load</div></div>
+        </div>
+
+        <h3>What this run does not show</h3>
+        <p>Because the whole dataset was in cache, this run says nothing about cache-miss latency from NVMe. It also doesn't cover 1 billion keys or a multi-node cluster. Later measurements, each under its own conditions, are listed on the <a class="inline" href="performance.html#performance">performance page</a>. On v1.7, server batch writes on macOS (8 clients × 1024-key MPUT, 1M-key space) reached 3.54M keys/s at P99 4.2 ms. On a 4-CPU CI runner with tmpfs and the client on the same host, the Go front-end measured 1.77M keys/s batch writes and 177–182K reads/s.</p>
+      </div>
+    </section>
+
+    <!-- Section 06: How to reproduce -->
+    <section class="a-section a-grid reveal">
+      <div class="a-num">06</div>
+      <div class="a-body">
+        <div class="a-kicker">How to reproduce</div>
+        <h2 class="a-h">Run it yourself <span class="em">with the tools in the repo</span>.</h2>
+        <p class="a-lede">The internal 1B-key harness was never published, so that run can't be reproduced. What you can run today is the server plus the repo's own load generator, <code>cmd/loadtest</code>, against your own hardware.</p>
+        <p>You'll need a Linux host with local NVMe (network-attached disks change the latency picture completely), Go, and a checkout of the VeltrixDB repo. <code>cmd/loadtest</code> is not YCSB, so its numbers are not directly comparable with §05. The YCSB client binding used for §05 is not in the repo.</p>
+
+        <h3>Step 1 — start a single node</h3>
+        <p>One data directory per NVMe disk, and a cache large enough for your dataset. The example uses the 5 ms windows from §05; the default for both is 15 ms.</p>
 
         <div class="a-code">
           <div class="a-code-head">
-            <span class="ttl">~/veltrixdb · zsh</span>
+            <span class="ttl">~/VeltrixDB · zsh</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
-<pre><span class="c">$</span> helm repo add veltrixdb https://charts.veltrixdb.com
-<span class="n">"veltrixdb" has been added to your repositories</span>
-
-<span class="c">$</span> helm install bench veltrixdb/veltrixdb \
-    --namespace veltrixdb --create-namespace \
-    -f bench-values.yaml
-
-<span class="n">✓</span> StorageClass · veltrixdb-nvme
-<span class="n">✓</span> StatefulSet · 3 replicas, anti-affinity
-<span class="n">✓</span> ServiceMonitor · 50+ metrics
-<span class="n">✓</span> PodDisruptionBudget · minAvailable 2
-<span class="n">✓</span> Ready in <span class="s">94s</span></pre>
+<pre><span class="c">$</span> go run ./cmd/server -addr :9000 \
+    -data-dirs /mnt/nvme0,/mnt/nvme1,/mnt/nvme2,/mnt/nvme3 \
+    -cache 409600 \
+    -wal-flush-window-ms 5 -vlog-flush-window-ms 5</pre>
         </div>
 
         <h3>Step 2 — tune the host</h3>
-        <p>VeltrixDB needs a few host-level tunings to deliver these numbers. The Helm chart applies the pod-level pieces automatically; the node-level ones you have to set yourself:</p>
+        <p>A few host-level settings matter:</p>
         <ul>
-          <li><b>Transparent hugepages</b> · <code>echo madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled</code></li>
-          <li><b>Swap</b> · off · the ART index lives in RAM and must not be paged</li>
+          <li><b>Memory maps</b> · on cgo builds (the default) the native index mmaps its arrays, so at large key counts set <code>vm.max_map_count ≥ 262144</code> (see <code>scripts/sysctl.conf</code>); otherwise inserts can fail with ENOMEM</li>
+          <li><b>Swap</b> · off · the whole key index lives in RAM and must not be paged</li>
           <li><b>CPU governor</b> · <code>performance</code> on all cores — don't let the kernel race-to-idle on tail latency</li>
-          <li><b>NUMA</b> · pin the VeltrixDB pod to a single NUMA node when possible</li>
-          <li><b>Kernel</b> · ≥ 5.10 for full io_uring SQPOLL support</li>
+          <li><b>Transparent hugepages</b> · <code>echo madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled</code></li>
         </ul>
 
-        <h3>Step 3 — load 1 billion keys</h3>
-        <p>The harness ships with a populator that streams 1B keys at ~3M writes/sec sustained. Total fill time is around <b>5.5 minutes</b> on our reference cluster — well under coffee break.</p>
+        <h3>Step 3 — load keys</h3>
+        <p><code>loadtest</code> writes keys <code>key:0 … key:N-1</code> for a fixed duration. <code>--batch-size</code> above 1 switches to MPUT, which engages VLog block packing.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">~/VeltrixDB · zsh</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c">$</span> go run ./cmd/loadtest --addr=127.0.0.1:9000 --mode=write \
+    --num-keys=100000000 --value-size=100 \
+    --concurrency=200 --duration=600</pre>
+        </div>
 
         <h3>Step 4 — measure</h3>
-        <p>Run the workload for 30 minutes warm-up, then 60 minutes measurement. The harness prints the merged HdrHistogram at every 10-second tick. If your P99 is more than 5% off from <code>4.9 ms</code>, something is wrong — open the Grafana dashboard the chart installs at <code>/grafana</code> and check the per-shard tail latency.</p>
+        <p>Then run reads (or <code>--mode=mixed --read-ratio=0.7</code>). <code>--safe-reads</code> reads only keys that have already been written. <code>loadtest</code> prints live stats every second and a latency summary at the end.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">~/VeltrixDB · zsh</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c">$</span> go run ./cmd/loadtest --addr=127.0.0.1:9000 --mode=read \
+    --num-keys=100000000 --value-size=100 \
+    --concurrency=200 --duration=60</pre>
+        </div>
 
         <div class="callout">
           <div class="ico">✓</div>
-          <p><b>We'll help.</b> If you set this up and the numbers don't match, that's a bug we want to fix. Email us with your hardware spec and the histogram output — we will turn around a root-cause analysis within 48 hours.</p>
+          <p><b>We'll help.</b> Email us your hardware spec and the <code>loadtest</code> output, and we'll help interpret it. For comparing network front-ends and storage configurations on Linux, the repo has <code>scripts/net-bench.sh</code> (documented in BENCHMARKING.md).</p>
         </div>
       </div>
     </section>
@@ -598,7 +656,7 @@ sample_hz     = <span class="n">1</span></pre>
     <!-- Article foot -->
     <div class="a-foot reveal">
       <div class="cite">
-        Harness: <b>veltrixdb/bench-harness</b> (private) · Hardware: <b>GCP n2-standard-64-lssd × 3</b> · Snapshot: <b>May 21, 2026 · 14:42 UTC</b>
+Internal run (unverified): harness <b>veltrixdb/bench-harness</b> (private) · <b>GCP n2-standard-64-lssd × 3</b> · snapshot <b>May 21, 2026 · 14:42 UTC</b>. Reproducible run: <b>YCSB 0.17.0 · June 9, 2026</b> (BENCHMARK_RESULTS.md in the main repo).
       </div>
       <div class="links">
         <a href="performance.html#performance">See the chart</a>
@@ -614,7 +672,7 @@ sample_hz     = <span class="n">1</span></pre>
         <a class="next" href="blog-architecture.html">
           <span class="kind">Architecture deep-dive</span>
           <h5>Key-value separation &amp; why compaction shouldn't touch values</h5>
-          <p>How the VLog, io_uring, and LIRS cache combine to keep P99 stable at any write load.</p>
+          <p>How the VLog, the group-commit WAL and the LIRS cache fit together in the storage engine.</p>
           <div class="m"><span>Engineering blog · 18 min</span><span>Read →</span></div>
         </a>
         <a class="next" href="blog-migration.html">
@@ -628,7 +686,7 @@ sample_hz     = <span class="n">1</span></pre>
       <div class="cta-mini">
         <div>
           <h3>Want the full <span class="em">benchmark PDF</span> on your desk?</h3>
-          <p>32 pages — every histogram bucket, the flamegraphs, and the cost analysis vs DynamoDB, Redis Enterprise, and Cassandra at 1B keys.</p>
+          <p>32 pages — the histogram buckets and flamegraphs from the internal run (unverified, labelled as such), plus the full YCSB results.</p>
         </div>
         <div class="actions">
           <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20benchmark%20report&body=Hi%20—%20please%20share%20the%20full%20benchmark%20methodology%20PDF.%0A%0AName%3A%0ACompany%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
@@ -649,39 +707,43 @@ sample_hz     = <span class="n">1</span></pre>
           <span class="mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-13h-7l0-7z"/></svg></span>
           <b>Veltrix<i>DB</i></b>
         </a>
-        <p>Sub-5ms reads at 1 billion keys. NVMe-backed. Cloud-portable. Built for teams whose users notice when their database can't keep up.</p>
+        <p>Values on NVMe, index in DRAM. Self-hosted, cloud-portable, Apache 2.0. Built for teams whose users notice when their database can't keep up.</p>
       </div>
       <div>
         <h5>Product</h5>
         <ul>
-          <li><a href="index.html#why">Platform</a></li>
-          <li><a href="performance.html#performance">Benchmark</a></li>
-          <li><a href="product.html#compare">Comparison</a></li>
-          <li><a href="product.html#how">Architecture</a></li>
+          <li><a href="product.html">Product</a></li>
+          <li><a href="performance.html">Performance</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="whitepaper.html">Whitepaper</a></li>
         </ul>
       </div>
       <div>
         <h5>Resources</h5>
         <ul>
-          <li><a href="blog-benchmark.html">Benchmark report</a></li>
-          <li><a href="blog-architecture.html">Architecture deep-dive</a></li>
-          <li><a href="blog-migration.html">Migration guide</a></li>
-          <li><a href="whitepaper.html">Whitepaper</a></li>
+          <li><a href="docs/index.html">Documentation</a></li>
+          <li><a href="docs/kubernetes/helm-chart.html">Helm chart</a></li>
+          <li><a href="docs/kubernetes/operator.html">Operator guide</a></li>
+          <li><a href="docs/operations/security.html">Security model</a></li>
+          <li><a href="blog-architecture.html">Blog · Architecture</a></li>
+          <li><a href="blog-benchmark.html">Blog · Benchmarks</a></li>
+          <li><a href="blog-migration.html">Blog · Migration</a></li>
+          <li><a href="redis-comparison.html">vs Redis</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="pricing.html#pricing">Pricing</a></li>
-          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
+          <li><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="mailto:veltrixdb@gmail.com">Book a demo</a></li>
-          <li><a href="#"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);margin-right:8px;vertical-align:middle"></span>Status · All systems</a></li>
+          <li><a href="tel:+919817463648">+91 98174 63648</a></li>
         </ul>
       </div>
     </div>
     <div class="ft-bar">
-      <div>© 2026 VeltrixDB · All rights reserved</div>
-      <div>v0.9.4-beta · build cb44a1f</div>
+      <div>© 2026 VeltrixDB · Apache 2.0</div>
+      <div>Latest release v1.8</div>
     </div>
   </div>
 </footer>

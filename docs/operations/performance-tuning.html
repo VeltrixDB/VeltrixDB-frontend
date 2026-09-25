@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -90,10 +90,10 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Performance Tuning</div>
     <h1>Performance Tuning</h1>
-<p class="page-lede">VeltrixDB's throughput and latency are governed by a small number of knobs: the WAL/VLog flush window, cache size, batching, and admission control. This page summarizes the tuning guidance from the project's performance guide.</p>
+<p class="page-lede">VeltrixDB's throughput and latency are governed by a small number of knobs: the WAL/VLog flush window, cache size, batching, and admission control. This page summarizes the tuning guidance from the project's performance guide (<code>PERFORMANCE.md</code>), plus the index, C++ storage and network switches added in v1.6–v1.7.</p>
 
 <h2 id="flush-windows">The most important knob: flush windows</h2>
-<p>Both the WAL and VLog use group-commit: writes arriving within a configurable window share a single <code>fdatasync</code>. <strong>Keep <code>-wal-flush-window-ms</code> and <code>-vlog-flush-window-ms</code> equal at all times.</p>
+<p>Both the WAL and VLog use group-commit: writes arriving within a configurable window share a single <code>fdatasync</code>. <strong>Keep <code>-wal-flush-window-ms</code> and <code>-vlog-flush-window-ms</code> equal at all times.</strong></p>
 <pre class="code-block"><code>writes/s ~ goroutines x (1000 / window_ms)</code></pre>
 <div class="table-wrap">
 <table>
@@ -102,11 +102,12 @@
 <tr><td>Lowest latency (low concurrency)</td><td>0 ms</td><td>~0.2 ms</td></tr>
 <tr><td>Low latency</td><td>2 ms</td><td>~2.2 ms</td></tr>
 <tr><td>100K+ writes/s</td><td><strong>5 ms</strong></td><td>~5.2 ms</td></tr>
-<tr><td>Default (balance)</td><td><strong>10 ms</strong></td><td>~10.2 ms</td></tr>
+<tr><td>Default (balance)</td><td><strong>15 ms</strong></td><td>~15.2 ms</td></tr>
 <tr><td>Maximum throughput</td><td>20 ms</td><td>~20.2 ms</td></tr>
 </tbody>
 </table>
 </div>
+<p>P99 figures are Linux NVMe. Do not size against a macOS measurement: on Darwin the engine calls plain <code>fsync(2)</code>, which returns at the drive cache in ~0.02&nbsp;ms without flushing it (crash-safe, but not power-loss-safe).</p>
 <pre class="code-block"><code>./veltrixdb --wal-flush-window-ms 5 --vlog-flush-window-ms 5</code></pre>
 <p>Widening the window trades write latency (one window's worth, at most) for higher sustained write throughput by amortizing <code>fdatasync</code> across more writers per batch.</p>
 
@@ -116,11 +117,12 @@
 <table>
 <thead><tr><th>Method</th><th>Throughput</th><th>When to use</th></tr></thead>
 <tbody>
-<tr><td>Individual PUT</td><td>~10K/s per goroutine at a 10 ms window</td><td>Single key</td></tr>
+<tr><td>Individual PUT</td><td>~10K/s per goroutine at 10 ms</td><td>Single key</td></tr>
 <tr><td>MultiPut, 1024 keys</td><td>~108K/s (macOS) / ~426K/s (Linux)</td><td>Any multi-key write</td></tr>
 </tbody>
 </table>
 </div>
+<p>The MultiPut row is historical (measured before the one-<code>write(2)</code>-per-batch WAL flusher and the ordered-index fix). Current server numbers for 8 clients &times; 1024-key <code>MPUT</code>: <strong>3.54M keys/s, P99 4.2&nbsp;ms</strong> over a 1M-key space on macOS (1.45M keys/s, P99 9.6&nbsp;ms before the ordered-index fix), and <strong>1.77M keys/s, P99 12.2&ndash;12.7&nbsp;ms</strong> on a 4-CPU CI runner (tmpfs, client on the same host, Go front-end, C++ storage off). <span class="badge good">New in v1.7</span></p>
 <p>The TCP server automatically coalesces back-to-back <code>PUT</code>s from the same connection into a <code>MultiPut</code>, so batching benefits apply even without client-side changes.</p>
 
 <h2 id="disk-density">Disk density and packing</h2>
@@ -141,26 +143,56 @@
 
 <h2 id="cache-tuning">Cache tuning</h2>
 <pre class="code-block"><code>-cache 65536      # 64 GB
---auto-tune       # VeltrixDB picks 85% of available RAM
+--auto-tune       # cache = 85% of (80% of RAM)
 --read-heavy      # 400 GB preset + scan-resistant tuning</code></pre>
 <p><code>-read-heavy</code> is a preset documented in the server flags reference as a <strong>400 GB cache with an extended GC interval</strong> — use it for workloads dominated by reads where you can afford more RAM and want to bias GC toward less frequent, larger passes.</p>
 <p>Check cache effectiveness with <code>veltrixdb_cache_hits_total / (hits + misses)</code>. Small values (&le;256 B) resist eviction more aggressively under the LIRS policy, so workloads with many small values benefit the most from a larger cache.</p>
 
+<h2 id="index-memory">Index memory and Go GC <span class="badge good">New in v1.6</span></h2>
+<p>On cgo builds (the default, including macOS and the official Docker image) the key index lives off the Go heap in per-shard C++ tables, so the Go garbage collector does not scan it. Measured with 5M keys: full GC <strong>21&nbsp;ms &rarr; 0.27&nbsp;ms</strong>, settled RSS <strong>168 &rarr; 142&nbsp;B/key</strong>, at a cost of ~19&nbsp;ns more per cache-miss lookup. Watch <code>veltrixdb_storage_native_index_bytes</code>: that memory is not in <code>go_memstats_*</code>.</p>
+<pre class="code-block"><code>VELTRIXDB_INDEX=map ./veltrixdb ...      # opt out: Go map index (also what CGO_ENABLED=0 builds use)
+sudo sysctl -p scripts/sysctl.conf       # includes vm.max_map_count = 262144</code></pre>
+<p>Large key counts need <code>vm.max_map_count &ge; 262144</code> (a large engine holds ~25K memory mappings); below that an insert can fail with <code>ENOMEM</code>.</p>
+
+<h2 id="cpp-storage">C++ storage switches <span class="badge good">New in v1.7</span></h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Env var</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>VELTRIXDB_URING_BRIDGE</code></td><td><code>off</code></td><td><code>on</code> / <code>sqpoll</code>: submit VLog batch writes through io_uring (Linux cgo builds). Falls back to <code>pwrite</code> where <code>io_uring_setup</code> is blocked (e.g. Kubernetes RuntimeDefault seccomp).</td></tr>
+<tr><td><code>VELTRIXDB_DISABLE_CGO_ENGINE</code></td><td>unset</td><td><code>1</code>: no C++ batch engine, bridge forced off, Go map index.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout warn">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Measure before enabling the io_uring bridge</span> A VLog batch is already one <code>pwrite</code> of one contiguous extent plus one <code>fdatasync</code>, so the bridge saves at most one syscall per batch, and SQPOLL spends a kernel thread busy-polling to save it. On a 4-CPU CI runner (tmpfs) the C++ storage layer with everything on (bridge with SQPOLL, batch engine, native index) measured <strong>1.12M keys/s</strong> batch writes against <strong>1.77M keys/s</strong> with all three off; per-part attribution is pending.</span>
+</div>
+<p>There are no <code>--cgo-batch-engine</code>, <code>--numa-aware</code> or <code>--sqpoll-reader</code> flags; passing one makes the server exit with "flag provided but not defined". Several C++ components in <code>cpp/</code> &mdash; the priority io_uring scheduler, the SQPOLL VLog reader, the ART index, the hugepage slab allocator, <code>mlockall</code>, the eBPF GC throttle &mdash; compile but have no Go caller, so hugepage, fixed-buffer or SQPOLL-reader settings have no effect on the server. The read path is Go <code>pread</code> (4&nbsp;KB-aligned, magic + CRC32C check).</p>
+
+<h2 id="network-front-end">Network front-end <span class="badge good">New in v1.7</span></h2>
+<p><code>--net=go</code> (default) serves every protocol and command. <code>--net=cpp|uring|poll</code> is an opt-in, <strong>experimental</strong> C++ event-loop front-end (<code>--net-threads</code>, default one loop per core) that serves only the binary <code>PUT GET DEL PING MPUT MGET</code> commands, in standalone mode without <code>--auth-config</code>. Keys that need a VLog read are finished off the loop in a goroutine (<code>VELTRIXDB_NET_DEFER_READS=0</code> restores the older inline behaviour for comparison). Load-test it with <code>loadtest --proto=binary</code>.</p>
+<p>It is <strong>not faster overall</strong>. On a 4-CPU CI runner (tmpfs, client on the same host, measured 2026-09-25 before disk reads were moved off the loop): read P50 154 vs 286&nbsp;&micro;s and poll read throughput 194K vs 177K ops/s, but read P99 ~3.0 vs 1.8&nbsp;ms and batch writes ~12% lower; io_uring did not beat poll. Compare on your own hardware with <code>scripts/net-bench.sh</code> (see <a class="inline-link" href="../resources/benchmarking.html">Benchmarking</a>). The server logs a per-stage latency breakdown of the C++ front-end at shutdown. Do not judge network changes on macOS: loopback caps round trips at ~60K/s for the Go and C++ front-ends alike.</p>
+
+<h2 id="profiling">Profiling <span class="badge good">New in v1.7</span></h2>
+<pre class="code-block"><code>./veltrixdb --pprof-addr 127.0.0.1:6060   # CPU / heap / trace profiles; separate listener, off by default
+go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30</code></pre>
+
 <h2 id="admission-control">Admission control</h2>
-<p>VeltrixDB throttles background GC based on an exponentially-weighted moving average (EWMA) of read latency, to keep GC from competing with foreground reads for NVMe bandwidth:</p>
+<p>VeltrixDB throttles background GC and, at the extreme, foreground writes based on an exponentially-weighted moving average (EWMA) of read latency, to keep GC from competing with foreground reads for NVMe bandwidth:</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Read EWMA</th><th>What happens</th></tr></thead>
 <tbody>
-<tr><td>&lt; 2 ms</td><td>Full speed</td></tr>
-<tr><td>&lt; 3 ms</td><td>Normal</td></tr>
-<tr><td>&ge; 3 ms</td><td>GC capped at 60 MB/s</td></tr>
-<tr><td>&ge; 4 ms</td><td>GC paused, and each <code>PUT</code> sleeps 2 ms</td></tr>
-<tr><td>No reads for 4+ minutes</td><td>EWMA considered stale — GC auto-resumes</td></tr>
+<tr><td>&lt; 15 ms</td><td>Normal</td></tr>
+<tr><td>&ge; 15 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
+<tr><td>&gt; 20 ms</td><td>GC paused, and each <code>PUT</code> sleeps 2 ms</td></tr>
+<tr><td>&lt; 10 ms</td><td>Throttle cleared, GC resumes</td></tr>
+<tr><td>No reads for 4+ minutes</td><td>EWMA considered stale &mdash; GC auto-resumes</td></tr>
 </tbody>
 </table>
 </div>
-<p>If <code>veltrixdb_storage_write_admission_throttles_total</code> is rising, read latency has crossed the 4 ms threshold and writes are being intentionally slowed to protect read latency. Diagnose the underlying cause with <code>veltrixdb_storage_read_latency_seconds</code> before changing any other knob — raising the cache size or flush window will not help if the disk itself is the bottleneck.</p>
+<p>The GC bandwidth cap deliberately fires before the full pause, so GC is throttled progressively rather than stopped dead. If <code>veltrixdb_storage_write_admission_throttles_total</code> is rising, read EWMA has crossed 20&nbsp;ms and writes are being intentionally slowed to protect read latency. Diagnose the underlying cause with <code>veltrixdb_storage_read_latency_seconds</code> before changing any other knob &mdash; raising the cache size or flush window will not help if the disk itself is the bottleneck.</p>
 
 <h2 id="common-problems">Common problems</h2>
 <div class="table-wrap">
@@ -168,8 +200,8 @@
 <thead><tr><th>Symptom</th><th>Check</th><th>Fix</th></tr></thead>
 <tbody>
 <tr><td>Write P99 high</td><td><code>veltrixdb_storage_write_admission_throttles_total</code> rising</td><td>Read latency too high — see admission control above</td></tr>
-<tr><td>Cache hit rate low</td><td><code>vlog_gc_skipped_empty_total</code> rising</td><td>Increase <code>-cache</code> or enable KV separation</td></tr>
-<tr><td>GC not running</td><td><code>vlog_gc_skipped_paused_total</code> rising</td><td>Wait up to 4 minutes for the stale EWMA to clear</td></tr>
+<tr><td>Cache hit rate low</td><td><code>veltrixdb_vlog_gc_skipped_empty_total</code> rising</td><td>Increase <code>-cache</code> or enable KV separation</td></tr>
+<tr><td>GC not running</td><td><code>veltrixdb_vlog_gc_skipped_paused_total</code> rising</td><td>Wait up to 4 minutes for the stale EWMA to clear</td></tr>
 <tr><td><code>reads_total = 0</code> with live traffic</td><td>Binary version</td><td>Update — a fixed release restores the missing metrics call</td></tr>
 <tr><td>False failure-detector alerts (single node)</td><td><code>fd.SetLocalNode</code> not called</td><td>Call it before <code>fd.Start()</code> in your cluster setup</td></tr>
 </tbody>

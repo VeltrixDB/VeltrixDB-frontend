@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -210,7 +210,20 @@ SETNX: [1B 0x1B][2B keyLen][4B valLen]      + [4B ttl] + key + value</code></pre
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Prefer batches</span> <code>MPUT</code>/<code>MGET</code> batches are roughly <strong>50× faster</strong> than issuing the same number of individual <code>PUT</code>/<code>GET</code> calls, because a batch amortizes one round trip and one group-commit window across many keys instead of paying that cost per key. All official SDKs expose batch methods (for example, <code>db.mput(...)</code> / <code>db.mget(...)</code>) — reach for them whenever you're writing or reading more than a handful of keys at once.</span></div>
 
 <h2 id="protocol-auto-detection">Protocol auto-detection</h2>
-<p>Both protocols share the same TCP listener (<code>-addr</code>, default <code>:9000</code>). A single connection is either all-text or all-binary — the server determines this from the leading byte of the first request and does not switch mid-connection. You never need to configure which protocol to use; connecting with <code>nc</code>/<code>telnet</code> naturally speaks text, and every official SDK's connection pool speaks binary.</p>
+<p>Both protocols share the same TCP listener (<code>-addr</code>, default <code>:9000</code>). A single connection is either all-text or all-binary — the server determines this from the leading byte of the first request and does not switch mid-connection. You never need to configure which protocol to use; connecting with <code>nc</code>/<code>telnet</code> naturally speaks text, and every official SDK's connection pool speaks binary. This applies to the default <code>--net=go</code> front-end; see below for the opt-in C++ front-end.</p>
+
+<h2 id="network-front-ends">Which front-end serves which commands <span class="badge good">New in v1.7</span></h2>
+<p>The <code>--net</code> server flag selects the network front-end that listens on <code>-addr</code>:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th><code>--net</code></th><th>Implementation</th><th>Serves</th></tr></thead>
+<tbody>
+<tr><td><code>go</code> <span class="badge">default</span></td><td>Go server, one goroutine per connection</td><td>Everything on this page: the text protocol, every binary opcode (including the extended and atomic frames), <code>AUTH</code>, TLS on <code>--tls-addr</code>, and all <code>--mode</code> values.</td></tr>
+<tr><td><code>cpp</code> / <code>uring</code> / <code>poll</code></td><td>C++ event loops in <code>netfront/</code>, one per core (<code>--net-threads</code>); <code>cpp</code> uses io_uring when available and <code>poll()</code> otherwise, <code>uring</code> requires io_uring, <code>poll</code> forces <code>poll()</code></td><td>Only the binary protocol's <code>PUT</code>, <code>GET</code>, <code>DEL</code>, <code>PING</code>, <code>MPUT</code> and <code>MGET</code>. No text protocol, no <code>AUTH</code>, no extended binary commands.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">The C++ front-end is experimental</span> It runs only in <code>--mode=standalone</code> and the server refuses it with <code>--auth-config</code>; TLS stays on the Go listener. Each connection stays strictly ordered, and reads that need a disk read are finished on a goroutine rather than the event loop (<code>VELTRIXDB_NET_DEFER_READS=0</code> disables this for A/B runs). It is not faster overall: on a 4-CPU CI runner it lowered read P50 against <code>--net=go</code> but had a worse read P99 and ~12% lower batch-write throughput. To load-test it, use <code>loadtest --proto=binary</code>.</span></div>
 
 <div class="card-grid">
 <a class="card" href="data-model.html"><div class="card-title">Data Model →</div><div class="card-desc">The keys, TTLs, hash fields, namespaces, and atomic ops these commands operate on.</div></a>

@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -90,7 +90,7 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Resources<span class="sep">/</span>Benchmarking Methodology</div>
     <h1>Benchmarking Methodology</h1>
-<p class="page-lede">How VeltrixDB's benchmark numbers are produced: the harness, the hardware, the pass/fail gates, and the raw results &mdash; so you can reproduce them or run the same harness against your own workload shape.</p>
+<p class="page-lede">How VeltrixDB's benchmark numbers are produced: the harness, the hardware, the pass/fail gates, and the raw results with the conditions they were measured under &mdash; so you can reproduce them or run the same harness against your own workload shape.</p>
 
 <h2 id="the-harness">The harness</h2>
 <p><code>scripts/bench.sh</code> runs a 6-phase sequenced workload and reports go/no-go on two hard gates: <strong>packing density</strong> and <strong>GC emergency runs</strong>. The project re-runs it after any storage engine change.</p>
@@ -135,6 +135,7 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </div>
 
 <h2 id="reference-numbers">Reference numbers (BENCHMARKING.md)</h2>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Provenance</span> Added at v1.1.0; the Linux table is a projection, not a measurement. Both tables predate the one-<code>write(2)</code> WAL flusher, one <code>pwrite</code> per VLog batch, the binary WAL, the <code>MultiPut</code> cache write-around, the ordered-index overwrite skip and the native index, all of which change write-path numbers. The macOS figures also sit on an <code>fsync</code> that does not flush the drive cache. Re-run before quoting them.</span></div>
 <h3>macOS M-series (dev)</h3>
 <div class="table-wrap">
 <table>
@@ -148,7 +149,7 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </div>
 
 <h3>Linux n2-highmem-64 (8 NVMe) &mdash; projected</h3>
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Labeled as projected</span> BENCHMARKING.md marks this table explicitly as "projected" figures for the 8-NVMe production configuration, distinct from the measured macOS dev numbers above and the measured cluster/AWS results below.</span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Labeled as projected</span> BENCHMARKING.md marks this table explicitly as "projected" figures for the 8-NVMe production configuration, distinct from the macOS dev numbers above and the measured AWS YCSB results below.</span></div>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Metric</th><th>Value</th></tr></thead>
@@ -161,42 +162,11 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </table>
 </div>
 
-<h2 id="cluster-benchmark">3-node GKE cluster benchmark</h2>
-<p>Reported in the README as the headline cluster numbers: <strong>3-node GKE cluster &middot; <code>n2-highmem-64</code> &middot; 8&times;375 GB NVMe per node &middot; 1 billion keys &middot; 80R/20W &middot; 30 minutes sustained</strong>.</p>
-<div class="table-wrap">
-<table>
-<thead><tr><th>Metric</th><th>Value</th></tr></thead>
-<tbody>
-<tr><td>Reads/s <em>(internal GKE run — unverified)</em></td><td><strong>7,200,000</strong></td></tr>
-<tr><td>Writes/s <em>(internal GKE run — unverified)</em></td><td><strong>1,800,000</strong></td></tr>
-<tr><td>P50 (80R/20W blended)</td><td><strong>~220 ns</strong></td></tr>
-<tr><td>P99 (80R/20W blended)</td><td><strong>~510 &micro;s</strong></td></tr>
-<tr><td>GC emergency events</td><td><strong>0</strong></td></tr>
-<tr><td>Errors</td><td><strong>0</strong></td></tr>
-<tr><td>Storage density</td><td><strong>~160 GB</strong> for 1B &times; 128 B values</td></tr>
-</tbody>
-</table>
-<p class="note" style="font-size:12.5px;color:#8A8C95;margin-top:8px"><b>Verified vs unverified:</b> the measured, reproducible numbers are the YCSB single-node results (427,697 reads/s &middot; 18,064 durable writes/s &middot; AWS EC2, 4&times;NVMe, 100M keys). The 3-node GKE figures (7.2M reads/s / 1.8M writes/s) come from an internal run without a published harness — treat them as unverified until reproduced.</p>
-</div>
-
-<h3>Single node (Linux NVMe)</h3>
-<div class="table-wrap">
-<table>
-<thead><tr><th>Operation</th><th>P50</th><th>P99</th></tr></thead>
-<tbody>
-<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s)</td></tr>
-<tr><td>PUT &mdash; 10 ms flush window</td><td>5 ms</td><td>10.2 ms</td></tr>
-<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s)</td></tr>
-<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s)</td></tr>
-</tbody>
-</table>
-</div>
-
 <h2 id="ycsb-results">YCSB benchmark results (100M keys)</h2>
-<p>Published in <code>BENCHMARK_RESULTS.md</code>, dated June 9, 2026. Test environment: AWS EC2 high-memory instance, 495 GB total RAM (488 GB available), 4&times; NVMe SSD at 873 GB each (3.5 TB total), raw block-device VLog (<code>/dev/nvmeXn1p2</code>), 400 GB LIRS cache, 200 client threads, 100,000,000 keys, ~100-byte values, benchmark tool <strong>YCSB 0.17.0</strong>.</p>
+<p>These are the only reproducible headline numbers. Published in <code>BENCHMARK_RESULTS.md</code>, dated June 9, 2026, on a <strong>historical pure-Go build</strong> (v1.0; it predates the native index, the binary WAL, the one-<code>write(2)</code> WAL flusher, the ordered-index fix and <code>--net</code>). Test environment: AWS EC2 high-memory instance, 495 GB total RAM (488 GB available), 4&times; NVMe SSD at 873 GB each (3.5 TB total), raw block-device VLog (<code>/dev/nvmeXn1p2</code>), 400 GB LIRS cache, 200 client threads, 100,000,000 keys, ~100-byte values, benchmark tool <strong>YCSB 0.17.0</strong>.</p>
 
 <h3>Write benchmark (100M key load)</h3>
-<p>Configuration: 5 ms WAL flush window, 5 ms VLog flush window, 200 threads, 4&times; NVMe striped.</p>
+<p>Configuration: 5 ms WAL flush window, 5 ms VLog flush window (the server default is now 15 ms), 200 threads, 4&times; NVMe striped, every write <code>fdatasync</code>-durable.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Metric</th><th>Value</th></tr></thead>
@@ -215,7 +185,7 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </div>
 
 <h3>Read benchmark (10M reads on 100M key dataset)</h3>
-<p>Configuration: 400 GB cache (entire dataset fits in RAM), 200 threads, 10,000,000 operations, 100% reads (YCSB <code>workload_c</code>).</p>
+<p>Configuration: 400 GB cache, 200 threads, 10,000,000 operations, 100% reads (YCSB <code>workload_c</code>). <strong>The entire dataset was in cache, so every read was a cache hit</strong> &mdash; this measures the cache-hit path through the network stack, not NVMe reads.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Metric</th><th>Value</th></tr></thead>
@@ -245,8 +215,87 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </table>
 </div>
 
+<h2 id="later-measurements">Later measurements <span class="badge good">New in v1.5–v1.7</span></h2>
+<p>Not YCSB and not the YCSB machine; each row states its conditions. These cover the native index and binary WAL (v1.6) and the ordered-index fix and C++ front-end (v1.7).</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Measurement</th><th>Result</th><th>Conditions</th></tr></thead>
+<tbody>
+<tr><td>Server batch writes, 8 clients &times; 1024-key <code>MPUT</code>, 1M-key space</td><td><strong>3.54M keys/s, P99 4.2 ms</strong> (1.45M, 9.6 ms before the ordered-index fix)</td><td>macOS (fsync does not flush the drive cache)</td></tr>
+<tr><td>Batch writes, Go front-end, C++ storage off</td><td><strong>1.77M keys/s, P99 12.2&ndash;12.7 ms</strong></td><td>4-CPU CI runner, tmpfs, client on same host, 2026-09-25</td></tr>
+<tr><td>Reads, same configuration</td><td><strong>177&ndash;182K ops/s, P99 1.8&ndash;2.0 ms</strong></td><td>same</td></tr>
+<tr><td>Mixed-workload write P99, 1 ms flush window</td><td><strong>2.57 ms</strong></td><td>same</td></tr>
+<tr><td>Batch writes, C++ storage layer all on (io_uring bridge + SQPOLL, batch engine, native index)</td><td>1.12M keys/s</td><td>same; per-part attribution pending</td></tr>
+<tr><td>C++ network front-end (<code>--net=cpp</code>, opt-in) vs Go</td><td>read P50 154 vs 286 &micro;s, poll read throughput 194K vs 177K ops/s; read P99 ~3.0 vs 1.8 ms, batch writes ~12% lower</td><td>same, measured before disk reads moved off the loop; not faster overall</td></tr>
+<tr><td>Native index vs Go map, 5M keys</td><td>full GC 21 &rarr; 0.27 ms, settled RSS 168 &rarr; 142 B/key, ~19 ns more per cache-miss lookup</td><td>engine benchmark</td></tr>
+<tr><td>In-process cache hit</td><td>~92 ns (sharded LIRS; was 711 ns)</td><td>engine benchmark</td></tr>
+</tbody>
+</table>
+</div>
+<p>Because the CI rows use tmpfs and a client on the same host, compare them with each other, not with other hardware.</p>
+
+<h2 id="net-bench">Network front-ends and storage configurations (<code>net-bench.sh</code>) <span class="badge good">New in v1.7</span></h2>
+<p><code>scripts/net-bench.sh</code> starts a fresh server per combination and runs batch write (8 &times; 1024-key <code>MPUT</code>, <code>BATCH_DURATION</code>, default 10 s), read (64 binary <code>GET</code> clients) and mixed (70/30) workloads, then prints one markdown table (also to <code>$GITHUB_STEP_SUMMARY</code>). The &ldquo;Net front-end&rdquo; GitHub workflow runs it on Linux, where the io_uring code exists.</p>
+<pre class="code-block"><code># Front-ends (NET:N = N event loops for a C++ front-end)
+NETS="go uring poll uring:2" ENGINES=native WINDOWS=5 ./scripts/net-bench.sh
+
+# Storage configurations under the Go front-end
+ENGINES="native bridge sqpoll map nocgo" NETS=go WINDOWS="5 1" ./scripts/net-bench.sh</code></pre>
+<p>Defaults: <code>NETS="go uring"</code>, <code>ENGINES=native</code>, <code>WINDOWS=5</code>, <code>DURATION=15</code> s per read/mixed workload, <code>NET_THREADS</code> = CPU count. The C++ front-ends need the binary protocol, so reads and mixed run with <code>loadtest --proto=binary</code>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th><code>ENGINES</code> value</th><th>Configuration</th></tr></thead>
+<tbody>
+<tr><td><code>native</code></td><td>Native C++ index, io_uring VLog bridge off &mdash; the default build</td></tr>
+<tr><td><code>inline</code></td><td><code>native</code>, but the C++ front-end reads disk on its loop thread (<code>VELTRIXDB_NET_DEFER_READS=0</code>)</td></tr>
+<tr><td><code>bridge</code> / <code>sqpoll</code></td><td><code>native</code> + <code>VELTRIXDB_URING_BRIDGE=on</code> / <code>sqpoll</code></td></tr>
+<tr><td><code>map</code></td><td>Go map index, bridge off</td></tr>
+<tr><td><code>nocgo</code></td><td><code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code>: map index, no C++ storage layer</td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong>Every overwrite appends to the WAL and VLog</strong> and nothing reclaims space during a run; one combination leaves ~5&ndash;10 GB, so each data dir is deleted when its combination finishes.</li>
+<li><strong>Each workload runs under a watchdog</strong> (duration + <code>WATCHDOG_SLACK</code>, default 60 s). On a hang the script dumps native and Go stacks, records a FAILED row, and moves on.</li>
+<li><strong>C++ front-ends log per-stage latency at shutdown</strong> (log2 buckets, so <code>p99&lt;=8ms</code> means [4, 8) ms). A high <code>cb_enter</code> means loop threads are waiting for a Go P; try fewer loops (<code>uring:2</code>).</li>
+<li>On macOS only poll with one loop runs, and loopback caps round trips at ~60K/s for both front-ends &mdash; measure on Linux.</li>
+</ul>
+
+<h2 id="cluster-benchmark">Internal GKE run (unverified)</h2>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Not a reproducible result</span> These figures come from an internal run with no published harness or raw output. They have not been reproduced, and &ldquo;1 billion keys&rdquo; has not been measured reproducibly. Do not use them for capacity planning; the YCSB results above are the only reproducible headline numbers.</span></div>
+<p>Reported conditions: <strong>3-node GKE cluster &middot; <code>n2-highmem-64</code> &middot; 8&times;375 GB NVMe per node &middot; 1 billion keys &middot; 80R/20W &middot; 30 minutes sustained</strong>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Reads/s <em>(internal GKE run — unverified)</em></td><td><strong>7,200,000</strong></td></tr>
+<tr><td>Writes/s <em>(internal GKE run — unverified)</em></td><td><strong>1,800,000</strong></td></tr>
+<tr><td>P50 (80R/20W blended)</td><td><strong>~220 ns</strong></td></tr>
+<tr><td>P99 (80R/20W blended)</td><td><strong>~510 &micro;s</strong></td></tr>
+<tr><td>GC emergency events</td><td><strong>0</strong></td></tr>
+<tr><td>Errors</td><td><strong>0</strong></td></tr>
+<tr><td>Storage density</td><td><strong>~160 GB</strong> for 1B &times; 128 B values</td></tr>
+</tbody>
+</table>
+<p class="note" style="font-size:12.5px;color:#8A8C95;margin-top:8px"><b>Verified vs unverified:</b> the measured, reproducible numbers are the YCSB single-node results (427,697 reads/s &middot; 18,064 durable writes/s &middot; AWS EC2, 4&times;NVMe, 100M keys). The 3-node GKE figures (7.2M reads/s / 1.8M writes/s) come from an internal run without a published harness — treat them as unverified until reproduced.</p>
+</div>
+
+<h3>Single node (Linux NVMe) &mdash; projected</h3>
+<p>Illustrative figures derived from the flush-window model in the performance guide, not from a recorded benchmark run.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Operation</th><th>P50</th><th>P99</th></tr></thead>
+<tbody>
+<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s)</td></tr>
+<tr><td>PUT &mdash; 15 ms flush window (default)</td><td>&mdash;</td><td>~15.2 ms</td></tr>
+<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s)</td></tr>
+<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s)</td></tr>
+</tbody>
+</table>
+</div>
+
 <h2 id="veltrixdb-vs-redis-head-to-head">VeltrixDB vs. Redis, head to head</h2>
-<p>From the same YCSB run, compared against publicly documented Redis behavior at equivalent durability settings.</p>
+<p>The VeltrixDB column is from the YCSB run above. <strong>The Redis column was not measured</strong> &mdash; it is a range of commonly cited figures, included for orientation only.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Mode</th><th>VeltrixDB</th><th>Redis</th></tr></thead>
@@ -272,14 +321,14 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 
 <h2 id="key-takeaways">Key takeaways</h2>
 <ul>
-<li><strong>Writes:</strong> 18,064 durable writes/sec across 4 NVMe disks, zero failures across 100M operations &mdash; comparable to Redis with <code>appendfsync always</code>.</li>
-<li><strong>Reads:</strong> 427,697 reads/sec at 461 &micro;s average latency, 2&ndash;4&times; faster than a single Redis instance without pipelining, while data lives on NVMe rather than RAM.</li>
-<li><strong>Scalability:</strong> 100M keys used only ~25 GB per disk out of 873 GB available; the same machine can hold 1 billion+ keys with no RAM constraint, where Redis would need 300&ndash;450 GB RAM for an equivalent dataset.</li>
-<li><strong>Durability:</strong> every write is crash-safe (WAL + <code>fdatasync</code>). Redis needs special configuration for the same guarantee and pays a similar performance cost when enabled.</li>
+<li><strong>Writes:</strong> 18,064 durable writes/sec across 4 NVMe disks at a 5 ms window, zero failures across 100M operations.</li>
+<li><strong>Reads:</strong> 427,697 reads/sec at 461 &micro;s average latency, with the whole dataset in the 400 GB cache (100% hits). Cache-miss (NVMe) read performance was not measured in this run.</li>
+<li><strong>Disk footprint:</strong> 100M keys used ~25 GB per disk out of 873 GB available. Larger key counts (1 billion+) have not been measured reproducibly; note the index itself stays in RAM (~142 B/key with the native index).</li>
+<li><strong>Durability:</strong> every write is crash-safe (WAL + <code>fdatasync</code>). Redis needs <code>appendfsync always</code> for a comparable guarantee.</li>
 <li><strong>Read hit rate:</strong> 100% with proper dataset sizing (<code>recordcount</code> matching <code>operationcount</code>), zero <code>NOT_FOUND</code> across 10 million reads.</li>
 </ul>
 
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Reproduce it yourself</span> All numbers on this page come from <code>scripts/bench.sh</code> and YCSB 0.17.0 runs against VeltrixDB v1.0, dated June 2026. Re-run the harness against your own key/value shape rather than assuming these numbers transfer directly &mdash; see <a class="inline-link" href="redis-comparison.html">VeltrixDB vs. Redis</a> for how to interpret the results relative to your workload.</span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Reproduce it yourself</span> The YCSB numbers come from YCSB 0.17.0 against VeltrixDB v1.0 (June 2026); the later measurements from <code>scripts/net-bench.sh</code> and engine benchmarks (September 2026, v1.7 code); the reference tables from <code>scripts/bench.sh</code> and projections. Re-run the harness against your own key/value shape rather than assuming these numbers transfer directly &mdash; see <a class="inline-link" href="redis-comparison.html">VeltrixDB vs. Redis</a> for how to interpret the results relative to your workload.</span></div>
 
 <div class="card-grid">
 <a class="card" href="redis-comparison.html"><div class="card-title">VeltrixDB vs. Redis &rarr;</div><div class="card-desc">Feature comparison, cost economics, and migration guidance.</div></a>

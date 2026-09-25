@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/docs.css" />
 </head>
 <body>
@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.1.0</span>
+    <span class="version-pill">v1.8</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -96,13 +96,17 @@
 <p>The fastest way to try VeltrixDB. The published image requires no build step:</p>
 <pre class="code-block"><code>docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb:latest</code></pre>
 <p>This starts a single standalone node listening on <code>9000</code>. It's suitable for local development and protocol testing, not for production NVMe throughput — for that, run on bare metal or Kubernetes with real local NVMe disks attached.</p>
+<p><span class="badge good">New in v1.6</span> The image is built with <code>CGO_ENABLED=1</code> on <code>gcr.io/distroless/cc-debian12</code> (glibc, no shell), so it carries the off-heap native index. The io_uring VLog write bridge is compiled in but stays off unless you set <code>VELTRIXDB_URING_BRIDGE=on</code> or <code>sqpoll</code>; under Kubernetes' RuntimeDefault seccomp profile <code>io_uring_setup</code> is blocked and an opted-in bridge falls back to <code>pwrite</code>. Build with <code>--build-arg CGO_ENABLED=0</code> for the old fully static, pure-Go image (Go map index).</p>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Set vm.max_map_count on the host</span> The native index mmaps its large arrays individually, so at large key counts the host (or Kubernetes node) needs <code>vm.max_map_count ≥ 262144</code>; below that an insert can fail with ENOMEM. A container cannot set it — apply <code>scripts/sysctl.conf</code> on the host, e.g. <code>sudo sysctl -w vm.max_map_count=262144</code>.</span></div>
 
 <h2 id="build-from-source">Build from source</h2>
-<p>Requires <strong>Go 1.19+</strong>. The Go layer builds and runs on macOS and Linux; the optional C++ acceleration layer (io_uring, ART index, NUMA pinning) is only active on Linux.</p>
+<p>Requires <strong>Go 1.19+</strong> for a pure-Go build. A default <code>go build</code> uses cgo, which needs a C++ compiler; the native index and the C++ network front-end also need Go 1.21+ (older toolchains fall back to the Go map and <code>--net=go</code> only); on Linux the C++ network front-end also links liburing (install <code>liburing-dev</code>, or add <code>-tags vxnf_nouring</code> for a poll()-only front-end). Set <code>CGO_ENABLED=0</code> for a pure-Go build with no C++ at all (Go map index, no <code>--net=cpp</code>).</p>
 <pre class="code-block"><code>git clone https://github.com/VeltrixDB/veltrixdb
 cd veltrixdb
-go build ./...
+go build ./...                  # cgo build (default): native index
+CGO_ENABLED=0 go build ./...    # pure-Go build: Go map index, no C++
 go run ./cmd/server -addr :9000 -data ./dev-data -cache 256</code></pre>
+<p>For release artifacts, <code>scripts/build.sh</code> builds the C++ library and the Go binaries together (Linux, requires CMake and liburing); <code>./scripts/build.sh --go-only</code> skips the CMake step. The cgo directives target a portable <code>-march=x86-64-v2</code> baseline on amd64; <code>scripts/build.sh</code> re-adds <code>-march=native</code> when it builds on the target machine.</p>
 <p>To build the standalone binary and additional tooling (operator CLI, backup tool):</p>
 <pre class="code-block"><code>go build -o veltrix ./cmd/veltrix        # cluster CLI: status, nodes, top, put/get, backup
 go build -o veltrixdb-backup ./cmd/backup # backup/restore tool</code></pre>
@@ -122,7 +126,8 @@ helm install veltrixdb veltrixdb/veltrixdb \
 <p>Verify the deployment:</p>
 <pre class="code-block"><code>kubectl get pv | grep local-nvme
 kubectl get pods -n veltrixdb -l app.kubernetes.io/name=veltrixdb
-kubectl exec -n veltrixdb veltrixdb-0 -- sh -c 'echo PING | nc 127.0.0.1 9000'
+kubectl port-forward -n veltrixdb veltrixdb-0 9000:9000 &amp;
+echo PING | nc 127.0.0.1 9000
 # Expected: PONG</code></pre>
 <p>See the <a class="inline-link" href="../kubernetes/helm-chart.html">Helm Chart reference</a> for the full values table, including cache sizing, TLS, encryption, quotas, and raw block-device VLog options.</p>
 
@@ -145,8 +150,8 @@ spec:
   image: veltrixdb/veltrixdb:1.0.0
   disksPerNode: 8
   cacheSizeMB: 262144
-  walFlushWindowMs: 10
-  vlogFlushWindowMs: 10</code></pre>
+  walFlushWindowMs: 15
+  vlogFlushWindowMs: 15</code></pre>
 <pre class="code-block"><code>kubectl apply -f veltrixcluster.yaml
 kubectl get veltrixcluster -n veltrixdb</code></pre>
 <p>See the <a class="inline-link" href="../kubernetes/operator.html">Kubernetes Operator reference</a> for the full spec, including at-rest encryption, audit logging, per-namespace quotas, the admin API/UI surface, and the optional chaos-engineering sidecar.</p>
