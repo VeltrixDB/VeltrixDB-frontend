@@ -289,15 +289,17 @@ function makeHero3D(){
   const bars = document.querySelectorAll('.bar-fill');
   const wrap = document.querySelector('.lat-wrap');
   if (!wrap) return;
+  const fill = () => bars.forEach(b=>{ b.style.width = b.dataset.w + '%'; });
+  if (!('IntersectionObserver' in window)) { fill(); return; }
+  let reported = false;
   const io = new IntersectionObserver((entries)=>{
+    reported = true;
     entries.forEach(e=>{
-      if (e.isIntersecting){
-        bars.forEach(b=>{ b.style.width = b.dataset.w + '%'; });
-        io.disconnect();
-      }
+      if (e.isIntersecting){ fill(); io.disconnect(); }
     });
   },{threshold:.2});
   io.observe(wrap);
+  setTimeout(()=>{ if (!reported){ io.disconnect(); fill(); } }, 3000);
 })();
 
 /* ============ Path demo — auto-cycling tabs + steps ============ */
@@ -456,7 +458,9 @@ function makePathShapes3D(){
     });
   }
   tag();
+  let reported = false;
   const io = new IntersectionObserver((entries) => {
+    reported = true;
     entries.forEach(e => {
       if (e.isIntersecting){
         e.target.classList.add('in');
@@ -464,7 +468,10 @@ function makePathShapes3D(){
       }
     });
   }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => io.observe(el));
+  const tagged = document.querySelectorAll('.reveal, .reveal-stagger');
+  tagged.forEach(el => io.observe(el));
+  // Never leave content hidden if the observer does not work here.
+  setTimeout(() => { if (!reported){ io.disconnect(); tagged.forEach(el => el.classList.add('in')); } }, 3000);
 })();
 
 /* ============ Cost Calculator ============ */
