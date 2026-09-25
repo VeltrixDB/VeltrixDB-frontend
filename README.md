@@ -2,6 +2,18 @@
 
 Static multi-page site. No build step — plain HTML + shared assets.
 
+## Run it locally
+
+Serve the folder over HTTP — do not open the files as `file://`:
+
+```bash
+python3 -m http.server 8000   # then open http://localhost:8000/
+```
+
+Browsers treat every `file://` page as its own security origin. Inside an editor preview
+or any other frame, navigating between pages is then blocked ("Unsafe attempt to load URL
+file:///… from frame …"), and some features behave differently.
+
 ## Structure
 
 | Page | Content |
