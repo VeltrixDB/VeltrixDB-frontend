@@ -415,3 +415,7 @@ p,li{text-wrap:pretty}
   .term-body{font-size:12.5px;padding:18px 16px}
 }
 @media (prefers-reduced-motion: reduce){.btn:hover{transform:none}}
+
+/* header: when the nav links collapse, the CTA group still belongs on the
+   right (it lost the push from .nav-links{margin-right:auto}) */
+.nav-cta{margin-left:auto}

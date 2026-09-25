@@ -4,15 +4,14 @@ Static multi-page site. No build step — plain HTML + shared assets.
 
 ## Run it locally
 
-Serve the folder over HTTP — do not open the files as `file://`:
+It is plain HTML: double-click `index.html` and it opens in Chrome, Safari or Firefox with
+every page, style and link working — no build, no server.
 
-```bash
-python3 -m http.server 8000   # then open http://localhost:8000/
-```
-
-Browsers treat every `file://` page as its own security origin. Inside an editor preview
-or any other frame, navigating between pages is then blocked ("Unsafe attempt to load URL
-file:///… from frame …"), and some features behave differently.
+The exception is an editor's built-in preview (e.g. VS Code), which shows the page inside
+a frame. There Chrome treats each `file://` page as its own origin and blocks loading
+between them ("Unsafe attempt to load URL file:///… from frame …"), so the page can
+appear unstyled or links do nothing. Open it in a real browser, or serve the folder:
+`python3 -m http.server 8000` and open http://localhost:8000/.
 
 ## Structure
 

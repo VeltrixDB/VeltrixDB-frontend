@@ -57,3 +57,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var
 /* UI labels: small sans caps. Monospace stays for code, commands and data. */
 .ft h5, .pv-figure .fl, .pv-text .pk, .toc-card .ch, .toc-head .meta, .wp-doc .seal-l, .wp-doc .seal-r, .wp-doc .st .l, .a-foot .links a, .a-kicker, .a-pull .pl, .lat-table th, .matrix th, .next .kind, .next-up h4, .spec td:first-child, .cmp thead th, .schem-label, .ck-h, .timeline-h{font-family:var(--sans) !important;font-weight:700 !important;letter-spacing:.07em !important;font-size:11.5px}
 .brand b i{font-weight:800 !important}
+
+/* header: when the nav links collapse, the CTA group still belongs on the
+   right (it lost the push from .nav-links{margin-right:auto}) */
+.nav-cta{margin-left:auto}
