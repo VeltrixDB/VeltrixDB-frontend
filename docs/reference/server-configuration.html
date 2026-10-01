@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -107,12 +108,12 @@
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>-addr</code></td><td><code>:9000</code></td><td>TCP address for the plaintext client listener (text protocol + binary protocol, auto-detected per connection).</td></tr>
-<tr><td><code>-metrics-addr</code></td><td><code>:2112</code></td><td>HTTP address serving <code>/metrics</code>, <code>/healthz</code>, <code>/readyz</code>, <code>/admin/*</code>, and <code>/traces</code>. This is the "admin port" referenced throughout the docs.</td></tr>
+<tr><td><code>-metrics-addr</code></td><td><code>:2112</code></td><td>HTTP address serving <code>/metrics</code>, <code>/healthz</code>, <code>/readyz</code>, <code>/admin/*</code>, and <code>/traces</code>. This is the "admin port" referenced throughout the docs. <code>/healthz</code> and <code>/readyz</code> answer from the moment the process starts; <code>/metrics</code>, <code>/admin/*</code> and <code>/traces</code> are added once the storage engine has opened (they return <code>404</code> before that).</td></tr>
 <tr><td><code>-tls-addr</code></td><td><code>:9443</code></td><td>TCP address for the TLS client listener. Only started when <code>-tls-cert</code> and <code>-tls-key</code> are both set; runs concurrently with the plaintext listener on <code>-addr</code>.</td></tr>
 <tr><td><code>-net</code></td><td><code>go</code></td><td><span class="badge good">New in v1.7</span> Network front-end for <code>-addr</code>: <code>go</code> (default; the Go server &mdash; every protocol and command, <code>AUTH</code>, all modes) | <code>cpp</code> (C++ event loops in <code>netfront/</code>: io_uring on Linux if available, else <code>poll()</code>) | <code>uring</code> (C++ with io_uring required; fails if unavailable) | <code>poll</code> (C++ with <code>poll()</code>, portable). The C++ front-end serves only the binary protocol's <code>PUT GET DEL PING MPUT MGET</code>, and the server refuses to start with it in <code>-mode raft</code>/<code>replicated</code> or with <code>-auth-config</code>. The text protocol, <code>AUTH</code>, extended binary commands and TLS (<code>-tls-addr</code>) stay on Go. Experimental: in CI measurements it lowered read P50 but had worse read P99 and lower batch-write throughput than <code>go</code> &mdash; see <a class="inline-link" href="../operations/performance-tuning.html">Performance Tuning</a>.</td></tr>
 <tr><td><code>-net-threads</code></td><td>NumCPU</td><td><span class="badge good">New in v1.7</span> Number of event loops for <code>-net=cpp|uring|poll</code> (one per core, each with its own <code>SO_REUSEPORT</code> listener). macOS runs a single poll loop.</td></tr>
 <tr><td><code>-pprof-addr</code></td><td><em>(empty = off)</em></td><td><span class="badge good">New in v1.7</span> Serves CPU, heap, goroutine and execution-trace profiles (pprof format) on this address, e.g. <code>127.0.0.1:6060</code>, under <code>/debug/pprof/</code> (<code>/debug/pprof/profile?seconds=N</code>, <code>/debug/pprof/trace?seconds=N</code>, <code>/debug/pprof/heap</code>, &hellip;). Uses its own HTTP mux, never the metrics port &mdash; profiles expose internals, so bind it to loopback.</td></tr>
-<tr><td><code>-node</code></td><td><code>node-1</code></td><td>Legacy node identifier flag. Superseded by <code>-node-id</code> when both are set.</td></tr>
+<tr><td><code>-node</code></td><td><code>node-1</code></td><td>Unique node ID in the cluster (legacy name). Superseded by <code>-node-id</code> when that is non-empty.</td></tr>
 </tbody>
 </table>
 </div>
@@ -125,9 +126,9 @@
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>-data</code></td><td><code>./veltrixdb-data</code></td><td>Single data directory (WAL + segments). Ignored whenever <code>-data-dirs</code> is set.</td></tr>
-<tr><td><code>-data-dirs</code></td><td><em>(empty)</em></td><td>Comma-separated NVMe mount paths, one per physical disk, e.g. <code>-data-dirs=/mnt/nvme0,/mnt/nvme1,...,/mnt/nvme7</code>. Each disk gets its own segment writer and compaction goroutine; the WAL is placed on the first listed disk. Overrides <code>-data</code>.</td></tr>
+<tr><td><code>-data-dirs</code></td><td><em>(empty)</em></td><td>Comma-separated NVMe mount paths, one per physical disk, e.g. <code>-data-dirs=/mnt/nvme0,/mnt/nvme1,...,/mnt/nvme7</code>. Each disk gets its own segment writer and compaction goroutine, and its own WAL and VLog. Overrides <code>-data</code>.</td></tr>
 <tr><td><code>-raw-vlogs</code></td><td><em>(empty)</em></td><td>Linux only. Comma-separated raw NVMe block-device paths for VLog backing (e.g. <code>/dev/nvme0n1,/dev/nvme1n1,...</code>), paired index-by-index with <code>-data-dirs</code>. Bypasses XFS for VLog I/O; WAL and segment files remain on <code>-data-dirs</code>. Requires <code>CAP_SYS_RAWIO</code> or root. First open writes a 4&nbsp;KB superblock at offset 0 of each device. Entry count must exactly match <code>-data-dirs</code>.</td></tr>
-<tr><td><code>-cache</code></td><td><code>256</code></td><td>LIRS cache size in MB. Ignored when <code>-auto-tune</code> is set (hardware-derived value wins), and overridden by the <code>-read-heavy</code> preset's 400&nbsp;GB default unless you explicitly pass a non-default <code>-cache</code> value alongside it.</td></tr>
+<tr><td><code>-cache</code></td><td><code>256</code></td><td>LIRS cache size in MB. Ignored when <code>-auto-tune</code> is set (the hardware-derived value wins; this flag is used only if hardware detection fails), and overridden by the <code>-read-heavy</code> preset's 400&nbsp;GB default unless you explicitly pass a non-default <code>-cache</code> value alongside it.</td></tr>
 <tr><td><code>-gc-threshold</code></td><td><code>0.30</code></td><td>VLog dead-space ratio (0.0&ndash;1.0) that triggers background compaction. Lower values trigger more frequent, smaller GC passes.</td></tr>
 <tr><td><code>-auto-tune</code></td><td><code>false</code></td><td>Auto-detects hardware (RAM, CPU cores, disk types) and self-tunes cache size, memtable size, shard count, compaction threads, and SSTable size (the "80% RAM rule"), plus applies OS-level tuning (NVMe I/O scheduler, hugepages, CPU governor). Requires root or <code>CAP_SYS_ADMIN</code> on Linux for the sysctl/rlimit changes; falls back to defaults with a logged warning if hardware detection fails.</td></tr>
 <tr><td><code>-read-heavy</code></td><td><code>false</code></td><td>Applies the read-heavy preset: 400&nbsp;GB cache, LIRS ratio 0.95, 300s GC interval, 60s TTL scan interval. Tuned for P99 &lt; 5&nbsp;ms at 2M+ ops/sec on n2-highmem-64-class hardware. Overrides <code>DefaultStorageConfig</code> but not <code>-auto-tune</code> or explicit per-flag overrides applied afterward.</td></tr>
@@ -138,13 +139,14 @@
 </div>
 
 <h2 id="durability">Durability</h2>
-<p>Flags controlling the write-ahead log, group-commit windows, and point-in-time-recovery (PITR) archiving.</p>
+<p>Flags controlling the write-ahead log, group commit, and point-in-time-recovery (PITR) archiving.</p>
 
 <div class="table-wrap">
 <table>
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>-wal-flush-window-ms</code></td><td><code>15</code></td><td>WAL group-commit flush window in milliseconds. At the 15&nbsp;ms default, roughly 200 entries batch per <code>fdatasync</code> at 100K writes/s. Use a smaller window (e.g. 5&nbsp;ms) for latency-sensitive workloads at the cost of fewer entries per sync. <strong>Must match</strong> <code>-vlog-flush-window-ms</code> (an enforced invariant).</td></tr>
+<tr><td><code>-group-commit</code></td><td><code>adaptive</code></td><td><span class="badge good">New in v1.12</span> How the WAL/VLog flush windows are used. <code>adaptive</code> (default): the window is an upper bound &mdash; a lone writer is synced at once, concurrent writers are synced after an idle gap of about one <code>fdatasync</code>. <code>fixed</code>: every batch waits the full window (the behaviour before v1.12). Any other value stops startup. Measured with an emulated 300&nbsp;&micro;s sync and the 15&nbsp;ms window: a single writer's Put P50 dropped from 16&nbsp;ms to 0.45&nbsp;ms, and 64 writers went from 4.0K to 37.5K durable writes/s (P99 16.8 &rarr; 2.6&nbsp;ms) at the same writes per <code>fdatasync</code>.</td></tr>
+<tr><td><code>-wal-flush-window-ms</code></td><td><code>15</code></td><td>WAL group-commit flush window in milliseconds (the upper bound in <code>adaptive</code> mode). At the 15&nbsp;ms default, roughly 200 entries batch per <code>fdatasync</code> at 100K writes/s. Use a smaller window (e.g. 5&nbsp;ms) for latency-sensitive workloads at the cost of fewer entries per sync. <strong>Must match</strong> <code>-vlog-flush-window-ms</code> (an enforced invariant).</td></tr>
 <tr><td><code>-vlog-flush-window-ms</code></td><td><code>15</code></td><td>VLog <code>fdatasync</code> group-commit window in milliseconds. Must equal <code>-wal-flush-window-ms</code> &mdash; WAL and VLog flushes race concurrently, and end-to-end P99 is the max of the two.</td></tr>
 <tr><td><code>-wal-max-batch</code></td><td><code>4096</code></td><td>Maximum WAL entries per group-commit flush before the flush timer is forced to fire early. Raise this if sustained write rate exceeds <code>window &times; max_batch</code> (e.g., 100K/s &times; 0.005s = 500, so 4096 gives generous headroom).</td></tr>
 <tr><td><code>-wal-format</code></td><td><code>binary</code></td><td><span class="badge good">New in v1.6</span> Encoding for new WAL records: <code>binary</code> (default; 48-byte little-endian header, magic <code>0xB1</code>, CRC32C over the whole record) or <code>text</code> (legacy). Replay reads both, mixed in one file. <code>text</code> exists only to roll back to a pre-binary build: run once with <code>-wal-format=text</code>, stop cleanly (the shutdown checkpoint rewrites <code>wal.log</code> as text), then downgrade. The server logs a warning when <code>text</code> is selected, because keys containing <code>|</code> or a newline can lose acknowledged writes on crash replay in that format. Only <code>cmd/server</code> has this flag; <code>veltrixdb-backup</code> and <code>veltrix-repair</code> always write binary.</td></tr>
@@ -156,10 +158,10 @@
 </table>
 </div>
 
-<p>See <a class="inline-link" href="../operations/backup-and-restore.html">Backup &amp; Restore</a> for how archived WAL segments combine with a full backup during <code>veltrixdb-backup restore-pitr</code>.</p>
+<p>See <a class="inline-link" href="../operations/backup-and-restore.html">Backup &amp; Restore</a> for how archived WAL segments combine with a full backup during <code>veltrixdb-backup restore-pitr</code> (an offline restore; take the base backup of a running server with <code>POST /admin/backup</code>).</p>
 
 <h2 id="security">Security</h2>
-<p>Flags controlling TLS, RBAC authentication, at-rest encryption, and the audit log.</p>
+<p>Flags controlling client TLS, RBAC authentication, the admin-API token, at-rest encryption, and the audit log. Inter-node TLS and the cluster secret are under <a class="inline-link" href="#cluster-replication">Cluster / Replication</a>.</p>
 
 <div class="table-wrap">
 <table>
@@ -168,11 +170,11 @@
 <tr><td><code>-tls-cert</code></td><td><em>(empty)</em></td><td>Path to the TLS server certificate PEM file for client connections. Enables the TLS listener on <code>-tls-addr</code> when set together with <code>-tls-key</code>.</td></tr>
 <tr><td><code>-tls-key</code></td><td><em>(empty)</em></td><td>Path to the TLS server private key PEM file.</td></tr>
 <tr><td><code>-tls-ca</code></td><td><em>(empty)</em></td><td>Path to a CA certificate for mTLS client verification on the client-facing TLS listener. When set, connecting clients must present a certificate signed by this CA.</td></tr>
-<tr><td><code>-auth-config</code></td><td><em>(empty)</em></td><td>Path to an RBAC auth config JSON file (users, password hashes, roles). When set, the <code>AUTH</code> command is required before any operation on that connection. When unset, RBAC is disabled and all operations are permitted without credentials.</td></tr>
+<tr><td><code>-auth-config</code></td><td><em>(empty)</em></td><td>Path to an RBAC auth config JSON file (users, password hashes, roles). When set, the <code>AUTH</code> command is required before any operation on that connection. Cannot be combined with <code>-net=cpp|uring|poll</code> (startup fails). When unset, RBAC is disabled and all operations are permitted without credentials.</td></tr>
 <tr><td><code>-encrypt-at-rest</code></td><td><code>false</code></td><td>Enables AES-256-GCM encryption of values stored in the VLog. The key is loaded from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64) or from <code>-encryption-key-path</code>. Startup fails fast if the key is missing or not exactly 32 bytes.</td></tr>
 <tr><td><code>-encryption-key-path</code></td><td><em>(empty)</em></td><td>Path to a file containing the 32-byte encryption key (raw or base64). Ignored if <code>VELTRIXDB_ENCRYPTION_KEY</code> is set in the environment.</td></tr>
 <tr><td><code>-audit-log</code></td><td><em>(empty)</em></td><td>Path to an append-only audit log (JSONL). Empty disables auditing. Covers <code>PUT</code>, <code>DEL</code>, and atomic ops; value bytes are never written to the audit log.</td></tr>
-<tr><td><code>-admin-token</code></td><td><code>$VELTRIX_ADMIN_TOKEN</code>, else <em>(empty)</em></td><td><span class="badge">v1.1.0</span> Bearer token guarding every <code>/admin/*</code> endpoint on <code>-metrics-addr</code>. When unset, <code>/admin/*</code> accepts loopback connections only (non-loopback gets <code>403</code>). When set, every <code>/admin/*</code> request — loopback included — must send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code> or it gets <code>401</code>; comparison is constant-time. Also readable from the <code>VELTRIX_ADMIN_TOKEN</code> environment variable. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are never guarded. See <a class="inline-link" href="../operations/security.html">Security</a>.</td></tr>
+<tr><td><code>-admin-token</code></td><td><code>$VELTRIX_ADMIN_TOKEN</code>, else <em>(empty)</em></td><td><span class="badge">v1.1.0</span> Bearer token guarding every <code>/admin/*</code> endpoint on <code>-metrics-addr</code>. The <code>veltrix</code> CLI and <code>kubectl-veltrix</code> send no token, so they get <code>401</code> from a server started with one (use <code>curl</code> with the header, or <code>repl-ship -src-token</code>). When unset, <code>/admin/*</code> accepts loopback connections only (non-loopback gets <code>403</code>). When set, every <code>/admin/*</code> request — loopback included — must send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code> or it gets <code>401</code>; comparison is constant-time. Also readable from the <code>VELTRIX_ADMIN_TOKEN</code> environment variable. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are never guarded. See <a class="inline-link" href="../operations/security.html">Security</a>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -183,13 +185,13 @@
 </div>
 
 <h2 id="cluster-replication">Cluster / Replication</h2>
-<p>Flags controlling <a class="inline-link" href="../concepts/deployment-modes.html">deployment mode</a> (standalone, raft, replicated), peer topology, and inter-node transport security.</p>
+<p>Flags controlling <a class="inline-link" href="../concepts/deployment-modes.html">deployment mode</a> (standalone, raft, replicated), peer topology, distributed search, and inter-node transport security.</p>
 
 <div class="table-wrap">
 <table>
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>-mode</code></td><td><code>standalone</code></td><td>Deployment mode: <code>standalone</code> | <code>raft</code> | <code>replicated</code>. <code>standalone</code> serves every request from local state (backward compatible, single node). <code>raft</code> commits writes through a Raft log (quorum-committed, linearizable writes; non-leaders return a <code>MOVED &lt;leader&gt;</code> redirect). <code>replicated</code> is primary-copy replication with per-request consistency via <code>-consistency</code>.</td></tr>
+<tr><td><code>-mode</code></td><td><code>standalone</code></td><td>Deployment mode: <code>standalone</code> | <code>raft</code> | <code>replicated</code>. <code>standalone</code> serves every request from local state (backward compatible, single node). <code>raft</code> commits writes through a Raft log (quorum-committed, linearizable writes; non-leaders answer writes with <code>MOVED &lt;leader-addr&gt; &lt;leader-id&gt;</code>). <code>replicated</code> is primary-copy replication with per-request consistency via <code>-consistency</code>.</td></tr>
 <tr><td><code>-node-id</code></td><td><em>(empty)</em></td><td>Node ID for the cluster. Overrides the legacy <code>-node</code> flag when set (non-empty).</td></tr>
 <tr><td><code>-peers</code></td><td><em>(empty)</em></td><td>Comma-separated cluster peers: <code>id@host:port,...</code>, where <code>host:port</code> is each peer's client <code>-addr</code>. Every node in the cluster should be listed with the same set of peers.</td></tr>
 <tr><td><code>-seeds</code></td><td><em>(empty)</em></td><td>Comma-separated bootstrap seed nodes in <code>nodeID=host:port</code> form, used to seed the gossip/partition map at startup (self-entries are skipped automatically).</td></tr>
@@ -197,29 +199,23 @@
 <tr><td><code>-repl-addr</code></td><td>derived</td><td>Replication server listen address. Empty derives <code>host:(clientPort+1)</code>.</td></tr>
 <tr><td><code>-gossip-addr</code></td><td>derived</td><td>Gossip listener address. Empty derives <code>host:(clientPort+3)</code>.</td></tr>
 <tr><td><code>-transfer-addr</code></td><td>derived</td><td><span class="badge">v1.1.0</span> Partition-transfer (rebalance) HTTP listen address. Empty derives <code>host:(clientPort+5)</code>. Used by the <a class="inline-link" href="../concepts/deployment-modes.html#auto-rebalance">TransferAgent</a> to stream keys to their new owners after a ring change; honors the <code>-cluster-tls-*</code> / <code>-cluster-mtls</code> settings when set.</td></tr>
-<tr><td><code>-linearizable-reads</code></td><td><code>false</code></td><td><span class="badge">v1.1.0</span> Raft mode: serve <code>GET</code> through the ReadIndex fence (quorum-confirmed, never stale). Costs one heartbeat round-trip per read; followers redirect to the leader. Logged as a no-op warning outside <code>-mode raft</code>.</td></tr>
+<tr><td><code>-linearizable-reads</code></td><td><code>false</code></td><td><span class="badge">v1.1.0</span> Raft mode: serve <code>GET</code> and <code>MGET</code> through the ReadIndex fence (quorum-confirmed, never stale). Costs one heartbeat round-trip per read; followers redirect to the leader. Logged as having no effect outside <code>-mode raft</code>. Without it (the default), raft-mode reads are local and can be stale on a follower, but since v1.12 a newly elected leader waits until its term's first entry has applied before serving reads, so writes the previous leader acknowledged are visible.</td></tr>
 <tr><td><code>-rack-id</code></td><td><em>(empty)</em></td><td><span class="badge">v1.1.0</span> This node's rack / availability-zone label (e.g. <code>-rack-id=asia-south1-a</code>). When set, partition placement and <code>GetReplicasForKey</code> never place two copies of a partition in the same failure domain — unless the replication factor exceeds the number of distinct racks, in which case placement falls back to distinct nodes while still spanning every rack available. Labels propagate to peers via gossip digests, so each node only needs its own flag. Reported as <code>"rack"</code> per node in the <code>/admin/cluster</code> topology JSON. Unset on all nodes keeps the previous deterministic round-robin placement.</td></tr>
 <tr><td><code>-auto-rebalance</code></td><td><code>true</code></td><td><span class="badge">v1.1.0</span> In distributed modes, automatically rebalance the partition ring and migrate keys to their new owners when nodes join, leave, or fail (3-second debounce per membership-event burst). Set <code>-auto-rebalance=false</code> to keep migration under manual control; the transfer listener still starts.</td></tr>
+<tr><td><code>-search-fanout</code></td><td><code>true</code></td><td><span class="badge good">New in v1.11</span> In <code>raft</code> / <code>replicated</code> mode, run every vector / text / hybrid search (and <code>QUERY</code>, <code>IDXQUERY</code>) on all non-failed nodes and merge the results &mdash; needed once a rebalance has partitioned the keys. <code>false</code> = local only. Node-to-node search traffic uses the transfer listener (<code>-transfer-addr</code>).</td></tr>
+<tr><td><code>-search-timeout-ms</code></td><td><code>2000</code></td><td><span class="badge good">New in v1.11</span> Per-peer timeout for one distributed search phase (BM25 has two). A peer that does not answer in time fails the request and is named in the error, unless <code>-search-allow-partial</code>.</td></tr>
+<tr><td><code>-search-allow-partial</code></td><td><code>false</code></td><td><span class="badge good">New in v1.11</span> Return a distributed search / <code>QUERY</code> / <code>IDXQUERY</code> result without the peers that failed or timed out (logged). Default: fail the request and name them. Also lets searches answer while the startup index rebuild is still running (otherwise refused; see <code>search_ready</code> in <a class="inline-link" href="admin-api.html#info">INFO</a>).</td></tr>
+<tr><td><code>-cluster-secret-file</code></td><td><em>(empty)</em></td><td><span class="badge good">New in v1.11</span> File holding the shared secret that signs (HMAC-SHA256) every request on the transfer listener: key migration and distributed search. Same file on every node; surrounding whitespace is trimmed and a secret shorter than 16 bytes stops startup. When empty, env <code>VELTRIXDB_CLUSTER_SECRET</code> is used. With neither a secret nor <code>-cluster-mtls</code>, the server logs that the transfer listener is unauthenticated &mdash; anyone who can reach it can write keys and run searches.</td></tr>
 <tr><td><code>-consistency</code></td><td><code>eventual</code></td><td><code>replicated</code>-mode write consistency: <code>eventual</code> (ACK after the local write, async replication) | <code>quorum</code> (ACK after a majority of replicas apply the write) | <code>strong</code> (ACK after all replicas apply it). <code>quorum</code>/<code>strong</code> return a clear timeout/quorum-not-reached error when the required copies are unreachable. Ignored in <code>standalone</code> and <code>raft</code> modes.</td></tr>
-<tr><td><code>-cluster-tls-cert</code></td><td><em>(empty)</em></td><td>PEM certificate for inter-node (Raft/replication) TLS.</td></tr>
+<tr><td><code>-cluster-tls-cert</code></td><td><em>(empty)</em></td><td>PEM certificate for inter-node (Raft/replication) TLS. With <code>-cluster-tls-key</code> it also puts the transfer listener (rebalance and distributed search) on TLS.</td></tr>
 <tr><td><code>-cluster-tls-key</code></td><td><em>(empty)</em></td><td>PEM key for inter-node TLS.</td></tr>
 <tr><td><code>-cluster-tls-ca</code></td><td><em>(empty)</em></td><td>PEM CA bundle for inter-node TLS peer verification.</td></tr>
-<tr><td><code>-cluster-mtls</code></td><td><code>false</code></td><td>Requires and verifies peer client certificates (mutual TLS) for inter-node Raft/replication traffic.</td></tr>
+<tr><td><code>-cluster-mtls</code></td><td><code>false</code></td><td>Requires and verifies peer client certificates (mutual TLS) for inter-node traffic, including the transfer listener.</td></tr>
 </tbody>
 </table>
 </div>
 
 <p>For the semantics of each mode's consistency guarantees — and the remaining node-local caveats (replicated-mode secondary-index metadata; <code>QUERY</code>/<code>RANGE</code>/<code>SCANCUR</code> reads) now that namespace, hash-field, vector, and list/set writes route through the coordinator in all modes — see <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a>.</p>
-
-<h2 id="misc">Miscellaneous</h2>
-<div class="table-wrap">
-<table>
-<thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>-node</code></td><td><code>node-1</code></td><td>See <a class="inline-link" href="#network">Network</a> above &mdash; legacy node identifier, superseded by <code>-node-id</code>.</td></tr>
-</tbody>
-</table>
-</div>
 
 <h2 id="environment">Environment variables</h2>
 <p>These are read by the server process at startup (and, for the storage ones, by any process that embeds the storage engine). They are not flags.</p>
@@ -228,6 +224,7 @@
 <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>VELTRIX_ADMIN_TOKEN</code></td><td><em>(unset)</em></td><td>Default value of <code>-admin-token</code> (the flag wins when passed). Also the default of <code>repl-ship -src-token</code>.</td></tr>
+<tr><td><code>VELTRIXDB_CLUSTER_SECRET</code></td><td><em>(unset)</em></td><td><span class="badge good">New in v1.11</span> Shared transfer-listener secret, used when <code>-cluster-secret-file</code> is empty (at least 16 bytes).</td></tr>
 <tr><td><code>VELTRIXDB_ENCRYPTION_KEY</code></td><td><em>(unset)</em></td><td>Base64 32-byte key for <code>-encrypt-at-rest</code>. Takes precedence over <code>-encryption-key-path</code>.</td></tr>
 <tr><td><code>VELTRIXDB_INDEX</code></td><td>native on cgo builds</td><td><span class="badge good">New in v1.6</span> Key-index implementation. Unset: the off-heap C++ native index on every cgo build (the official Docker image included), the Go map on <code>CGO_ENABLED=0</code> builds. <code>map</code> opts out; <code>native</code> forces it (when compiled in) even if <code>VELTRIXDB_DISABLE_CGO_ENGINE</code> is set. At large key counts the native index needs <code>vm.max_map_count &ge; 262144</code> (see <code>scripts/sysctl.conf</code>) or inserts can fail with <code>ENOMEM</code>. The chosen implementation is reported in the startup log.</td></tr>
 <tr><td><code>VELTRIXDB_URING_BRIDGE</code></td><td><code>off</code></td><td><span class="badge good">New in v1.7</span> io_uring VLog write bridge on a Linux cgo build: <code>off</code> (default; <code>pwrite</code> + <code>fdatasync</code>) | <code>on</code> (io_uring, no SQPOLL) | <code>sqpoll</code> (io_uring with an SQPOLL kernel thread per ring). Opt in only after measuring on your hardware; unknown values are logged and treated as <code>off</code>.</td></tr>
@@ -265,10 +262,11 @@
   -cluster-tls-key /etc/veltrixdb/cluster/node.key \
   -cluster-tls-ca /etc/veltrixdb/cluster/ca.crt \
   -cluster-mtls \
+  -cluster-secret-file /etc/veltrixdb/cluster/secret \
   -archive-dir /mnt/wal-archive \
   -archive-max-age-sec 604800</code></pre>
 
-<p>Notes on this configuration: <code>-cache 65536</code> allocates a 64&nbsp;GB LIRS cache; <code>-wal-flush-window-ms</code> and <code>-vlog-flush-window-ms</code> are kept equal per the durability invariant; <code>-cluster-mtls</code> requires every peer to present a certificate signed by <code>-cluster-tls-ca</code>; and <code>-archive-max-age-sec 604800</code> retains seven days of WAL archive for point-in-time recovery.</p>
+<p>Notes on this configuration: <code>-cache 65536</code> allocates a 64&nbsp;GB LIRS cache; <code>-wal-flush-window-ms</code> and <code>-vlog-flush-window-ms</code> are kept equal per the durability invariant; <code>-cluster-mtls</code> requires every peer to present a certificate signed by <code>-cluster-tls-ca</code>, and <code>-cluster-secret-file</code> additionally signs transfer-listener requests (the same file on all three nodes); <code>-group-commit</code> is left at its <code>adaptive</code> default; and <code>-archive-max-age-sec 604800</code> retains seven days of WAL archive for point-in-time recovery.</p>
 
 <div class="card-grid">
 <a class="card" href="admin-api.html"><div class="card-title">Admin API Reference →</div><div class="card-desc">Every HTTP endpoint exposed on -metrics-addr, with example requests and responses.</div></a>

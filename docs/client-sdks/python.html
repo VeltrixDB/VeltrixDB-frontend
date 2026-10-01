@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -301,6 +302,25 @@ except VeltrixDBError as e:
 except TimeoutError:
     print('operation timed out')</code></pre>
 <p><code>VeltrixDBError</code> is raised for a <code>STATUS_ERR</code> response from the server or for a connection dropped mid-read. Missing keys are represented as <code>None</code>, never an exception — check for <code>None</code> rather than wrapping every <code>get</code> in a <code>try</code>/<code>except</code>.</p>
+
+<h2 id="search">Vector, text and hybrid search</h2>
+<p>This SDK has no search methods: the Veltrixdb-client SDKs were not updated with the v1.11 search release. The search commands (<code>VCREATE</code>, <code>VSET … NS</code>, <code>VSEARCH</code>, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code>, <code>IDXCREATE</code>/<code>IDXQUERY</code>) are available over the text and binary protocols, and as typed methods only in the Go <code>client</code> package in the server repository (<a class="inline-link" href="go.html#search">Go &rarr; Search</a>; its cluster-aware <code>client.Client</code> has none). From Python, open a plain TCP socket to the server's <code>-addr</code> and send one text command per line; each search answers <code>id score</code> lines then <code>END</code>, or one <code>ERR …</code> line. Text cannot contain newlines and filter values cannot contain spaces on this protocol. Syntax: <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+<pre class="code-block"><div class="code-label">python &mdash; standard library only</div><code>import socket
+
+with socket.create_connection(("127.0.0.1", 9000)) as s:
+    f = s.makefile("rw", newline="\n")
+    def cmd(line):
+        f.write(line + "\n"); f.flush()
+        return f.readline().rstrip("\n")
+
+    print(cmd("VSET doc-42 NS docs 0.12 -0.03 0.88 0.41"))   # OK
+    f.write("VSEARCH 10 NS docs EF 128 0.1 0 0.9 0.4\n"); f.flush()
+    for line in iter(f.readline, ""):
+        line = line.rstrip("\n")
+        if line == "END" or line.startswith("ERR"):
+            break
+        doc_id, score = line.split(" ")
+        print(doc_id, float(score))</code></pre>
 
     <div class="page-nav">
 <a class="prev" href="../client-sdks/go.html"><span class="dir">&larr; Previous</span><span>Go</span></a>

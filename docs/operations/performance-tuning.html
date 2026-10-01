@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,26 +91,50 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Performance Tuning</div>
     <h1>Performance Tuning</h1>
-<p class="page-lede">VeltrixDB's throughput and latency are governed by a small number of knobs: the WAL/VLog flush window, cache size, batching, and admission control. This page summarizes the tuning guidance from the project's performance guide (<code>PERFORMANCE.md</code>), plus the index, C++ storage and network switches added in v1.6–v1.7.</p>
+<p class="page-lede">VeltrixDB's throughput and latency are governed by a small number of knobs: group commit and the WAL/VLog flush window, cache size, batching, and admission control; vector search adds its own (beam width, quantization, graph placement). This page summarizes the tuning guidance from the project's performance guide (<code>PERFORMANCE.md</code>) and <code>docs/vector-search.md</code>, including the index, C++ storage and network switches added in v1.6&ndash;v1.7 and the group-commit and vector knobs of v1.11&ndash;v1.12.</p>
 
-<h2 id="flush-windows">The most important knob: flush windows</h2>
-<p>Both the WAL and VLog use group-commit: writes arriving within a configurable window share a single <code>fdatasync</code>. <strong>Keep <code>-wal-flush-window-ms</code> and <code>-vlog-flush-window-ms</code> equal at all times.</strong></p>
-<pre class="code-block"><code>writes/s ~ goroutines x (1000 / window_ms)</code></pre>
+<h2 id="flush-windows">The most important knob: group commit <span class="badge good">Adaptive since v1.12</span></h2>
+<p>The WAL and the VLog both use group commit: concurrent writes share one <code>fdatasync</code>, and every write is acknowledged only after the sync that covers it.</p>
 <div class="table-wrap">
 <table>
-<thead><tr><th>Goal</th><th>Window</th><th>P99 write</th></tr></thead>
+<thead><tr><th>Flag</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>--group-commit</code></td><td><code>adaptive</code></td><td><code>adaptive</code>: the flush window is an upper bound, not a wait. <code>fixed</code>: every batch waits the whole window (the pre-2026-10 behaviour)</td></tr>
+<tr><td><code>--wal-flush-window-ms</code></td><td>15</td><td>WAL group-commit window in ms; in adaptive mode only the upper bound on how long a busy batch may stay open</td></tr>
+<tr><td><code>--vlog-flush-window-ms</code></td><td>15</td><td>VLog group-commit window; <strong>must equal <code>--wal-flush-window-ms</code></strong></td></tr>
+<tr><td><code>--wal-max-batch</code></td><td>4096</td><td>Maximum WAL entries per flush; a full batch is flushed before the window ends</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Adaptive (default).</strong> A writer that is alone (one request in the batch and an EWMA of fewer than 1.5 requests per recent flush) is synced at once, so its latency is about one <code>fdatasync</code>. When writers are concurrent, a batch stays open until no new write has arrived for an idle gap equal to the EWMA of recent <code>fdatasync</code> times (clamped to 20&nbsp;&micro;s&ndash;2&nbsp;ms), or the window expires, or the <code>--wal-max-batch</code> cap is reached (<code>storage/group_commit.go</code>). Measured with an emulated 300&nbsp;&micro;s device sync and the 15&nbsp;ms window on macOS:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Writers</th><th>Fixed 15 ms window</th><th>Adaptive</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>P50 16.0 ms, 63 writes/s</td><td>P50 0.45 ms, 2,186 writes/s</td></tr>
+<tr><td>8</td><td>P50 16.0 ms, 501 writes/s</td><td>P50 0.96 ms, 8,283 writes/s</td></tr>
+<tr><td>64</td><td>P50 15.9 ms, P99 16.8 ms, 4,053 writes/s</td><td>P50 1.7 ms, P99 2.6 ms, 37,504 writes/s</td></tr>
+<tr><td>256</td><td>P99 33.2 ms, 15,291 writes/s</td><td>P99 11.5 ms, 73,999 writes/s</td></tr>
+</tbody>
+</table>
+</div>
+<p>Batches are as large as in fixed mode (64 writes per sync at 64 writers), so adaptive does not cost more IOPS under load. With a 2&nbsp;ms sync (slow or network disk) 64 writers go 3,541 &rarr; 11,691 writes/s. Reproduce with <code>VELTRIX_GC_TABLE=1 go test ./storage -run TestGroupCommit_LatencyTable -v</code>; full table and conditions in <a class="inline-link" href="../resources/benchmarking.html#group-commit">Benchmarking</a>. In adaptive mode the default 15&nbsp;ms window is fine for almost everything.</p>
+<p><strong>Fixed (<code>--group-commit=fixed</code>).</strong> Only useful if you depend on its exact batching. Each writer waits up to one window, so:</p>
+<pre class="code-block"><code>writes/s ~ goroutines x (1000 / window_ms)      # fixed mode</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Goal (fixed mode)</th><th>Window</th><th>P99 write</th></tr></thead>
 <tbody>
 <tr><td>Lowest latency (low concurrency)</td><td>0 ms</td><td>~0.2 ms</td></tr>
 <tr><td>Low latency</td><td>2 ms</td><td>~2.2 ms</td></tr>
 <tr><td>100K+ writes/s</td><td><strong>5 ms</strong></td><td>~5.2 ms</td></tr>
-<tr><td>Default (balance)</td><td><strong>15 ms</strong></td><td>~15.2 ms</td></tr>
+<tr><td>Default window</td><td><strong>15 ms</strong></td><td>~15.2 ms</td></tr>
 <tr><td>Maximum throughput</td><td>20 ms</td><td>~20.2 ms</td></tr>
 </tbody>
 </table>
 </div>
-<p>P99 figures are Linux NVMe. Do not size against a macOS measurement: on Darwin the engine calls plain <code>fsync(2)</code>, which returns at the drive cache in ~0.02&nbsp;ms without flushing it (crash-safe, but not power-loss-safe).</p>
-<pre class="code-block"><code>./veltrixdb --wal-flush-window-ms 5 --vlog-flush-window-ms 5</code></pre>
-<p>Widening the window trades write latency (one window's worth, at most) for higher sustained write throughput by amortizing <code>fdatasync</code> across more writers per batch.</p>
+<p>P99 figures in the fixed table are Linux NVMe. Do not size against a macOS measurement: on Darwin the engine calls plain <code>fsync(2)</code>, which returns at the drive cache in ~0.02&nbsp;ms without flushing it (the adaptive table above emulates the sync cost for that reason).</p>
+<pre class="code-block"><code>./veltrixdb --group-commit=fixed --wal-flush-window-ms 5 --vlog-flush-window-ms 5</code></pre>
 
 <h2 id="batching">Batch operations</h2>
 <p>Always prefer <code>MultiPut</code>/<code>MultiGet</code> over individual <code>PUT</code>/<code>GET</code> calls when operating on multiple keys — they share a single network round trip.</p>
@@ -117,13 +142,13 @@
 <table>
 <thead><tr><th>Method</th><th>Throughput</th><th>When to use</th></tr></thead>
 <tbody>
-<tr><td>Individual PUT</td><td>~10K/s per goroutine at 10 ms</td><td>Single key</td></tr>
+<tr><td>Individual PUT</td><td>&asymp; 1 per <code>fdatasync</code> per goroutine (adaptive; 2,186/s at an emulated 300&nbsp;&micro;s sync), 1000 / window_ms in fixed mode</td><td>Single key</td></tr>
 <tr><td>MultiPut, 1024 keys</td><td>~108K/s (macOS) / ~426K/s (Linux)</td><td>Any multi-key write</td></tr>
 </tbody>
 </table>
 </div>
 <p>The MultiPut row is historical (measured before the one-<code>write(2)</code>-per-batch WAL flusher and the ordered-index fix). Current server numbers for 8 clients &times; 1024-key <code>MPUT</code>: <strong>3.54M keys/s, P99 4.2&nbsp;ms</strong> over a 1M-key space on macOS (1.45M keys/s, P99 9.6&nbsp;ms before the ordered-index fix), and <strong>1.77M keys/s, P99 12.2&ndash;12.7&nbsp;ms</strong> on a 4-CPU CI runner (tmpfs, client on the same host, Go front-end, C++ storage off). <span class="badge good">New in v1.7</span></p>
-<p>The TCP server automatically coalesces back-to-back <code>PUT</code>s from the same connection into a <code>MultiPut</code>, so batching benefits apply even without client-side changes.</p>
+<p>The binary-protocol handler coalesces pipelined <code>PUT</code> frames that are already buffered on one connection into a <code>MultiPut</code> (<code>tryCoalescePuts</code>, <code>cmd/server/main.go</code>), so pipelining binary clients get batch performance without code changes. Text-protocol <code>PUT</code>s, and a client that waits for each reply, are not coalesced.</p>
 
 <h2 id="disk-density">Disk density and packing</h2>
 <p>Batched writes pack multiple records per 4 KB VLog block, which materially changes on-disk density at small value sizes:</p>
@@ -139,13 +164,13 @@
 </tbody>
 </table>
 </div>
-<p>Packing is automatic for <code>MultiPut</code> and pipelined <code>PUT</code>s. A single unbatched <code>Put</code> uses the unpacked lock-free path instead. You can verify actual packing efficiency with <code>veltrixdb_vlog_file_bytes / veltrixdb_storage_writes_total ~ value_size + 24</code>.</p>
+<p>Packing is automatic for <code>MultiPut</code> and pipelined binary <code>PUT</code>s. A single unbatched <code>Put</code> uses the unpacked lock-free path instead, which pads each record to a full 4&nbsp;KB block. You can verify actual packing efficiency with <code>veltrixdb_vlog_file_bytes / veltrixdb_storage_writes_total ~ value_size + 24</code>.</p>
 
 <h2 id="cache-tuning">Cache tuning</h2>
 <pre class="code-block"><code>-cache 65536      # 64 GB
---auto-tune       # cache = 85% of (80% of RAM)
---read-heavy      # 400 GB preset + scan-resistant tuning</code></pre>
-<p><code>-read-heavy</code> is a preset documented in the server flags reference as a <strong>400 GB cache with an extended GC interval</strong> — use it for workloads dominated by reads where you can afford more RAM and want to bias GC toward less frequent, larger passes.</p>
+--auto-tune       # cache = 85% of an 80%-of-RAM budget (~68% of RAM); ignores -cache
+--read-heavy      # 400 GB cache, LIRRatio 0.95, GC every 300 s, TTL scan every 60 s (-cache still wins)</code></pre>
+<p><code>--read-heavy</code> is a preset for workloads dominated by reads where you can afford more RAM and want GC to run less often. An explicit <code>-cache</code> overrides its cache size.</p>
 <p>Check cache effectiveness with <code>veltrixdb_cache_hits_total / (hits + misses)</code>. Small values (&le;256 B) resist eviction more aggressively under the LIRS policy, so workloads with many small values benefit the most from a larger cache.</p>
 
 <h2 id="index-memory">Index memory and Go GC <span class="badge good">New in v1.6</span></h2>
@@ -194,16 +219,42 @@ go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30</code></pre>
 </div>
 <p>The GC bandwidth cap deliberately fires before the full pause, so GC is throttled progressively rather than stopped dead. If <code>veltrixdb_storage_write_admission_throttles_total</code> is rising, read EWMA has crossed 20&nbsp;ms and writes are being intentionally slowed to protect read latency. Diagnose the underlying cause with <code>veltrixdb_storage_read_latency_seconds</code> before changing any other knob &mdash; raising the cache size or flush window will not help if the disk itself is the bottleneck.</p>
 
+<h2 id="vector-tuning">Vector search tuning <span class="badge good">New in v1.11&ndash;v1.12</span></h2>
+<p>Commands and the data model are in <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>. The knobs, with their effect on GloVe-100 (first 100K words, 100-dim, recall@10 / p50, in-process, one query at a time, macOS):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Knob</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>VSEARCH ... EF n</code></td><td>64 (raised to k, and to 4 &times; k for quantized layouts)</td><td>The recall / latency knob. float32: ef 64 &rarr; 0.842 / 0.25&nbsp;ms, ef 128 &rarr; 0.906 / 0.42&nbsp;ms, ef 256 &rarr; 0.953 / 0.77&nbsp;ms, ef 512 &rarr; 0.983 / 1.43&nbsp;ms</td></tr>
+<tr><td><code>VCREATE ns dim QUANT int8</code></td><td>float32 (<code>QUANT none</code>)</td><td>Same recall as float32 (0.839 / 0.905 / 0.952 / 0.983 at ef 64&ndash;512) at ~&#8531; of the vector RAM; re-ranks the top 4 &times; k against the float32 vectors on disk (+0.1&ndash;0.3&nbsp;ms at this size)</td></tr>
+<tr><td><code>VCREATE ... QUANT pq [PQM m] [PQTRAIN n]</code></td><td><code>PQM</code> = dim/8 (range 1&ndash;dim); <code>PQTRAIN</code> 10,000 (min 256)</td><td>Gives up 1.4&ndash;4.5 points of recall@10 on GloVe-100 (ef 512 &rarr; 64) for ~&#8528; of float32&rsquo;s RAM at 768-dim; re-ranks the whole beam (max(4 &times; k, ef)) from disk. More <code>PQM</code> = better recall, more RAM. Until <code>PQTRAIN</code> vectors exist the namespace stores float32, then trains in the background</td></tr>
+<tr><td><code>VCREATE ... GRAPH disk</code></td><td><code>memory</code></td><td>Moves layer-0 edges (~97% of edge memory) to a memory-mapped scratch file under <code>&lt;first data dir&gt;/vector-scratch</code>; recall unchanged within noise. Helps once edges dominate RAM (many vectors, small codes)</td></tr>
+<tr><td><code>IDXCREATE name field</code></td><td>&mdash;</td><td><code>=</code> filters on that field are served from the index instead of one record read per candidate</td></tr>
+<tr><td><code>--search-timeout-ms</code></td><td>2000</td><td>Per-peer timeout for one distributed search phase (BM25 has two). A peer that does not answer fails the request and is named in the error</td></tr>
+<tr><td><code>--search-allow-partial</code></td><td>false</td><td>Return results without the peers that failed or timed out (logged), and answer during the startup rebuild</td></tr>
+<tr><td><code>--search-fanout</code></td><td>true</td><td><code>false</code> keeps searches local &mdash; only correct while every node holds every record (no rebalance has moved keys)</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Choosing a layout.</strong> Measured Go heap per 768-dim vector (10K synthetic clustered vectors, macOS, <code>VELTRIX_VECTOR_MEMORY=1 go test ./storage -run TestVectorMemoryTable -v</code>): float32 3,383&nbsp;B, int8 1,078&nbsp;B, pq (m = 96) 493&nbsp;B, pq + disk graph 378&nbsp;B heap + 216&nbsp;B mapped. At 100-dim the quantized layouts are <em>slower</em> per query than float32 (they re-rank from the VLog) and save less, because graph edges dominate; they pay off at high dimension or large counts. Start with int8; use pq + <code>GRAPH disk</code> when RAM is the constraint and a few points of recall are acceptable, then raise <code>EF</code> or <code>PQM</code> to win recall back.</p>
+<p><strong>Sizing estimate</strong> (heap, N vectors of dimension d; the constant is graph edges and Go per-node overhead derived from the 768-dim measurement, so treat it as an estimate for other dimensions): float32 &asymp; N &times; (4d + ~310&nbsp;B), int8 &asymp; N &times; (d + ~310&nbsp;B), pq &asymp; N &times; (m + ~400&nbsp;B), pq + disk &asymp; N &times; (m + ~280&nbsp;B) plus 132&nbsp;B per vector in the mapped file (up to 2&times; that while the file grows). Tested up to 100K real vectors and 10K at 768-dim; nothing at 10M+ yet.</p>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Plan restarts of large namespaces</span> The graph and inverted index are not saved; they are rebuilt from the persisted keys at startup, and vector / text / hybrid searches are refused until the rebuild finishes (<code>INFO</code> &rarr; <code>search_ready</code>). KV traffic is not affected.</span></div>
+<p>Benchmarks and reproduce commands: <a class="inline-link" href="../resources/benchmarking.html#vector-search">Benchmarking &rarr; Vector search</a>.</p>
+
 <h2 id="common-problems">Common problems</h2>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Symptom</th><th>Check</th><th>Fix</th></tr></thead>
 <tbody>
 <tr><td>Write P99 high</td><td><code>veltrixdb_storage_write_admission_throttles_total</code> rising</td><td>Read latency too high — see admission control above</td></tr>
-<tr><td>Cache hit rate low</td><td><code>veltrixdb_vlog_gc_skipped_empty_total</code> rising</td><td>Increase <code>-cache</code> or enable KV separation</td></tr>
+<tr><td>Cache hit rate low</td><td><code>veltrixdb_cache_evictions_total</code> rising, <code>cache_size_bytes</code> &asymp; <code>cache_max_size_bytes</code></td><td>Increase <code>-cache</code> (or reclaim ~90 B/key with <code>--disable-ordered-index</code> and give it to the cache)</td></tr>
 <tr><td>GC not running</td><td><code>veltrixdb_vlog_gc_skipped_paused_total</code> rising</td><td>Wait up to 4 minutes for the stale EWMA to clear</td></tr>
 <tr><td><code>reads_total = 0</code> with live traffic</td><td>Binary version</td><td>Update — a fixed release restores the missing metrics call</td></tr>
 <tr><td>False failure-detector alerts (single node)</td><td><code>fd.SetLocalNode</code> not called</td><td>Call it before <code>fd.Start()</code> in your cluster setup</td></tr>
+<tr><td>Writes slow at low concurrency (&asymp; one window per write)</td><td><code>--group-commit=fixed</code> set</td><td>Use the default <code>adaptive</code></td></tr>
+<tr><td><code>search indexes are still rebuilding after restart</code></td><td><code>INFO</code> shows <code>search_ready=0 search_loaded=x/y</code></td><td>Wait for the rebuild, or <code>--search-allow-partial</code> if incomplete results are acceptable</td></tr>
+<tr><td><code>search incomplete: N of M peers did not answer</code></td><td>The named peer is down or slow and not yet marked failed</td><td>Retry after the failure detector marks it, raise <code>--search-timeout-ms</code>, or <code>--search-allow-partial</code></td></tr>
+<tr><td>A PQ namespace uses as much RAM as float32</td><td>Fewer than <code>PQTRAIN</code> vectors; the codebook is not trained yet</td><td>Expected until the threshold; lower <code>PQTRAIN</code> (&ge; 256) for small namespaces</td></tr>
 </tbody>
 </table>
 </div>

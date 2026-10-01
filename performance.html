@@ -10,6 +10,25 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<style>
+/* page-scoped: measured-result tables (October 2026 section). Tables scroll inside their wrapper on phones. */
+.mt-h3{font-size:19px;font-weight:700;color:var(--ink);margin:56px 0 0;letter-spacing:-.01em}
+.mt-h3 .tag{display:inline-block;margin-left:8px;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);vertical-align:middle}
+.mt-lede{max-width:760px;color:var(--ink-3);font-size:14.5px;line-height:1.65;margin-top:10px}
+.mt-wrap{margin-top:18px;border:1px solid var(--line);border-radius:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--surface);max-width:100%;min-width:0}
+.mt{width:100%;border-collapse:collapse;font-size:13.5px;min-width:540px}
+.mt th,.mt td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.mt thead th{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.mt td{color:var(--ink-2)}
+.mt td.wrap{white-space:normal;min-width:220px}
+.mt tbody tr:last-child td{border-bottom:0}
+.mt .hl{color:var(--ink);font-weight:700}
+.mt tr.grp td{border-top:1px solid var(--line-2)}
+.mt-cmd{display:block;margin-top:10px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+.mt-cap{max-width:760px;font-size:13px;color:var(--ink-3);line-height:1.6;margin-top:10px}
+.mt-cap code,.mt-lede code{overflow-wrap:anywhere}
+@media (max-width:560px){.mt{font-size:12.5px}.mt th,.mt td{padding:8px 10px}.mt-h3{font-size:17px}}
+</style>
 </head>
 <body>
 <nav class="top">
@@ -44,7 +63,11 @@
 </nav>
 <div class="subnav" aria-label="Page sections">
   <div class="subnav-inner">
-    <a href="#performance">Benchmark</a>
+    <a href="#performance">June YCSB</a>
+    <a href="#oct-2026">Durable writes</a>
+    <a href="#ycsb-af">YCSB A–F</a>
+    <a href="#vectors">Vector search</a>
+    <a href="#stability">Stability</a>
     <a href="#transparency">Metrics</a>
     <a href="#research">Active R&D</a>
   </div>
@@ -54,7 +77,7 @@
   <div class="wrap">
     <div class="eyebrow">PERFORMANCE</div>
     <h2 class="sh" style="margin-top:10px;border-top:none">Numbers we can <span class="em">reproduce</span>.</h2>
-    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">Every figure on this page comes from a measured run, and each one states the conditions it was measured under. Raw results are in <code>BENCHMARK_RESULTS.md</code> in the repo. No projected numbers, no competitor numbers we did not measure.</p>
+    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">Every figure on this page comes from a measured run, and each one states the conditions it was measured under. Raw results are in <code>BENCHMARK_RESULTS.md</code> in the repo. No projected numbers, no competitor numbers we did not measure. No other database has been run on the same hardware yet: the same-hardware harness (<code>bench/compare</code>) exists, but its Aerospike and ScyllaDB paths are only compile-checked.</p>
   </div>
 </section>
 
@@ -63,7 +86,7 @@
   <div class="wrap">
     <span class="eyebrow">By the numbers</span>
     <h2 class="sh">The YCSB run, <span class="em">with its conditions</span>.</h2>
-    <p class="sh-sub">YCSB 0.17.0, June 9 2026 · pure-Go build (historical: it predates the native index, the binary WAL and <code>--net</code>) · AWS EC2 high-memory, 495 GB RAM · 4&times; NVMe, raw block VLog · 400 GB LIRS cache · 200 client threads · 100M keys &times; ~100 B values.</p>
+    <p class="sh-sub">YCSB 0.17.0, June 9 2026 · pure-Go build (historical: it predates the native index, the binary WAL and <code>--net</code>) · AWS EC2 high-memory, 495 GB RAM · 4&times; NVMe, raw block VLog · 400 GB LIRS cache · 200 client threads · 100M keys &times; ~100 B values. The YCSB 0.17.0 binding used is not in the repo, so this run cannot be re-run from it; <code>bench/compare</code> (go-ycsb, <a href="#ycsb-af" style="color:var(--accent)">below</a>) is the reproducible YCSB path.</p>
     <div class="metric-row">
       <div class="metric">
         <div class="big"><span class="red">427,697</span></div>
@@ -116,6 +139,122 @@
       </table>
       <div class="lat-foot">This run did not measure cache-miss reads. When a read does miss the cache, the value is read with one Go <code>pread</code> of a 4 KB-aligned VLog block, checked with magic + CRC32C. That is not io_uring and not zero-copy. The in-process cache hit itself costs <b>~92 ns</b>; the rest of the read latency above is spent outside the cache lookup (network round trip, protocol, 200 concurrent clients).</div>
     </div>
+  </div>
+</section>
+
+<!-- ============ OCTOBER 2026 MEASUREMENTS ============ -->
+<section id="oct-2026">
+  <div class="wrap">
+    <span class="eyebrow">October 2026 · v1.11 &amp; v1.12</span>
+    <h2 class="sh">Newer measurements, <span class="em">on a laptop</span>.</h2>
+    <p class="sh-sub">Taken while building adaptive group commit, vector / text / hybrid search, PQ and the disk graph. All on one macOS laptop (Apple silicon) unless stated, so the absolute numbers do not predict a Linux NVMe server. None of them is a comparison with another database. Each table names the command that reproduces it.</p>
+
+    <h3 class="mt-h3">Durable single-key writes: adaptive vs fixed group commit <span class="tag">v1.12</span></h3>
+    <p class="mt-lede">Adaptive group commit is the default since v1.12 (<code>--group-commit=adaptive</code>). The flush window becomes an upper bound: a lone writer is synced at once, and concurrent writers are synced after an idle gap of about one <code>fdatasync</code>. <b>Conditions:</b> the device&rsquo;s fdatasync cost is <b>emulated</b> (a sleep before the real sync), because macOS <code>fsync</code> returns at the drive cache. 15&nbsp;ms window, 128&nbsp;B values, each writer doing sequential durable <code>Put</code>s for 1.5&nbsp;s.</p>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="Group commit, emulated 300 microsecond sync">
+        <thead><tr><th scope="col">Writers</th><th scope="col">Mode</th><th scope="col">P50</th><th scope="col">P99</th><th scope="col">Writes/s</th><th scope="col">Writes per fdatasync</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="6" class="hl">Emulated sync = 300 µs (NVMe-like)</td></tr>
+          <tr><td>1</td><td>fixed</td><td>16.01 ms</td><td>17.76 ms</td><td>63</td><td>1.0</td></tr>
+          <tr><td>1</td><td class="hl">adaptive</td><td class="hl">0.45 ms</td><td>0.52 ms</td><td class="hl">2,186</td><td>1.0</td></tr>
+          <tr><td>8</td><td>fixed</td><td>16.02 ms</td><td>16.39 ms</td><td>501</td><td>8.0</td></tr>
+          <tr><td>8</td><td class="hl">adaptive</td><td class="hl">0.96 ms</td><td>1.22 ms</td><td class="hl">8,283</td><td>8.0</td></tr>
+          <tr><td>64</td><td>fixed</td><td>15.94 ms</td><td>16.81 ms</td><td>4,053</td><td>64.0</td></tr>
+          <tr><td>64</td><td class="hl">adaptive</td><td class="hl">1.67 ms</td><td>2.64 ms</td><td class="hl">37,504</td><td>63.9</td></tr>
+          <tr><td>256</td><td>fixed</td><td>16.40 ms</td><td>33.15 ms</td><td>15,291</td><td>249.3</td></tr>
+          <tr><td>256</td><td class="hl">adaptive</td><td class="hl">3.18 ms</td><td>11.54 ms</td><td class="hl">73,999</td><td>255.2</td></tr>
+          <tr class="grp"><td colspan="6" class="hl">Emulated sync = 2 ms (slow / network disk)</td></tr>
+          <tr><td>1</td><td>fixed</td><td>18.10 ms</td><td>23.68 ms</td><td>55</td><td>&mdash;</td></tr>
+          <tr><td>1</td><td class="hl">adaptive</td><td class="hl">2.41 ms</td><td>2.52 ms</td><td class="hl">417</td><td>&mdash;</td></tr>
+          <tr><td>64</td><td>fixed</td><td>18.18 ms</td><td>19.12 ms</td><td>3,541</td><td>&mdash;</td></tr>
+          <tr><td>64</td><td class="hl">adaptive</td><td class="hl">5.40 ms</td><td>7.07 ms</td><td class="hl">11,691</td><td>&mdash;</td></tr>
+          <tr><td>256</td><td>fixed</td><td>18.32 ms</td><td>35.17 ms</td><td>13,705</td><td>&mdash;</td></tr>
+          <tr><td>256</td><td class="hl">adaptive</td><td class="hl">6.96 ms</td><td>18.56 ms</td><td class="hl">32,277</td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-cap">Batches are as large as in fixed mode (about 64 writes per sync at 64 writers), so adaptive mode does not cost more IOPS under load. The 2&nbsp;ms run did not record writes per sync. <code>--group-commit=fixed</code> restores the old behaviour, where every batch waits the whole window.</p>
+    <code class="mt-cmd">VELTRIX_GC_TABLE=1 go test ./storage -run TestGroupCommit_LatencyTable -v</code>
+
+    <h3 class="mt-h3" id="ycsb-af">YCSB A–F through the server, VeltrixDB only</h3>
+    <p class="mt-lede"><b>Conditions:</b> go-ycsb core workloads (<code>bench/compare/cmd/ycsb</code>) against a local server on the same laptop. 20,000 records &times; 10 fields &times; 100&nbsp;B, 20,000 operations, 16 threads, zipfian, whole-record writes. macOS <code>fsync</code> does not reach the platter, so the write latencies here are a lower bound. This is not the June YCSB&nbsp;0.17.0 run above, and the two are not comparable.</p>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="go-ycsb workloads A to F">
+        <thead><tr><th scope="col">Workload</th><th scope="col">Op</th><th scope="col">Ops/s</th><th scope="col">Avg</th><th scope="col">P99</th><th scope="col">P99.9</th></tr></thead>
+        <tbody>
+          <tr><td class="hl">load</td><td>INSERT</td><td>37,495</td><td>419 µs</td><td>1.29 ms</td><td>2.04 ms</td></tr>
+          <tr class="grp"><td class="hl">A (50/50 read/update)</td><td>total</td><td>34,640</td><td>453 µs</td><td>1.30 ms</td><td>2.98 ms</td></tr>
+          <tr><td></td><td>READ</td><td>17,230</td><td>262 µs</td><td>0.77 ms</td><td>1.55 ms</td></tr>
+          <tr><td></td><td>UPDATE</td><td>17,434</td><td>642 µs</td><td>1.63 ms</td><td>3.14 ms</td></tr>
+          <tr class="grp"><td class="hl">B (95/5)</td><td>total</td><td>52,255</td><td>303 µs</td><td>0.65 ms</td><td>0.74 ms</td></tr>
+          <tr class="grp"><td class="hl">C (read only)</td><td>READ</td><td>55,287</td><td>287 µs</td><td>0.39 ms</td><td>0.53 ms</td></tr>
+          <tr class="grp"><td class="hl">D (read latest)</td><td>total</td><td>55,163</td><td>288 µs</td><td>0.39 ms</td><td>0.59 ms</td></tr>
+          <tr class="grp"><td class="hl">E (short scans)</td><td>SCAN</td><td>23,651</td><td>638 µs</td><td>1.43 ms</td><td>1.97 ms</td></tr>
+          <tr class="grp"><td class="hl">F (read-modify-write)</td><td>total</td><td>40,067</td><td>392 µs</td><td>0.81 ms</td><td>0.98 ms</td></tr>
+          <tr><td></td><td>READ_MODIFY_WRITE</td><td>13,397</td><td>915 µs</td><td>1.22 ms</td><td>1.49 ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <code class="mt-cmd">cd bench/compare &amp;&amp; START=0 DBS=veltrixdb RECORDS=20000 OPS=20000 THREADS=16 WORKLOADS="a b c d e f" ./compare.sh</code>
+    <p class="mt-cap"><code>compare.sh</code> can also drive Aerospike and ScyllaDB one at a time on the same machine, but those drivers have only been compiled, not run, and no shared run has been published. Workload E uses VeltrixDB&rsquo;s <code>RANGE</code> over the ordered key index.</p>
+
+    <h3 class="mt-h3" id="vectors">Vector search <span class="tag">v1.11 &amp; v1.12</span></h3>
+    <p class="mt-lede"><b>Conditions:</b> the first 100,000 words of GloVe-100 (angular), 100 dimensions, 500 queries, exact cosine ground truth. In-process, one query at a time, macOS (Apple silicon, GOMAXPROCS = 18). Each cell is recall@10 and p50 latency.</p>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="GloVe-100 recall at 10 and p50 latency by beam width">
+        <thead><tr><th scope="col">Layout</th><th scope="col">ef = 64</th><th scope="col">ef = 128</th><th scope="col">ef = 256</th><th scope="col">ef = 512</th></tr></thead>
+        <tbody>
+          <tr><td class="hl">float32</td><td>0.842 · 0.25 ms</td><td>0.906 · 0.42 ms</td><td>0.953 · 0.77 ms</td><td>0.983 · 1.43 ms</td></tr>
+          <tr><td class="hl">int8</td><td>0.839 · 0.61 ms</td><td>0.905 · 0.55 ms</td><td>0.952 · 0.72 ms</td><td>0.983 · 1.18 ms</td></tr>
+          <tr><td class="hl">pq (m = 25)</td><td>0.797 · 0.56 ms</td><td>0.870 · 0.72 ms</td><td>0.927 · 1.17 ms</td><td>0.969 · 1.56 ms</td></tr>
+          <tr><td class="hl">pq + disk graph</td><td>0.788 · 0.55 ms</td><td>0.875 · 0.66 ms</td><td>0.931 · 1.06 ms</td><td>0.966 · 1.60 ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-cap">At this size the quantized layouts are slower per query than float32, because they re-rank candidates against the full vectors read back from the VLog. They exist to save RAM, and at 100 dimensions the graph edges, not the vectors, take most of it. float32 at ef = 128: p99 0.63&nbsp;ms, 2,351 QPS on one thread.</p>
+    <code class="mt-cmd">scripts/ann-dataset.py glove-100-angular /tmp/ann --train 100000 --test 500
+VELTRIX_ANN_DIR=/tmp/ann go test ./storage -run TestRealEmbeddings -v -timeout 30m</code>
+
+    <p class="mt-lede" style="margin-top:32px"><b>Over the network.</b> GloVe-100, first 20,000 words, 300 queries, int8, 8 concurrent clients. Server and client on the same macOS machine (<code>bench/compare/cmd/vecbench</code>).</p>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="vecbench over the network">
+        <thead><tr><th scope="col">ef</th><th scope="col">recall@10</th><th scope="col">QPS</th><th scope="col">p50</th><th scope="col">p99</th></tr></thead>
+        <tbody>
+          <tr><td class="hl">64</td><td>0.894</td><td class="hl">24,637</td><td>0.28 ms</td><td>0.68 ms</td></tr>
+          <tr><td class="hl">256</td><td>0.985</td><td class="hl">15,629</td><td>0.48 ms</td><td>0.91 ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <code class="mt-cmd">cd bench/compare &amp;&amp; go run ./cmd/vecbench -data /tmp/ann -train 20000 -quant int8 -threads 8</code>
+
+    <p class="mt-lede" style="margin-top:32px"><b>RAM per vector at 768 dimensions.</b> Go heap per vector, 10,000 synthetic clustered vectors, macOS. The full float32 vectors always stay on NVMe; this is what RAM holds.</p>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="Heap per 768-dim vector by layout">
+        <thead><tr><th scope="col">Layout</th><th scope="col">Heap / vector</th><th scope="col">Mapped file / vector</th><th scope="col">vs float32</th></tr></thead>
+        <tbody>
+          <tr><td class="hl">float32</td><td>3,383 B</td><td>&mdash;</td><td>1&times;</td></tr>
+          <tr><td class="hl">int8</td><td>1,078 B</td><td>&mdash;</td><td>3.1&times; less</td></tr>
+          <tr><td class="hl">pq, m = 96</td><td>493 B</td><td>&mdash;</td><td>6.9&times; less</td></tr>
+          <tr><td class="hl">pq, m = 96 + disk graph</td><td>378 B</td><td>216 B</td><td>8.9&times; less heap</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <code class="mt-cmd">VELTRIX_VECTOR_MEMORY=1 go test ./storage -run TestVectorMemoryTable -v</code>
+    <p class="mt-cap">Tested up to 100K real vectors and 10K at 768 dimensions; nothing at 10M+ yet. No other vector database has been run on the same hardware. Tuning: <a href="docs/operations/performance-tuning.html#vector-tuning" style="color:var(--accent)">performance tuning, vector search</a>.</p>
+
+    <h3 class="mt-h3" id="stability">Stability: soak and crash chaos</h3>
+    <div class="mt-wrap">
+      <table class="mt" aria-label="Soak and crash chaos results">
+        <thead><tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Reproduce</th></tr></thead>
+        <tbody>
+          <tr><td class="wrap hl">Search soak, 60 s, 4 writers + 4 searchers, 5K-id space (macOS)</td><td class="wrap">201,573 writes and 292,079 searches; 0 results outside the oracle of acknowledged writes; 288,025 self-queries with 0 misses; RSS flat at ~1.0 GB; exact oracle match before and after restart</td><td class="wrap"><code>VELTRIX_SOAK_DURATION=60s go test ./tests/integration -run TestSearchSoak -v</code> (nightly: 20 min on Linux)</td></tr>
+          <tr><td class="wrap hl">Crash chaos, SIGKILL mid-write (macOS)</td><td class="wrap">3 cycles with 8,524 / 8,380 / 11,851 acknowledged writes, all visible after restart and index rebuild; no deleted id returned</td><td class="wrap"><code>VELTRIX_CHAOS_CYCLES=3 go test ./tests/integration -run TestSearchCrashRecovery -v</code> (nightly: 10 cycles)</td></tr>
+          <tr><td class="wrap hl">Raft failover read barrier</td><td class="wrap">without it, a new leader missed the acknowledged write in 20 / 20 test rounds; with it, 0 / 20</td><td class="wrap"><code>go test ./consensus -run TestWaitLeaderApplied_FailoverVisibility -v</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-cap">Writes in flight at the kill are not checked. After each cycle the test rewrites every such id to a fresh, fully acknowledged version, so later cycles check it again.</p>
   </div>
 </section>
 
@@ -174,9 +313,9 @@
 <!-- ============ ACTIVE DEVELOPMENT ============ -->
 <section id="research">
   <div class="wrap">
-    <span class="eyebrow rd-eyebrow-live"><span class="rd-live-dot"></span>Active Development · September 2026</span>
+    <span class="eyebrow rd-eyebrow-live"><span class="rd-live-dot"></span>Active Development · September&ndash;October 2026</span>
     <h2 class="sh">What we're working on <span class="em">in the engine.</span></h2>
-    <p class="sh-sub">All of this has shipped: v1.6 and v1.7, with v1.8 the latest release. Each item lists what we measured and under which conditions, including the result that did not go our way. No dates are promised.</p>
+    <p class="sh-sub">All of this has shipped, in v1.6, v1.7, v1.11 and v1.12 (v1.12 is the latest release). The experimental and investigating items ship as opt-in switches. Each item lists what we measured and under which conditions, including the result that did not go our way. No dates are promised.</p>
 
     <div class="rd-grid" id="rdGrid">
 
@@ -260,6 +399,38 @@
         </div>
       </div>
 
+      <div class="rd-item">
+        <div class="rd-item-idx">
+          <div>06</div>
+          <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
+        </div>
+        <div class="rd-item-body">
+          <div class="rd-cat">Durability</div>
+          <div class="rd-title">Adaptive group commit</div>
+          <div class="rd-desc">The WAL and VLog flush windows are now upper bounds, not waits. A lone writer is synced at once; concurrent writers share one <code>fdatasync</code> after an idle gap of about one sync. With an emulated 300&nbsp;µs sync and the 15&nbsp;ms default window (macOS), one writer&rsquo;s P50 went 16.0 &rarr; 0.45&nbsp;ms and 64 writers 4.0K &rarr; 37.5K writes/s at the same writes per sync. <code>--group-commit=fixed</code> restores the old behaviour. <a href="#oct-2026" style="color:var(--accent)">Full table</a>. Since v1.12.</div>
+        </div>
+        <div class="rd-item-stat">
+          <div class="rd-stat-v"><span class="s-good">0.45</span> ms</div>
+          <div class="rd-stat-l">1-writer P50, emulated sync<br/>(was 16.0 ms)</div>
+        </div>
+      </div>
+
+      <div class="rd-item">
+        <div class="rd-item-idx">
+          <div>07</div>
+          <div class="rd-badge shipped"><span class="rd-badge-dot"></span>Shipped</div>
+        </div>
+        <div class="rd-item-body">
+          <div class="rd-cat">Search</div>
+          <div class="rd-title">Vector, text and hybrid search; PQ and the disk graph</div>
+          <div class="rd-desc">Vector namespaces with filters and deletes, int8 quantization, BM25 text search and hybrid (rank-fused) search shipped in v1.11. v1.12 added product quantization (<code>QUANT pq</code>) and <code>GRAPH disk</code>, which moves layer-0 HNSW edges to a memory-mapped file. On GloVe-100 (100K words, in-process, macOS) float32 reaches recall@10 0.953 at ef&nbsp;=&nbsp;256 with p50 0.77&nbsp;ms. Searches are refused while the index rebuilds after a restart. <a href="#vectors" style="color:var(--accent)">All numbers</a>.</div>
+        </div>
+        <div class="rd-item-stat">
+          <div class="rd-stat-v">378 <span class="s-accent">B</span></div>
+          <div class="rd-stat-l">heap / 768-dim vector, pq + disk<br/>(float32: 3,383 B)</div>
+        </div>
+      </div>
+
     </div>
 
     <div class="rd-bench">
@@ -294,10 +465,10 @@
     <h2>Don't trust our numbers. <span class="em">Reproduce them</span>.</h2>
     <div class="repro-cmd" style="margin:18px auto 6px;max-width:560px;text-align:left">
       <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:13px 16px">
-        <code style="font-family:var(--mono);font-size:13px;color:var(--ink-2);flex:1;overflow-x:auto;white-space:nowrap" id="reproCmd">git clone github.com/VeltrixDB/veltrixdb && ./scripts/bench.sh</code>
+        <code style="font-family:var(--mono);font-size:13px;color:var(--ink-2);flex:1;overflow-x:auto;white-space:nowrap" id="reproCmd">git clone https://github.com/VeltrixDB/veltrixdb &amp;&amp; cd veltrixdb &amp;&amp; ./scripts/bench.sh</code>
         <button class="btn" id="copyRepro" aria-label="Copy benchmark command" style="padding:6px 12px;font-size:12px">Copy</button>
       </div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:8px">Pass/fail gates on packing density and GC emergency runs &middot; the CI rows above come from <code>scripts/net-bench.sh</code> (see BENCHMARKING.md)</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:8px">Pass/fail gates on packing density and GC emergency runs &middot; the CI rows above come from <code>scripts/net-bench.sh</code>, the October 2026 tables from the commands printed under each (see BENCHMARKING.md)</div>
     </div>
     <div class="cta-cta">
       <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Benchmark%20on%20our%20workload">Benchmark our workload for us <span class="arrow">&#8599;</span></a>
@@ -349,7 +520,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

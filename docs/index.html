@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="./resources/faq.html">FAQ</a>
     <a class="btn primary" href="./getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="./concepts/data-model.html" class="">Data Model</a>
+<a href="./concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="./concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="./concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,9 +91,9 @@
   <main class="content-col">
     
     <div style="padding:8px 0 12px">
-  <span class="badge red">NVMe-native</span><span class="badge">Key-value</span><span class="badge">Kubernetes-first</span><span class="badge good">Apache 2.0</span>
+  <span class="badge red">NVMe-native</span><span class="badge">Key-value</span><span class="badge">Vector &amp; hybrid search</span><span class="badge">Kubernetes-first</span><span class="badge good">Apache 2.0</span>
   <h1 style="margin-top:16px">VeltrixDB Documentation</h1>
-  <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database. Values live on NVMe in an append-only log with ~1× write amplification by design (WiscKey KV-separation); the index and hot values stay in DRAM. This is the complete reference for building, deploying, and operating it.</p>
+  <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database with built-in vector, full-text and hybrid search. Values live on NVMe in an append-only log with ~1× write amplification by design (WiscKey KV-separation); the index and hot values stay in DRAM. This is the complete reference for building, deploying, and operating it.</p>
 </div>
 
 <div class="table-wrap" style="margin-bottom:28px">
@@ -108,6 +109,14 @@
   </table>
 </div>
 <p style="margin:-16px 0 28px"><a class="inline-link" href="resources/benchmarking.html">Full benchmark methodology and hardware spec →</a></p>
+
+<h2 id="whats-new-search">What's new in v1.11 and v1.12</h2>
+<div class="card-grid">
+  <a class="card" href="concepts/vector-search.html"><div class="card-title">Vector, BM25 &amp; hybrid search <span class="badge good">v1.11</span></div><div class="card-desc">Vector namespaces with metadata filters and VDEL, int8 quantization, BM25 full-text (TSET / TSEARCH) and hybrid HSEARCH fused by reciprocal rank — all stored as ordinary keys next to the record they describe.</div></a>
+  <a class="card" href="concepts/vector-search.html#clusters"><div class="card-title">Cluster-wide search <span class="badge good">v1.11</span></div><div class="card-desc">Searches, QUERY and IDXQUERY fan out to every non-failed node and merge; a peer that misses --search-timeout-ms fails the request. Node-to-node traffic can be HMAC-signed with --cluster-secret-file.</div></a>
+  <a class="card" href="concepts/vector-search.html#memory-layouts"><div class="card-title">Product quantization &amp; disk graph <span class="badge good">v1.12</span></div><div class="card-desc">QUANT pq and GRAPH disk: measured 378 B of heap per 768-dim vector vs 3,383 B for float32 (10K synthetic vectors, macOS). Recall and latency tables state their conditions.</div></a>
+  <a class="card" href="concepts/vector-search.html#durability"><div class="card-title">Safe restarts for search <span class="badge good">v1.12</span></div><div class="card-desc">Searches are refused until the startup index rebuild finishes (INFO search_ready), instead of silently missing vectors; nightly soak and SIGKILL chaos tests check every acknowledged write.</div></a>
+</div>
 
 <h2 id="whats-new">What's new in 1.1.0</h2>
 <div class="card-grid">
@@ -131,7 +140,7 @@
 <h2 id="explore-the-docs">Explore the docs</h2>
 <div class="card-grid">
   <a class="card" href="architecture/overview.html"><div class="card-title">Architecture</div><div class="card-desc">Sharding, write/read paths, admission control, cluster and consensus.</div></a>
-  <a class="card" href="concepts/data-model.html"><div class="card-title">Core Concepts</div><div class="card-desc">Data model, wire protocol, and deployment modes.</div></a>
+  <a class="card" href="concepts/data-model.html"><div class="card-title">Core Concepts</div><div class="card-desc">Data model, vector &amp; hybrid search, wire protocol, and deployment modes.</div></a>
   <a class="card" href="client-sdks/index.html"><div class="card-title">Client SDKs</div><div class="card-desc">Go, Python, Node.js, Java, Rust, and C++ — same binary protocol, connection pooling built in.</div></a>
   <a class="card" href="operations/security.html"><div class="card-title">Operations</div><div class="card-desc">Security, backup &amp; restore, replication, monitoring, performance tuning, disaster recovery.</div></a>
   <a class="card" href="reference/server-configuration.html"><div class="card-title">Reference</div><div class="card-desc">Every server flag, the Admin HTTP API, and CLI tools.</div></a>

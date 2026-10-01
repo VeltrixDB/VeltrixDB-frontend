@@ -23,7 +23,7 @@ appear unstyled or links do nothing. Open it in a real browser, or serve the fol
 | `pricing.html` | Open source ($0) / engineering support (contact) / managed service (planned, not available) + static node-sizing rules. The old tier-priced calculator was removed (it priced a managed service that does not exist); its `#calc` anchor now holds the sizing section |
 | `faq.html` | FAQ accordion (no RESP, no managed service, no certifications — stated plainly), resource cards, origin story |
 | `whitepaper.html`, `redis-comparison.html`, `blog-*.html` | Long-form content |
-| `docs/` | Product documentation subsite — 34 pages: getting-started, architecture, concepts, SDKs, operations, reference, Kubernetes, resources |
+| `docs/` | Product documentation subsite — 35 pages: getting-started, architecture, concepts (incl. `concepts/vector-search.html`), SDKs, operations, reference, Kubernetes, resources |
 
 ## Shared assets
 
@@ -73,7 +73,7 @@ appear unstyled or links do nothing. Open it in a real browser, or serve the fol
 - Performance claims must be measured numbers (YCSB run in the main repo); no projected figures.
   Unverified figures (the internal GKE run) are always labeled as such — in docs too. Nothing at "1 billion keys"
   has been measured reproducibly; cost comparisons are illustrative list-price arithmetic and say so
-- Features on the unreleased branch (native index, binary WAL, `--net`, opt-in io_uring bridge) carry an "Unreleased" label
+- Label features with the release that first shipped them (`git tag --contains <commit>` in the main repo; the CHANGELOG lags). Search shipped in v1.11, adaptive group commit + PQ disk graph in v1.12; nothing currently carries an "Unreleased" label
 - Each page answers ONE question; don't repeat a section across pages — link to it instead
 - All motion is compositor-only and disabled under `prefers-reduced-motion` (3D scenes, counters, bar fills)
 - `sitemap.xml` lists every public page — update it when adding one

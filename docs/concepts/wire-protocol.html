@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="active">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -99,7 +100,7 @@
 <thead><tr><th>Command</th><th>Response</th></tr></thead>
 <tbody>
 <tr><td><code>PUT key value</code></td><td><code>OK</code></td></tr>
-<tr><td><code>GET key</code></td><td><code>value</code> (or <code>ERR</code> if not found)</td></tr>
+<tr><td><code>GET key</code></td><td><code>value</code> (or an <code>ERR ...</code> line if not found)</td></tr>
 <tr><td><code>DEL key</code></td><td><code>OK</code></td></tr>
 <tr><td><code>PING</code></td><td><code>PONG</code></td></tr>
 <tr><td><code>INFO</code></td><td><code>keys=N writes=N reads=N ...</code></td></tr>
@@ -108,6 +109,7 @@
 </tbody>
 </table>
 </div>
+<p><code>SET</code> is an alias of <code>PUT</code>, <code>DELETE</code> of <code>DEL</code>, <code>EXIT</code> of <code>QUIT</code>, and <code>CLUSTER</code> of <code>TOPOLOGY</code>. Commands are case-insensitive. A malformed command answers <code>ERR usage: ...</code>; an unknown one answers <code>ERR unknown command: ...</code> with the supported list.</p>
 
 <h3 id="text-commands-1-1-0">Text commands added in v1.1.0</h3>
 <p>v1.1.0 brings the text protocol to parity with operations that were previously binary-only (TTL writes, atomics, batch get) and adds the new list and set data types. The usage lines below are exactly what the server prints on a malformed invocation (<code>ERR usage: ...</code>):</p>
@@ -131,7 +133,47 @@
 </tbody>
 </table>
 </div>
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Token-delimited arguments</span> <code>CAS</code> parses <code>&lt;expected&gt;</code> as a single space-delimited token — use the binary protocol for values containing spaces. Semantics of every command (per-key TTL, atomic RMW guarantees, list/set encoding) are covered in the <a class="inline-link" href="data-model.html">Data Model</a>, which also documents the <code>VSET</code>/<code>VSEARCH</code> vector commands.</span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Token-delimited arguments</span> <code>CAS</code> parses <code>&lt;expected&gt;</code> as a single space-delimited token — use the binary protocol for values containing spaces. Semantics of every command (per-key TTL, atomic RMW guarantees, list/set encoding) are covered in the <a class="inline-link" href="data-model.html">Data Model</a>, and search semantics are on <a class="inline-link" href="vector-search.html">Vector &amp; Hybrid Search</a>.</span></div>
+
+<h3 id="text-search-commands">Search, index and query commands</h3>
+<p>Search commands answer <code>id score</code> lines then <code>END</code>, or one <code>ERR ...</code> line. What they do — ranking, filters, memory layouts, cluster fan-out — is on <a class="inline-link" href="vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td><code>VCREATE &lt;ns&gt; &lt;dim&gt; [QUANT none|int8|pq] [PQM &lt;m&gt;] [PQTRAIN &lt;n&gt;] [GRAPH memory|disk]</code> <span class="badge good">New in v1.11</span></td><td><code>OK</code>. <code>PQM</code>/<code>PQTRAIN</code>/<code>GRAPH</code> and <code>QUANT pq</code> are new in v1.12.</td></tr>
+<tr><td><code>VSET &lt;key&gt; [NS &lt;ns&gt;] &lt;f1&gt; &lt;f2&gt; ...</code></td><td><code>OK</code>. <code>NS</code> is new in v1.11 (default namespace <code>default</code>).</td></tr>
+<tr><td><code>VSEARCH &lt;k&gt; [NS &lt;ns&gt;] [EF &lt;n&gt;] [FILTER &lt;field&gt; &lt;op&gt; &lt;value&gt;] &lt;f1&gt; &lt;f2&gt; ...</code></td><td><code>id score</code> lines (cosine), <code>END</code>. <code>k = 0</code> returns every match. <code>NS</code>/<code>EF</code>/<code>FILTER</code> are new in v1.11.</td></tr>
+<tr><td><code>VDEL &lt;key&gt; [NS &lt;ns&gt;]</code> <span class="badge good">New in v1.11</span></td><td><code>OK</code></td></tr>
+<tr><td><code>TSET &lt;id&gt; [NS &lt;ns&gt;] TEXT &lt;text&gt;</code> <span class="badge good">New in v1.11</span></td><td><code>OK</code>. The text is the rest of the line (at most 1 MiB).</td></tr>
+<tr><td><code>TDEL &lt;id&gt; [NS &lt;ns&gt;]</code> <span class="badge good">New in v1.11</span></td><td><code>OK</code></td></tr>
+<tr><td><code>TSEARCH &lt;k&gt; [NS &lt;ns&gt;] [FILTER &lt;field&gt; &lt;op&gt; &lt;value&gt;] QUERY &lt;text&gt;</code> <span class="badge good">New in v1.11</span></td><td><code>id score</code> lines (BM25), <code>END</code>. <code>k = 0</code> returns every match.</td></tr>
+<tr><td><code>HSEARCH &lt;k&gt; [NS &lt;ns&gt;] [EF &lt;n&gt;] [ALPHA &lt;a&gt;] [CAND &lt;n&gt;] [FILTER &lt;field&gt; &lt;op&gt; &lt;value&gt;] [VEC &lt;f1&gt; ... &lt;fn&gt;] QUERY &lt;text&gt;</code> <span class="badge good">New in v1.11</span></td><td><code>id score</code> lines (RRF score), <code>END</code>. <code>k &gt; 0</code>; needs <code>VEC</code>, <code>QUERY</code> or both.</td></tr>
+<tr><td><code>IDXCREATE &lt;name&gt; &lt;field&gt;</code> / <code>IDXDROP &lt;name&gt;</code></td><td><code>OK</code>. Indexes <code>&lt;field&gt;</code> of every value (JSON object or <code>k=v</code> pairs); backfills existing keys.</td></tr>
+<tr><td><code>IDXQUERY &lt;name&gt; &lt;value&gt; [LIMIT n]</code></td><td>One key per line, <code>END</code>.</td></tr>
+<tr><td><code>QUERY &lt;namespace&gt; WHERE &lt;field&gt; &lt;op&gt; &lt;value&gt; [LIMIT n]</code></td><td><code>key value</code> lines, <code>END</code>. Ops: <code>= != &gt; &lt; &gt;= &lt;= contains</code>; uses a secondary index for <code>=</code> on an indexed field, else scans the namespace.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Option clauses may come in any order, each at most once; the floats or the <code>QUERY</code> text come last. Because the text protocol is whitespace-split, filter values cannot contain spaces and <code>TSET</code> text cannot contain newlines — use the binary <a class="inline-link" href="#search-opcodes">search opcodes</a> for those.</p>
+
+<h3 id="text-other-commands">Other text commands</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td><code>NSPUT &lt;ns&gt; &lt;key&gt; &lt;value&gt;</code> / <code>NSGET &lt;ns&gt; &lt;key&gt;</code> / <code>NSDEL &lt;ns&gt; &lt;key&gt;</code> / <code>NSDROP &lt;ns&gt;</code></td><td>Namespaced KV (see <a class="inline-link" href="data-model.html#namespaces">Data Model</a>).</td></tr>
+<tr><td><code>NSSCAN &lt;ns&gt; [prefix] [limit]</code> / <code>NSLIST</code></td><td><code>key value</code> lines / <code>namespace count</code> lines, then <code>END</code>.</td></tr>
+<tr><td><code>HSET &lt;key&gt; &lt;field&gt; &lt;value&gt; [ttl]</code>, <code>HGET</code>, <code>HDEL</code>, <code>HGETALL</code>, <code>HKEYS</code>, <code>HLEN</code>, <code>HEXPIRE &lt;key&gt; &lt;field&gt; &lt;ttl&gt;</code>, <code>HTTL</code></td><td>Hash fields with per-field TTL. <code>HGET</code> of a missing field answers <code>NOT_FOUND</code>.</td></tr>
+<tr><td><code>RANGE &lt;start&gt; &lt;end&gt; [LIMIT n] [REV]</code></td><td>Ordered <code>key value</code> lines, <code>END</code> (local node only in cluster modes).</td></tr>
+<tr><td><code>SCANCUR &lt;cursor&gt; &lt;limit&gt;</code></td><td><code>key value</code> lines, then <code>CURSOR &lt;next&gt;</code>; cursor <code>-</code> starts from the beginning.</td></tr>
+<tr><td><code>TXN &lt;numOps&gt;</code> then that many lines of <code>SET &lt;key&gt; &lt;value&gt;</code> / <code>SETIF &lt;key&gt; &lt;expectedVersion&gt; &lt;value&gt;</code> / <code>DEL &lt;key&gt;</code></td><td><code>OK</code>, or <code>CONFLICT</code> when a <code>SETIF</code> version no longer matches.</td></tr>
+<tr><td><code>VER &lt;key&gt;</code></td><td>The key's version (the token for <code>SETIF</code>); <code>0</code> when absent.</td></tr>
+<tr><td><code>TOPOLOGY</code> / <code>CLUSTER</code></td><td>One JSON line with the cluster topology, for client-side routing.</td></tr>
+</tbody>
+</table>
+</div>
+
 
 <h3>Worked example</h3>
 <p>Start a server and drive it with <code>nc</code>:</p>
@@ -160,13 +202,14 @@ BYE</code></pre>
 <pre class="code-block"><code>echo -e "PUT hello world\nGET hello\nPING" | nc localhost 9000</code></pre>
 
 <h2 id="binary-protocol">Binary protocol</h2>
-<p>The binary protocol is what every official SDK (Go, Python, Node.js, Java, Rust, C++) speaks by default, and it's what the server assumes once it sees a leading byte that matches a known opcode rather than ASCII command text — no handshake or negotiation is required, the server simply auto-detects the framing per connection.</p>
+<p>The binary protocol is what every official SDK (Go, Python, Node.js, Java, Rust, C++) speaks by default (only the Go client implements the search opcodes), and it's what the server assumes once it sees a leading byte that matches a known opcode rather than ASCII command text — no handshake or negotiation is required, the server simply auto-detects the framing per connection.</p>
 
 <h3>Frame layout</h3>
 <pre class="code-block"><code>Request:  [1B cmd][2B keyLen][4B valLen][key][value]
 Response: [1B status][4B payloadLen][payload]</code></pre>
 
-<h3>Opcodes</h3>
+<h3 id="opcodes">Opcodes</h3>
+<p>Every opcode below is defined in <code>cmd/server/main.go</code> (handlers for <code>0x20</code>–<code>0x29</code>, <code>0x08</code>, <code>0x1C</code>, <code>0x1E</code> and <code>0x1F</code> in <code>cmd/server/ext_ops.go</code>). <code>0x1D</code> is unused. New opcodes take free slots at or below <code>0x29</code>, because a first byte above it is read as text.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Category</th><th>Opcode</th><th>Command</th></tr></thead>
@@ -178,10 +221,39 @@ Response: [1B status][4B payloadLen][payload]</code></pre>
 <tr><td><code>0x05</code></td><td><code>INFO</code></td></tr>
 <tr><td rowspan="2">Batch</td><td><code>0x06</code></td><td><code>MPUT</code> (vectorized multi-put)</td></tr>
 <tr><td><code>0x07</code></td><td><code>MGET</code> (vectorized multi-get)</td></tr>
+<tr><td>Auth</td><td><code>0x09</code></td><td><code>AUTH</code> — <code>[1B 0x09][2B userLen][4B passLen][user][pass]</code></td></tr>
+<tr><td rowspan="6">Namespace</td><td><code>0x0A</code></td><td><code>NSPUT</code></td></tr>
+<tr><td><code>0x0B</code></td><td><code>NSGET</code></td></tr>
+<tr><td><code>0x0C</code></td><td><code>NSDEL</code></td></tr>
+<tr><td><code>0x0D</code></td><td><code>NSDROP</code></td></tr>
+<tr><td><code>0x0E</code></td><td><code>NSSCAN</code></td></tr>
+<tr><td><code>0x0F</code></td><td><code>NSLIST</code></td></tr>
+<tr><td rowspan="8">Hash</td><td><code>0x10</code></td><td><code>HSET</code></td></tr>
+<tr><td><code>0x11</code></td><td><code>HGET</code></td></tr>
+<tr><td><code>0x12</code></td><td><code>HDEL</code></td></tr>
+<tr><td><code>0x13</code></td><td><code>HGETALL</code></td></tr>
+<tr><td><code>0x14</code></td><td><code>HKEYS</code></td></tr>
+<tr><td><code>0x15</code></td><td><code>HLEN</code></td></tr>
+<tr><td><code>0x16</code></td><td><code>HEXPIRE</code></td></tr>
+<tr><td><code>0x17</code></td><td><code>HTTL</code></td></tr>
 <tr><td rowspan="4">Atomic</td><td><code>0x18</code></td><td><code>CAS</code> (compare-and-swap)</td></tr>
 <tr><td><code>0x19</code></td><td><code>INCR</code></td></tr>
 <tr><td><code>0x1A</code></td><td><code>DECR</code></td></tr>
 <tr><td><code>0x1B</code></td><td><code>SETNX</code></td></tr>
+<tr><td rowspan="8">Extended</td><td><code>0x20</code></td><td><code>RANGE</code></td></tr>
+<tr><td><code>0x21</code></td><td><code>SCANCUR</code></td></tr>
+<tr><td><code>0x22</code></td><td><code>TXN</code> (one-shot optimistic transaction)</td></tr>
+<tr><td><code>0x23</code></td><td><code>IDXCREATE</code></td></tr>
+<tr><td><code>0x24</code></td><td><code>IDXDROP</code></td></tr>
+<tr><td><code>0x25</code></td><td><code>IDXQUERY</code></td></tr>
+<tr><td><code>0x28</code></td><td><code>QUERY</code></td></tr>
+<tr><td><code>0x29</code></td><td><code>GETVER</code> (key version for <code>TXN</code> <code>SETIF</code>)</td></tr>
+<tr><td rowspan="5">Vector</td><td><code>0x26</code></td><td><code>VSET</code> (namespace <code>default</code>)</td></tr>
+<tr><td><code>0x27</code></td><td><code>VSEARCH</code> (namespace <code>default</code>)</td></tr>
+<tr><td><code>0x08</code></td><td><code>VSETNS</code> <span class="badge good">New in v1.11</span></td></tr>
+<tr><td><code>0x1E</code></td><td><code>VSEARCHX</code> — namespace, ef, filter <span class="badge good">New in v1.11</span></td></tr>
+<tr><td><code>0x1F</code></td><td><code>VDEL</code> <span class="badge good">New in v1.11</span></td></tr>
+<tr><td>Search</td><td><code>0x1C</code></td><td><code>SEARCH</code>, sub-op in the 2-byte field: 1 <code>VCREATE</code>, 2 <code>TSET</code>, 3 <code>TDEL</code>, 4 <code>TSEARCH</code>, 5 <code>HSEARCH</code> <span class="badge good">New in v1.11</span></td></tr>
 </tbody>
 </table>
 </div>
@@ -191,6 +263,29 @@ Response: [1B status][4B payloadLen][payload]</code></pre>
 INCR:  [1B 0x19][2B keyLen][4B 0]           + [8B delta int64] + [4B ttl] + key
 DECR:  [1B 0x1A][2B keyLen][4B 0]           + [8B delta int64] + [4B ttl] + key
 SETNX: [1B 0x1B][2B keyLen][4B valLen]      + [4B ttl] + key + value</code></pre>
+
+<h3 id="search-opcodes">Vector and search frames</h3>
+<p>Each frame starts with the standard 7-byte header <code>[1B cmd][2B][4B]</code>, whose two fields are reinterpreted per opcode; all integers are little-endian, floats are IEEE-754 float32 LE. Writes answer the standard <code>OK</code>/<code>ERR</code> frame.</p>
+<pre class="code-block"><code>VSET     0x26: [1B][2B keyLen][4B dim] + key + dim×4B
+VSEARCH  0x27: [1B][2B k][4B dim]      + dim×4B
+VSETNS   0x08: [1B][2B idLen][4B dim]  + [2B nsLen] + ns + id + dim×4B
+VSEARCHX 0x1E: [1B][2B k][4B dim]      + [2B nsLen][2B ef][2B fieldLen][2B opLen][2B valLen]
+               + ns + field + op + value + dim×4B      (fieldLen 0 = no filter, ef 0 = default)
+VDEL     0x1F: [1B][2B idLen][4B nsLen] + ns + id
+
+SEARCH   0x1C: [1B][2B subop][4B payloadLen] + payload of [4B len][bytes] fields
+  1 VCREATE: ns, dim u32, quant ("" | none | int8 | pq)
+             [, pqM u32, pqTrainAt u32, graph ("" | memory | disk)]          → OK
+  2 TSET:    ns, id, text                                                     → OK
+  3 TDEL:    ns, id                                                           → OK
+  4 TSEARCH: ns, k u32, query, filterField, filterOp, filterValue             → matches
+  5 HSEARCH: ns, k u32, ef u32, alpha f32 (NaN = default 0.5), candidates u32,
+             vec (dim×4B, may be empty), query, filterField, filterOp, filterValue → matches
+  (filterField "" = no filter)
+
+Matches (VSEARCH, VSEARCHX, TSEARCH, HSEARCH):
+  [1B OK][4B count] + count × [2B idLen][4B score float32][id]</code></pre>
+<p>The trailing <code>VCREATE</code> fields (<code>pqM</code>, <code>pqTrainAt</code>, <code>graph</code>) are new in v1.12 and optional, so older clients that send only the first three fields keep working. The Go client is the only official SDK that implements these frames (<code>VSetNS</code>, <code>VSearchWithOptions</code>, <code>VDel</code>, <code>VCreateWithOptions</code>, <code>TSet</code>, <code>TDel</code>, <code>TSearch</code>, <code>HSearch</code>).</p>
 
 <h3>Status codes</h3>
 <div class="table-wrap">
@@ -207,10 +302,10 @@ SETNX: [1B 0x1B][2B keyLen][4B valLen]      + [4B ttl] + key + value</code></pre
 </table>
 </div>
 
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Prefer batches</span> <code>MPUT</code>/<code>MGET</code> batches are roughly <strong>50× faster</strong> than issuing the same number of individual <code>PUT</code>/<code>GET</code> calls, because a batch amortizes one round trip and one group-commit window across many keys instead of paying that cost per key. All official SDKs expose batch methods (for example, <code>db.mput(...)</code> / <code>db.mget(...)</code>) — reach for them whenever you're writing or reading more than a handful of keys at once.</span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Prefer batches</span> An <code>MPUT</code>/<code>MGET</code> batch pays one round trip (and, for writes, one group commit) for many keys instead of one per key, so it is much faster than the same number of individual <code>PUT</code>/<code>GET</code> calls; the gain depends on batch size and network latency. All official SDKs expose batch methods (for example, <code>db.mput(...)</code> / <code>db.mget(...)</code>) — reach for them whenever you're writing or reading more than a handful of keys at once.</span></div>
 
 <h2 id="protocol-auto-detection">Protocol auto-detection</h2>
-<p>Both protocols share the same TCP listener (<code>-addr</code>, default <code>:9000</code>). A single connection is either all-text or all-binary — the server determines this from the leading byte of the first request and does not switch mid-connection. You never need to configure which protocol to use; connecting with <code>nc</code>/<code>telnet</code> naturally speaks text, and every official SDK's connection pool speaks binary. This applies to the default <code>--net=go</code> front-end; see below for the opt-in C++ front-end.</p>
+<p>Both protocols share the same TCP listener (<code>-addr</code>, default <code>:9000</code>). A single connection is either all-text or all-binary — the server determines this from the leading byte of the first request — <code>0x01</code>–<code>0x29</code> selects binary, anything else is read as a text line — and does not switch mid-connection. You never need to configure which protocol to use; connecting with <code>nc</code>/<code>telnet</code> naturally speaks text, and every official SDK's connection pool speaks binary. This applies to the default <code>--net=go</code> front-end; see below for the opt-in C++ front-end.</p>
 
 <h2 id="network-front-ends">Which front-end serves which commands <span class="badge good">New in v1.7</span></h2>
 <p>The <code>--net</code> server flag selects the network front-end that listens on <code>-addr</code>:</p>
@@ -227,12 +322,13 @@ SETNX: [1B 0x1B][2B keyLen][4B valLen]      + [4B ttl] + key + value</code></pre
 
 <div class="card-grid">
 <a class="card" href="data-model.html"><div class="card-title">Data Model →</div><div class="card-desc">The keys, TTLs, hash fields, namespaces, and atomic ops these commands operate on.</div></a>
+<a class="card" href="vector-search.html"><div class="card-title">Vector &amp; Hybrid Search →</div><div class="card-desc">What the search commands do, what RAM they need, and what they measured.</div></a>
 <a class="card" href="deployment-modes.html"><div class="card-title">Deployment Modes →</div><div class="card-desc">How writes made over this protocol are routed in cluster modes.</div></a>
 <a class="card" href="../client-sdks/index.html"><div class="card-title">Client SDKs →</div><div class="card-desc">Go, Python, Node.js, Java, Rust, and C++ clients that speak the binary protocol.</div></a>
 </div>
 
     <div class="page-nav">
-<a class="prev" href="../concepts/data-model.html"><span class="dir">&larr; Previous</span><span>Data Model</span></a>
+<a class="prev" href="../concepts/vector-search.html"><span class="dir">&larr; Previous</span><span>Vector &amp; Hybrid Search</span></a>
 <a class="next" href="../concepts/deployment-modes.html"><span class="dir">Next &rarr;</span><span>Deployment Modes</span></a>
 </div>
   </main>

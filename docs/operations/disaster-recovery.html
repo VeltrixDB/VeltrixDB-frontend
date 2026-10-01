@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,7 +91,11 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Disaster Recovery</div>
     <h1>Disaster Recovery</h1>
-<p class="page-lede">A runbook-style summary of VeltrixDB's disaster recovery procedures, covering pod crash loops, data corruption, write outages, GC death-spirals, backup/restore, encryption key rotation, failed disks, metadata repair and WAL-format rollback. Assumes <code>kubectl</code> admin access with pods labeled <code>app.kubernetes.io/name=veltrixdb</code> in the <code>veltrixdb</code> namespace.</p>
+<p class="page-lede">A runbook-style summary of VeltrixDB's disaster recovery procedures, covering pod crash loops, data corruption, write outages, GC death-spirals, backup/restore, encryption key rotation, failed disks, metadata repair and WAL-format rollback. Assumes <code>kubectl</code> admin access with pods labeled <code>app.kubernetes.io/name=veltrixdb</code> in the <code>veltrixdb</code> namespace (the <code>kubectl veltrix</code> plugin's defaults).</p>
+<div class="callout note">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">The image has no shell.</span> The runtime image is distroless (no <code>sh</code>, <code>curl</code>, <code>rm</code> or <code>nc</code>), so <code>kubectl exec POD -- curl …</code> does not work. Reach the admin port with <code>kubectl port-forward</code> from your workstation, and run file commands from an ephemeral debug container that shares the server's process namespace (<code>kubectl debug --target=veltrixdb</code>; the server's filesystem is then under <code>/proc/1/root</code>) or a node debug pod (host filesystem under <code>/host</code>). The <code>kubectl veltrix</code> plugin port-forwards for you but sends no admin token, so it only works on servers started without <code>--admin-token</code>.</span>
+</div>
 
 <h2 id="severity">Severity classes</h2>
 <div class="table-wrap">
@@ -115,8 +120,11 @@ kubectl describe pod -n veltrixdb POD</code></pre>
 <tbody>
 <tr><td><code>[wal] replay of &hellip;/wal.log stopped at byte N of M after K records</code></td><td>Torn final write on crash (small <code>M &minus; N</code>), or WAL damage (large). Every record is CRC32C-checked and replay stops at the first bad one.</td><td>Restart the pod once. If it recurs or <code>M &minus; N</code> is large, treat it as corruption: wipe the node's data and let replication refill it (section 2), or restore from backup (section 5).</td></tr>
 <tr><td><code>panic: native index: insert failed (out of memory?)</code> <span class="badge good">New in v1.6</span></td><td><code>vm.max_map_count</code> too low for the off-heap native index (cgo builds, including the Docker image)</td><td>Apply <code>scripts/sysctl.conf</code> (<code>vm.max_map_count = 262144</code>) on the <strong>node</strong>; or set <code>VELTRIXDB_INDEX=map</code> to use the Go map index</td></tr>
-<tr><td><code>vlog bad magic at offset O</code></td><td>Silent disk corruption</td><td>Drain the node, replace the disk, re-join</td></tr>
-<tr><td><code>encryption: enabled but no key in VELTRIXDB_ENCRYPTION_KEY &hellip;</code></td><td>Missing secret</td><td><code>kubectl create secret generic veltrixdb-enc --from-literal=key=BASE64_32B</code></td></tr>
+<tr><td><code>vlog bad magic at offset O</code> / <code>vlog CRC32C mismatch at offset O</code></td><td>Silent disk corruption</td><td>Drain the node, replace the disk, re-join</td></tr>
+<tr><td><code>[search] rebuilt N vectors and M text documents in T</code> <span class="badge good">New in v1.11</span></td><td>Normal after every start: search indexes are rebuilt from the persisted keys, and searches are refused until this line (<code>INFO</code> shows <code>search_ready=1</code>)</td><td>Nothing &mdash; size restart windows by <em>T</em> for large vector namespaces</td></tr>
+<tr><td>client error <code>search indexes are still rebuilding after restart (loaded x of y)</code></td><td>A search reached a node (or a fan-out peer) before its rebuild finished</td><td>Retry; or run with <code>--search-allow-partial</code> if incomplete results are acceptable</td></tr>
+<tr><td><code>[transfer] WARNING: listener … is unauthenticated</code></td><td>No <code>--cluster-secret-file</code> and no cluster mTLS</td><td>Mount the same secret (&ge; 16 bytes) on every node (<code>--cluster-secret-file</code> or <code>VELTRIXDB_CLUSTER_SECRET</code>) and restart &mdash; see <a class="inline-link" href="security.html#cluster-secret">Security</a></td></tr>
+<tr><td><code>encryption: enabled but no key in VELTRIXDB_ENCRYPTION_KEY and no EncryptionKeyPath set</code></td><td><code>--encrypt-at-rest</code> with no key (env unset, no <code>--encryption-key-path</code>)</td><td><code>kubectl create secret generic veltrixdb-enc --from-literal=key=BASE64_32B</code> and reference it from the pod env</td></tr>
 </tbody>
 </table>
 </div>
@@ -124,37 +132,40 @@ kubectl describe pod -n veltrixdb POD</code></pre>
 <h2 id="data-corruption">2. Data corruption (SEV-0)</h2>
 <ol>
 <li>Confirm corruption via metrics:
-<pre class="code-block"><code>kubectl exec -n veltrixdb POD -- curl -s localhost:2112/metrics | \
-  grep -E 'scrub_corruption_total|vlog_gc_read_errors_total'</code></pre>
+<pre class="code-block"><code>kubectl port-forward -n veltrixdb POD 2112:2112 &amp;
+curl -s localhost:2112/metrics | grep -E 'scrub_corruption_total|vlog_gc_read_errors_total'</code></pre>
 </li>
-<li>Find the bad disk: <code>kubectl logs -n veltrixdb POD | grep '\[scrub\] disk='</code> (lines report <code>MAGIC MISMATCH</code> or <code>CRC MISMATCH</code> with the disk and offset)</li>
+<li>Find the bad disk: <code>kubectl logs -n veltrixdb POD | grep -E '\[scrub\] disk=.*MISMATCH'</code> (lines report <code>MAGIC MISMATCH</code> or <code>CRC MISMATCH</code> with the disk and offset)</li>
 <li>Quarantine the pod: <code>kubectl label pod -n veltrixdb POD veltrixdb.io/quarantine=true --overwrite</code></li>
-<li>Wipe the affected files and restart — replication refills automatically:
-<pre class="code-block"><code>kubectl exec -n veltrixdb POD -- rm -rf /mnt/nvme*/vlog_active.dat /mnt/nvme*/wal.log*
+<li>Wipe the node's data and restart &mdash; <strong>raft or replicated mode only</strong>, where the other nodes refill it (Raft log catch-up / <code>InstallSnapshot</code>). In standalone mode restore from backup instead (section 5):
+<pre class="code-block"><code>kubectl debug -n veltrixdb POD -it --image=busybox:1.36 --target=veltrixdb -- \
+  sh -c 'rm -f /proc/1/root/mnt/nvme*/vlog_active.dat /proc/1/root/mnt/nvme*/wal.log*'
 kubectl delete pod -n veltrixdb POD</code></pre>
-</li>
+In replicated mode only writes the primaries still hold un-acked are re-sent; there is no full-state resync, so verify the refilled node.</li>
 <li>After replay completes, remove the quarantine label: <code>kubectl label pod -n veltrixdb POD veltrixdb.io/quarantine- --overwrite</code></li>
-<li>Root-cause the disk: <code>kubectl exec -n veltrixdb POD -- smartctl -a /dev/nvme0n1</code></li>
+<li>Root-cause the disk from a node debug pod: <code>kubectl debug node/NODE -it --image=ubuntu:24.04 -- chroot /host smartctl -a /dev/nvme0n1</code></li>
 </ol>
 
 <h2 id="write-outage">3. Write outage (SEV-0)</h2>
 <pre class="code-block"><code>kubectl get pods -n veltrixdb -o wide
-kubectl exec -n veltrixdb POD -- df -h /mnt/nvme*
-kubectl exec -n veltrixdb POD -- curl -s localhost:2112/metrics | grep wal_flushes_total</code></pre>
+kubectl debug -n veltrixdb POD -it --image=busybox:1.36 --target=veltrixdb -- \
+  sh -c 'df -h /proc/1/root/mnt/nvme*'
+kubectl port-forward -n veltrixdb POD 2112:2112 &amp;
+curl -s localhost:2112/metrics | grep -E 'storage_wal_flushes_total|vlog_garbage_ratio'</code></pre>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Cause</th><th>Fix</th></tr></thead>
 <tbody>
-<tr><td>Disk 100% full and GC paused</td><td><code>kubectl veltrix checkpoint</code></td></tr>
+<tr><td>Disk 100% full and GC paused</td><td><code>kubectl veltrix checkpoint</code>; check <code>kubectl veltrix gc-status</code></td></tr>
 <tr><td>GC can't keep up</td><td><code>kubectl veltrix quota-set NS 1000 5000000</code> — throttle writes</td></tr>
-<tr><td>Network partition</td><td><code>kubectl exec POD -- nc -zv OTHER_POD 9000</code> — check CNI/NetworkPolicies</td></tr>
+<tr><td>Network partition</td><td><code>kubectl debug -n veltrixdb POD -it --image=busybox:1.36 -- nc -zv OTHER_POD 9000</code> — check CNI/NetworkPolicies</td></tr>
 </tbody>
 </table>
 </div>
 
 <h2 id="gc-death-spiral">4. GC death-spiral / garbage ratio &gt; 65% (SEV-2)</h2>
 <ol>
-<li>Throttle writes immediately: <code>kubectl veltrix quota-set tenant_42 1000 5000000</code></li>
+<li>Throttle writes immediately: <code>kubectl veltrix quota-set tenant_42 1000 5000000</code>, then watch GC work through it with <code>kubectl veltrix gc-status</code> (ratio per disk, runs, emergency state).</li>
 <li>Do not look for a runtime GC-budget knob: the GC bandwidth tiers (60&nbsp;MB/s throttled, 200&nbsp;MB/s critical at &ge; 50% garbage, uncapped emergency mode at &ge; 65%) are compile-time constants in <code>storage/defrag.go</code>, and there is no environment variable that overrides them. <code>-gc-threshold</code> only sets when normal GC starts.</li>
 <li>Long-term: add disks (scale <code>volumeClaimTemplates</code>, re-roll the StatefulSet).</li>
 </ol>
@@ -164,43 +175,55 @@ kubectl exec -n veltrixdb POD -- curl -s localhost:2112/metrics | grep wal_flush
 </div>
 
 <h2 id="backup-restore-runbook">5. Backup and restore</h2>
-<pre class="code-block"><code># Full backup (engine can be running)
+<pre class="code-block"><code># Full backup of a RUNNING server: through the admin API, written on the
+# server's own filesystem (dest_dir is a path inside the pod)
+kubectl port-forward -n veltrixdb POD 2112:2112 &amp;
+curl -s -X POST localhost:2112/admin/backup \
+  -d '{"type":"full","dest_dir":"/mnt/nvme0/backup/'$(date +%F)'"}'
+# incremental: {"type":"incremental","dest_dir":"...","base_dir":"&lt;previous backup dir&gt;"}
+# (same as a full backup: veltrix --addr 127.0.0.1:2112 backup DEST_DIR)
+
+# Offline tool: ONLY while the server is STOPPED (see warning below)
 veltrixdb-backup full --data-dirs=/mnt/nvme0,...,/mnt/nvme7 --dest=/backup/$(date +%F)
 
-# Upload to S3
+# Upload to S3 (prints the cloud path: &lt;prefix&gt;/&lt;backup_id&gt;/, default prefix veltrixdb-backups)
 veltrixdb-backup upload --src=/backup/$(date +%F) \
   --provider=s3 --bucket=my-bucket --region=us-east-1
 
 # Download and restore (stop the engine first)
-veltrixdb-backup download --provider=s3 --bucket=my-bucket \
-  --cloud-path=veltrixdb-backups/$(date +%F) --dest=/tmp/restore
+veltrixdb-backup download --provider=s3 --bucket=my-bucket --region=us-east-1 \
+  --cloud-path=veltrixdb-backups/full-1748001600000000000/ --dest=/tmp/restore
 veltrixdb-backup restore --chain=/tmp/restore --data-dirs=/data-new</code></pre>
-<p>Or restore from Kubernetes volume snapshots:</p>
-<pre class="code-block"><code>kubectl create volumesnapshot veltrixdb-disk-0 -n veltrixdb \
-  --persistentvolumeclaim=data-veltrixdb-0</code></pre>
+<div class="callout danger">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title"><code>veltrixdb-backup</code> on a live server truncates its files.</span> It opens the data dirs with its own engine; pointed at a running server's directories it produced an empty backup and truncated the live <code>wal.log</code> and <code>vlog_active.dat</code> in testing. Use <code>POST /admin/backup</code> for running servers. The tool is not in the server image (the Dockerfile builds only <code>cmd/server</code>). With <code>--raw-vlogs</code>, backups contain no VLog data.</span>
+</div>
+<p>Kubernetes volume snapshots are an operator-side alternative if your CSI driver supports them: create a <code>VolumeSnapshot</code> object per PVC (there is no <code>kubectl create volumesnapshot</code> subcommand, and the main repository ships no snapshot manifests). Run <code>POST /admin/checkpoint</code> first so <code>wal.log</code> is a compacted checkpoint.</p>
 <p>Backups and PITR restores write a binary WAL; restoring into a build that predates the binary WAL (v1.5 and earlier) needs the <a class="inline-link" href="#wal-format-rollback">WAL rollback procedure</a> first. For the full backup/incremental/PITR model, see <a class="inline-link" href="backup-and-restore.html">Backup &amp; Restore</a>.</p>
 
 <h2 id="key-rotation">6. Encryption key rotation</h2>
-<div class="callout warn">
+<div class="callout danger">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">Online rotation is not supported.</span> Rotating the AES-256-GCM master key requires taking the cluster offline for the duration of the migration.</span>
+  <span><span class="callout-title">Key rotation is not implemented &mdash; do not swap the Secret under existing data.</span> The engine loads exactly one key at startup and stores no per-record key version, so values written under the old key cannot be decrypted once the key changes, and no command re-encrypts in place. <code>kubectl veltrix migrate</code> (<code>POST /admin/migrate</code>) only rewrites records whose <em>schema</em> version is old; it does not re-encrypt.</span>
 </div>
+<p>The only way to change the key is to move the data through a client:</p>
 <ol>
-<li>Stop all pods: <code>kubectl scale statefulset/veltrixdb --replicas=0 -n veltrixdb</code></li>
-<li>Generate a new key: <code>openssl rand 32 | base64</code></li>
-<li>Update the secret: <code>kubectl create secret generic veltrixdb-enc --from-literal=key=NEW_KEY --dry-run=client -o yaml | kubectl apply -f -</code></li>
-<li>Start the pods and force a full rewrite at the new key: <code>kubectl veltrix migrate</code></li>
+<li>Start a fresh node (empty data dirs) with <code>--encrypt-at-rest</code> and the <strong>new</strong> key.</li>
+<li>Read every key from a node still running with the old key and write it into the new node (for example <code>veltrix-migrate</code> export/import over the binary protocol).</li>
+<li>Cut clients over to the new node, then retire the old one and its key.</li>
 </ol>
+<p>Values written by atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) are stored unencrypted today regardless of the key (known gap).</p>
 
 <h2 id="disk-failure">7. Failed disk — auto-degraded node (SEV-1)</h2>
 <p>VeltrixDB trips a per-disk breaker after <strong>5 consecutive I/O errors</strong> on a disk's WAL/VLog. The disk is marked <code>FAILED</code>: writes routed to it fail fast with <code>ErrDiskFailed</code>, GC skips it, and the node reports degraded. Reads still try the device and are served from cache when possible. Detection:</p>
 <pre class="code-block"><code># Readiness probe fails while the node keeps serving reads
-kubectl exec -n veltrixdb POD -- curl -s -o /dev/null -w '%{http_code}\n' localhost:2112/readyz
-# 503 — body: "degraded: disks [2] failed"
+kubectl port-forward -n veltrixdb POD 2112:2112 &amp;
+curl -s -w '%{http_code}\n' localhost:2112/readyz
+# degraded: disks [2] failed
+# 503
 
 # Which disks tripped
-kubectl exec -n veltrixdb POD -- curl -s localhost:2112/readyz     # degraded: disks [2] failed
-kubectl logs -n veltrixdb POD | grep '\[disk\]'                    # "disk=2 marked FAILED after 5 consecutive ... errors"</code></pre>
+kubectl logs -n veltrixdb POD | grep '\[disk\]'   # "disk=2 marked FAILED after 5 consecutive ... errors"</code></pre>
 <p><code>INFO</code> (text protocol) also appends <code>FAILED_DISKS=[2]</code> for a degraded node, and the engine's internal <code>DiskFailures</code> counter records breaker trips (not exported to Prometheus).</p>
 <div class="callout warn">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
@@ -210,7 +233,7 @@ kubectl logs -n veltrixdb POD | grep '\[disk\]'                    # "disk=2 mar
 <ol>
 <li><strong>Drain:</strong> the failing <code>/readyz</code> already stops new traffic; let in-flight work complete, then take the node out of rotation (cordon the K8s node or scale traffic away).</li>
 <li><strong>Replace:</strong> swap the failed device (see section 1's <code>bad magic</code> row and section 2 for corruption handling on the same disk).</li>
-<li><strong>Restart:</strong> restart the pod/process — the breaker state is in-memory, so a restart with a healthy disk comes back clean and replication refills the data.</li>
+<li><strong>Restart:</strong> restart the pod/process — the breaker state is in-memory, so a restart with a healthy disk comes back clean. In raft mode the leader refills the replaced disk's data through log catch-up or <code>InstallSnapshot</code>; in standalone mode restore from backup; in replicated mode there is no full-state resync, so restore or re-copy the data.</li>
 </ol>
 
 <h2 id="transform-metadata">8. Value-transform metadata damage from a pre-fix build (SEV-1) <span class="badge good">Fixed in v1.3</span></h2>
@@ -220,7 +243,9 @@ kubectl logs -n veltrixdb POD | grep '\[disk\]'                    # "disk=2 mar
 
 # 2. Repair each node with the server STOPPED
 kubectl scale statefulset veltrixdb --replicas=0
-veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
+veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair
+# encrypted: add --encrypt-at-rest (key from VELTRIXDB_ENCRYPTION_KEY or --encryption-key-path)
+# data not written with zstd: --compression=none|flate</code></pre>
 <p>Each <code>wal.log</code> is copied to <code>wal.log.prerepair.&lt;timestamp&gt;</code> first. The repair is exact: it accepts only the interpretation of each blob that reproduces the stored plaintext CRC, and is idempotent. Verify by reading back values larger than 256 bytes and re-running the scan. Encrypted deployments need the key (<code>VELTRIXDB_ENCRYPTION_KEY</code> plus <code>--encrypt-at-rest</code>), or those records report as unresolved. See <a class="inline-link" href="../reference/cli-reference.html#veltrix-repair">veltrix-repair</a>.</p>
 
 <h2 id="wal-format-rollback">9. WAL format: upgrade and rollback <span class="badge good">New in v1.6</span></h2>

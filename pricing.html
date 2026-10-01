@@ -57,10 +57,11 @@
         <p class="for">The whole engine, on your infrastructure. No feature gates, no per-op meter.</p>
         <div class="amt"><span class="v">$0</span><span class="u">Apache 2.0</span></div>
         <ul>
-          <li>Self-hosted: Docker, Helm chart, Kubernetes operator, bare metal</li>
+          <li>Self-hosted: Docker, bare metal, Helm chart and Kubernetes operator (separate repos)</li>
           <li>Standalone, replicated, or Raft cluster modes</li>
-          <li>AES-256-GCM at rest, RBAC, mTLS, audit log</li>
-          <li>60+ Prometheus metrics, Grafana dashboards, 22 alert rules</li>
+          <li>Vector, BM25 full-text and hybrid search</li>
+          <li>AES-256-GCM at rest, RBAC, TLS / mTLS, audit log</li>
+          <li>70+ Prometheus metric families, Grafana dashboards, alert rules</li>
           <li>Community support on GitHub</li>
         </ul>
         <div class="pcta">
@@ -129,7 +130,7 @@
           <div class="calc-card us">
             <div class="nm"><span>VeltrixDB</span><span class="tag">NVMe</span></div>
             <div class="price"><span>RAM ≈ index + cache</span></div>
-            <div class="breakdown">NVMe holds the values. RAM holds the index — ~142 B/key measured at 5M keys with the native index (since v1.6; 168 B/key with the Go map), plus ~90 B/key for the ordered index unless disabled — plus whatever cache you choose (default 256 MB).</div>
+            <div class="breakdown">NVMe holds the values. RAM holds the index — ~142 B/key measured at 5M keys with the native index (since v1.6; 168 B/key with the Go map), plus ~90 B/key for the ordered index unless disabled — plus whatever cache you choose (default 256 MB). Using vector search? Add its index: ~3.4 KB per 768-dim vector as float32, ~1.1 KB int8, ~0.6 KB with PQ + disk graph (measured at 10K vectors).</div>
           </div>
         </div>
         <div class="calc-foot">
@@ -197,7 +198,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

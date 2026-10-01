@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>FAQ - VeltrixDB</title>
-<meta name="description" content="The questions every engineering leader asks before adopting VeltrixDB - plus where the project came from." />
+<meta name="description" content="The questions every engineering leader asks before adopting VeltrixDB - including vector and hybrid search, security gaps and what is self-hosted only - plus where the project came from." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,23 +53,31 @@
     <div class="faq">
       <details open>
         <summary>Is VeltrixDB a drop-in replacement for Redis or DynamoDB?</summary>
-        <div class="answer">Not drop-in. VeltrixDB does <b>not</b> speak the Redis protocol (RESP); it has its own text and binary protocols and client SDKs for Go, Python, Node.js, Java, Rust, and C++. The command set is deliberately familiar — <code>PUT</code>/<code>SET</code>, <code>GET</code>, <code>DEL</code>, <code>HSET</code>/<code>HGET</code>, <code>INCR</code>, <code>CAS</code>, <code>MPUT</code>/<code>MGET</code>, plus ordered scans with <code>RANGE</code> and <code>SCANCUR</code> — so for <b>point-lookup workloads</b> the change is a client swap, not a redesign. If you need joins, SQL, or full-text search, VeltrixDB is the wrong tool — we'll tell you that in the demo.</div>
+        <div class="answer">Not drop-in. VeltrixDB does <b>not</b> speak the Redis protocol (RESP); it has its own text and binary protocols and client SDKs for Go, Python, Node.js, Java, Rust, and C++. The command set is deliberately familiar — <code>PUT</code>/<code>SET</code>, <code>GET</code>, <code>DEL</code>, <code>HSET</code>/<code>HGET</code>, <code>INCR</code>, <code>CAS</code>, <code>MPUT</code>/<code>MGET</code>, plus ordered scans with <code>RANGE</code> and <code>SCANCUR</code> and vector / text search (<code>VSEARCH</code>, <code>TSEARCH</code>, <code>HSEARCH</code>) — so for <b>point-lookup workloads</b> the change is a client swap, not a redesign. RESP compatibility is on the roadmap with no date. If you need joins, SQL, or a full search engine (facets, phrase queries, stemming), VeltrixDB is the wrong tool — we'll tell you that in the demo.</div>
       </details>
       <details>
         <summary>How fast are reads, really?</summary>
         <div class="answer">The reproducible number: <b>427,697 reads/s, P99 2.8 ms</b> (avg 461 µs) on YCSB workload C — 100M keys, 200 threads, one AWS node with 4× NVMe. The whole dataset fit in the 400 GB cache, so those were cache hits; we have not published a reproducible run where most reads miss to NVMe, or one at a billion keys. How it works: a sharded, scan-resistant LIRS cache serves hot keys (~92 ns in-process); a miss is one 4 KB-aligned Go <code>pread</code> from the value log, CRC32C-checked; and with no LSM compaction, value-log GC runs off the read path and backs off when read latency rises. Full conditions are on the <a href="performance.html">performance page</a>.</div>
       </details>
       <details>
+        <summary>Can I use VeltrixDB as a vector database?</summary>
+        <div class="answer">For vectors that belong next to your KV records, yes — since v1.11. Each namespace has one HNSW graph (cosine) with float32, int8 or product-quantized codes in RAM and an optional on-disk layer-0 graph (v1.12); the full vectors stay on NVMe and re-rank the candidates. Searches filter on the record with the same id and fan out across cluster nodes. Measured on one macOS laptop with GloVe-100 (100K real vectors, one query at a time): recall@10 <b>0.953</b> at p50 <b>0.77 ms</b> (float32, ef 256); over the network with 20K vectors, int8 and 8 same-host clients, 24.6K QPS at recall 0.894. The honest limits: the index lives in RAM (~0.4–3.4 KB per 768-dim vector by layout) and is <b>rebuilt at every start</b>, with searches refused until it finishes; tested to 100K real vectors, nothing at 10M+; one graph per namespace, cosine only, no GPU; <code>DEL</code> removes the record but not its vector — use <code>VDEL</code> (and <code>TDEL</code> for text); the search API is in the bundled Go client, other languages use the text protocol. There is <b>no same-hardware comparison</b> with Milvus, Qdrant or any other vector database. Details: <a href="docs/concepts/vector-search.html">vector search docs</a>.</div>
+      </details>
+      <details>
+        <summary>Does it do full-text or hybrid search?</summary>
+        <div class="answer">Yes, within limits. <code>TSET</code> indexes a document for Okapi BM25 (Unicode tokenizer, no stemming, stop words or phrase queries, at most 1 MiB per document), and <code>HSEARCH</code> fuses a vector and a text ranking with weighted reciprocal-rank fusion. In a cluster, BM25 is scored with cluster-wide statistics. There are no facets, aggregations or per-field weights, so if search is the product, Elasticsearch or OpenSearch is the better tool.</div>
+      </details>
+      <details>
         <summary>What does the bill actually look like at scale?</summary>
-        <div class="answer">VeltrixDB is free and self-hosted, so the bill is your hardware — RAM, NVMe, and network — not a per-operation meter. RAM covers the index (~142 B/key measured at 5M keys with the native index, plus ~90 B/key for the ordered index unless disabled) and whatever cache you choose; NVMe holds the values. See <a href="pricing.html#calc">how to size a node</a>, and we'll model your workload during the demo. We don't quote savings percentages we haven't measured.</div>
+        <div class="answer">VeltrixDB is free and self-hosted, so the bill is your hardware — RAM, NVMe, and network — not a per-operation meter. RAM covers the index (~142 B/key measured at 5M keys with the native index, plus ~90 B/key for the ordered index unless disabled), whatever cache you choose and, if you use search, the vector and text indexes; NVMe holds the values. The saving over an all-in-RAM store grows with value size — roughly 4–7× less RAM at 1 KB values, little at 128 B values. See <a href="pricing.html#calc">how to size a node</a>, and we'll model your workload during the demo. We don't quote savings percentages we haven't measured.</div>
       </details>
       <details>
         <summary>How does data durability and replication work?</summary>
-        <div class="answer">A write is acknowledged only after it is <code>fdatasync</code>'d: the value to the value log and its record to a group-commit WAL, which shares one <code>write(2)</code> and one <code>fdatasync</code> across all writers in the window (15 ms by default). WAL records are binary with a CRC32C over the whole record (binary is the default since v1.6; v1.5 and earlier wrote text records). A crash replays the WAL; a clean shutdown writes a compacted checkpoint. Across nodes: <code>--mode=raft</code> for quorum-committed writes, or <code>--mode=replicated</code> with <code>eventual</code>, <code>quorum</code>, or <code>strong</code> consistency; <code>--rack-id</code> keeps replicas in different zones. Cross-region, <code>repl-ship</code> forwards the change stream. There is no SLA — it's software you run.</div>
+        <div class="answer">A write is acknowledged only after it is <code>fdatasync</code>'d: the value to the value log and its record to a group-commit WAL, which shares one <code>write(2)</code> and one <code>fdatasync</code> across all writers in a batch. Since v1.12 group commit is adaptive: a lone writer is synced at once and the 15 ms window is only an upper bound (<code>--group-commit=fixed</code> restores the full wait). WAL records are binary with a CRC32C over the whole record (binary is the default since v1.6; v1.5 and earlier wrote text records). A crash replays the WAL; a clean shutdown writes a compacted checkpoint. Across nodes: <code>--mode=raft</code> for quorum-committed (linearizable) writes — reads are local by default, and <code>--linearizable-reads</code> sends GET and MGET through the ReadIndex fence; namespace, hash and range reads stay local — or <code>--mode=replicated</code> with <code>eventual</code>, <code>quorum</code>, or <code>strong</code> consistency, which is not linearizable under concurrent writers; <code>--rack-id</code> keeps replicas in different zones. Cross-region, <code>repl-ship</code> forwards the change stream. There is no SLA — it's software you run.</div>
       </details>
       <details>
         <summary>What's the security and compliance story?</summary>
-        <div class="answer">In the software: AES-256-GCM encryption at rest, TLS 1.3 for clients, mTLS between nodes, RBAC, and an append-only audit log. Because you run it in your own environment, compliance is scoped to your deployment — VeltrixDB itself holds no SOC 2 or ISO 27001 certification. Note that point-in-time-recovery archives hold decrypted values, so protect the archive location.</div>
+        <div class="answer">In the software: AES-256-GCM encryption of values at rest, TLS 1.3 for clients, TLS / mTLS between nodes, HMAC-SHA256 signing of node-to-node transfer and search traffic (<code>--cluster-secret-file</code>), RBAC, and an append-only audit log. <code>/admin/*</code> answers loopback only unless you set <code>--admin-token</code>. Known gaps: <b>encryption key rotation is not implemented</b> (one key per data directory, from an env var or key file), keys themselves are not encrypted, and point-in-time-recovery archives hold decrypted values, so protect the archive location. Because you run it in your own environment, compliance is scoped to your deployment — VeltrixDB itself holds no SOC 2 or ISO 27001 certification.</div>
       </details>
       <details>
         <summary>How long does production migration take?</summary>
@@ -77,11 +85,11 @@
       </details>
       <details>
         <summary>What happens when I outgrow a cluster?</summary>
-        <div class="answer">Add nodes. The Kubernetes operator reshards when the replica count changes, and the cluster rebalances partitions to the new nodes. There are no plans or capacity tiers to upgrade — the open-source engine has no limits beyond your hardware.</div>
+        <div class="answer">Add nodes. Gossip does not add members on its own: every node has to know the new one, which for the server means restarting each node with it in <code>--peers</code>; keys then migrate to their new owners in the background (<code>--auto-rebalance</code>, on by default). The Kubernetes operator — a separate repository — automates resharding when the replica count changes. Distributed searches ask every node, so their cost grows with the cluster. There are no plans or capacity tiers to upgrade — the open-source engine has no limits beyond your hardware.</div>
       </details>
       <details>
         <summary>Is VeltrixDB open source? Is there a managed service?</summary>
-        <div class="answer">Yes — VeltrixDB is fully open source under <b>Apache 2.0</b>. The server and all core client libraries live on GitHub: clone it, run it, fork it, send PRs. No license keys, no trial limits, no feature-gated tiers — the whole engine is free to use in production. There is <b>no managed cloud service today</b>; VeltrixDB is self-hosted only. A managed service is planned, with no date announced.</div>
+        <div class="answer">Yes — VeltrixDB is fully open source under <b>Apache 2.0</b>. The server lives on GitHub, with the client SDKs, the Helm chart and the Kubernetes operator in their own repositories: clone them, run them, fork them, send PRs. No license keys, no trial limits, no feature-gated tiers — the whole engine is free to use in production. There is <b>no managed cloud service today</b>; VeltrixDB is self-hosted only. A managed service is planned, with no date announced.</div>
       </details>
     </div>
   </div>
@@ -214,7 +222,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

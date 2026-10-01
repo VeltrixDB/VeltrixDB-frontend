@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,7 +91,12 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>Go</div>
     <h1>Go Client</h1>
-<p class="page-lede">The Go client is a thread-safe, connection-pooled driver for VeltrixDB with the broadest API surface of any SDK — single-key ops, batches, namespaces, hash fields, atomic ops (CAS/INCR/DECR/SETNX), range scans, optimistic transactions, secondary indexes, and vector search.</p>
+<p class="page-lede">There are two Go clients. <code>veltrixdb-client-go</code> (from the separate Veltrixdb-client repository) is a thread-safe, connection-pooled driver for single-key ops, batches, namespaces, hash fields, atomics, scans and transactions. The <code>client</code> package inside the server repository (<code>github.com/VeltrixDB/veltrixdb/client</code>) is the only client with the v1.11 search API &mdash; vector namespaces, filtered vector search, BM25 text search and hybrid search.</p>
+
+<div class="callout note">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Which one do you need?</span> For search (<code>VCREATE</code>, <code>VSET … NS</code>, <code>VSEARCH</code> with options, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code>) jump to <a class="inline-link" href="#search">Search (in-repo client)</a>. The sections from <a class="inline-link" href="#install">Install</a> to <a class="inline-link" href="#concurrent-usage">Concurrent usage</a> describe <code>veltrixdb-client-go</code>; that SDK lives outside the server repository and was not updated with the search release.</span>
+</div>
 
 <h2 id="install">Install</h2>
 <pre class="code-block"><div class="code-label">bash</div><code>go get github.com/VeltrixDB/veltrixdb-client-go</code></pre>
@@ -280,7 +286,7 @@ created, err := client.SetNX(ctx, "lock", []byte("owner-A"))
 // created == false → someone else holds the key</code></pre>
 
 <h3>Range scans, transactions, indexes, and vectors</h3>
-<p>Beyond the wire-protocol operations documented in the client README, the Go client exposes a further set of methods (<code>RangeScan</code>, <code>ScanCursor</code>, <code>Txn</code>, <code>KeyVersion</code>, <code>IdxCreate</code>/<code>IdxDrop</code>/<code>IdxQuery</code>, <code>VSet</code>/<code>VSearch</code>, <code>Query</code>) implemented directly in <code>client.go</code>:</p>
+<p>Beyond the wire-protocol operations documented in the client README, <code>veltrixdb-client-go</code> exposes a further set of methods (<code>RangeScan</code>, <code>ScanCursor</code>, <code>Txn</code>, <code>KeyVersion</code>, <code>IdxCreate</code>/<code>IdxDrop</code>/<code>IdxQuery</code>, <code>VSet</code>/<code>VSearch</code>, <code>Query</code>). Its <code>VSet</code>/<code>VSearch</code> use only the <code>default</code> vector namespace with no options; namespaces, filters, beam width, deletes, text and hybrid search are in the <a class="inline-link" href="#search">in-repo client</a>.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
@@ -291,7 +297,7 @@ created, err := client.SetNX(ctx, "lock", []byte("owner-A"))
 <tr><td><code>KeyVersion(ctx, key)</code></td><td>Optimistic version token for a key (0 = absent) — feeds <code>TxnOp.ExpectedVersion</code></td></tr>
 <tr><td><code>IdxCreate(ctx, name, field)</code> / <code>IdxDrop(ctx, name)</code></td><td>Manage a persistent secondary index on a JSON field</td></tr>
 <tr><td><code>IdxQuery(ctx, name, value, limit)</code></td><td>Look up primary keys by indexed field value</td></tr>
-<tr><td><code>VSet(ctx, key, vec)</code> / <code>VSearch(ctx, k, query)</code></td><td>Store/search vectors by cosine similarity</td></tr>
+<tr><td><code>VSet(ctx, key, vec)</code> / <code>VSearch(ctx, k, query)</code></td><td>Store/search vectors by cosine similarity in the <code>default</code> namespace</td></tr>
 <tr><td><code>Query(ctx, ns, field, op, value, limit)</code></td><td>Field-predicate query over a namespace (<code>= != &gt; &lt; &gt;= &lt;= contains</code>)</td></tr>
 </tbody>
 </table>
@@ -350,8 +356,122 @@ for i := 0; i < workers; i++ {
 <span><span class="callout-title">Match pool size to concurrency</span> If you run 16 concurrent goroutines against the client, set <code>PoolSize: 16</code>. A larger pool doesn't help throughput and just wastes idle connections.</span>
 </div>
 
-<h2 id="cluster-aware-variant">Cluster-aware variant</h2>
-<p>This page covers <code>github.com/VeltrixDB/veltrixdb-client-go</code> — a single-node, connection-pooled client. The VeltrixDB server repository also bundles a separate cluster-aware client under <code>github.com/VeltrixDB/veltrixdb/client</code> (<code>client.NewClient</code>), which discovers cluster topology, builds a consistent-hash ring matching the server's, and follows Raft <code>MOVED</code> redirects automatically. Reach for that package specifically when talking to a <code>raft</code> or <code>replicated</code> mode deployment — see <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a>.</p>
+<h2 id="in-repo-client">In-repo client package</h2>
+<p>The server repository ships its own Go client, <code>github.com/VeltrixDB/veltrixdb/client</code> (module <code>github.com/VeltrixDB/veltrixdb</code>, Go 1.19+), used by the server's tests, <code>cmd/loadtest</code>, <code>cmd/admin</code> and <code>bench/compare</code>. It has four types:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Type</th><th>Constructor</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td><code>BinaryConn</code></td><td><code>DialBinary(addr string, timeout time.Duration)</code></td><td>One connection, binary protocol. KV, <code>MPut</code>/<code>MGet</code>, scans, <code>Txn</code>, indexes, <code>Query</code>, and the full search API.</td></tr>
+<tr><td><code>TCPConn</code></td><td><code>DialTCP(addr string, timeout time.Duration)</code></td><td>One connection, text protocol. The same search API (line-based: no newlines in text, no spaces in filter values), plus <code>Info()</code> and <code>Topology()</code>.</td></tr>
+<tr><td><code>Pipeline</code></td><td><code>NewPipeline(bc *BinaryConn)</code></td><td>Queues <code>Put</code>/<code>Get</code>/<code>Delete</code> on a <code>BinaryConn</code> and sends them with <code>Exec()</code>.</td></tr>
+<tr><td><code>Client</code></td><td><code>NewClient(seeds []string, cfg *ClientConfig)</code></td><td>Cluster-aware: builds the server's consistent-hash ring from the <code>TOPOLOGY</code> command and follows <code>MOVED</code> redirects to the Raft leader. Only <code>Put</code>, <code>Get</code>, <code>Delete</code>, <code>Topology</code> and <code>Close</code> &mdash; <strong>no search methods</strong>.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Neither connection type is safe for concurrent use (one per goroutine), and both dial plain TCP &mdash; there is no TLS option in this package. With <code>-auth-config</code>, call <code>Auth(user, pass)</code> first.</p>
+
+<h2 id="search">Search (in-repo client)</h2>
+<p><span class="badge good">New in v1.11</span> Search methods exist on both <code>BinaryConn</code> and <code>TCPConn</code> with identical signatures. Results are <code>[]client.VectorResult</code> (<code>ID string</code>, <code>Score float64</code>): cosine similarity for vector search, BM25 for text, the fused reciprocal-rank score for hybrid. Filters apply to the KV record whose key equals the vector / document id.</p>
+<pre class="code-block"><div class="code-label">go</div><code>package main
+
+import (
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/VeltrixDB/veltrixdb/client"
+)
+
+func main() {
+    bc, err := client.DialBinary("127.0.0.1:9000", 5*time.Second)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer bc.Close()
+
+    // Namespace "docs": 4 dimensions, int8 codes in RAM, float32 re-rank from disk.
+    if err := bc.VCreateWithOptions("docs", 4, client.VectorNamespaceOptions{Quantization: "int8"}); err != nil {
+        log.Fatal(err)
+    }
+
+    // The record that filters read: same key as the vector / document id.
+    if err := bc.Put("doc-42", []byte(`{"lang":"en","tier":"gold"}`), -1); err != nil {
+        log.Fatal(err)
+    }
+    if err := bc.VSetNS("docs", "doc-42", []float32{0.12, -0.03, 0.88, 0.41}); err != nil {
+        log.Fatal(err)
+    }
+    if err := bc.TSet("docs", "doc-42", "how to rotate encryption keys"); err != nil {
+        log.Fatal(err)
+    }
+    // Optional: an index on the field makes "=" filters exact and cheap.
+    if err := bc.IdxCreate("by_lang", "lang"); err != nil {
+        log.Fatal(err)
+    }
+
+    q := []float32{0.1, 0.0, 0.9, 0.4}
+
+    // Top 10 by cosine, beam width 128, only records with lang = en.
+    hits, err := bc.VSearchWithOptions(10, q, client.VectorSearchOptions{
+        NS: "docs", Ef: 128,
+        FilterField: "lang", FilterOp: "=", FilterValue: "en",
+    })
+    if err != nil {
+        log.Fatal(err) // e.g. "search indexes are still rebuilding after restart ..."
+    }
+    for _, h := range hits {
+        fmt.Printf("vec   %s %.4f\n", h.ID, h.Score)
+    }
+
+    // BM25 full-text search.
+    text, err := bc.TSearch(10, "rotate keys", client.TextSearchOptions{NS: "docs"})
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("text hits:", len(text))
+
+    // Hybrid: both halves fused by reciprocal rank; alpha = vector weight.
+    alpha := 0.7
+    hybrid, err := bc.HSearch(10, q, "rotate keys", client.HybridSearchOptions{NS: "docs", Alpha: &amp;alpha})
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("hybrid hits:", len(hybrid))
+
+    // Deletes.
+    _ = bc.VDel("docs", "doc-42")
+    _ = bc.TDel("docs", "doc-42")
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method (on <code>BinaryConn</code> and <code>TCPConn</code>)</th><th>Wire command</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>VCreateWithOptions(ns string, dim int, opts VectorNamespaceOptions) error</code></td><td><code>VCREATE ns dim [QUANT …] [PQM m] [PQTRAIN n] [GRAPH memory|disk]</code></td><td><code>VectorNamespaceOptions{Quantization, PQSubspaces, PQTrainAt, Graph}</code>: <code>""</code>/<code>"none"</code>, <code>"int8"</code> or <code>"pq"</code>; PQ bytes per vector (0 = dim/8); vectors before PQ training (0 = 10,000); <code>"disk"</code> puts layer-0 graph edges in a memory-mapped file (v1.12). Re-running it on an existing namespace re-encodes it; changing the dimension is refused.</td></tr>
+<tr><td><code>VCreate(ns string, dim int, quant string) error</code></td><td><code>VCREATE ns dim [QUANT quant]</code></td><td>Quantization only.</td></tr>
+<tr><td><code>VSetNS(ns, id string, vec []float32) error</code></td><td><code>VSET id NS ns f1 …</code></td><td>Upsert. The first <code>VSET</code> in a namespace that was never created makes a float32 one with that dimension.</td></tr>
+<tr><td><code>VSet(key string, vec []float32) error</code></td><td><code>VSET key f1 …</code></td><td>Namespace <code>default</code>.</td></tr>
+<tr><td><code>VDel(ns, id string) error</code></td><td><code>VDEL id NS ns</code></td><td>Pass the namespace explicitly (<code>"default"</code> for the default one).</td></tr>
+<tr><td><code>VSearchWithOptions(k int, query []float32, opts VectorSearchOptions) ([]VectorResult, error)</code></td><td><code>VSEARCH k [NS ns] [EF n] [FILTER f op v] f1 …</code></td><td><code>VectorSearchOptions{NS, Ef, FilterField, FilterOp, FilterValue}</code>; <code>NS ""</code> = <code>default</code>, <code>Ef 0</code> = server default. Ops: <code>= != &gt; &lt; &gt;= &lt;= contains</code>. <code>k = 0</code> returns every match (exact scan).</td></tr>
+<tr><td><code>VSearch(k int, query []float32) ([]VectorResult, error)</code></td><td><code>VSEARCH k f1 …</code></td><td>Namespace <code>default</code>, no options.</td></tr>
+<tr><td><code>TSet(ns, id, text string) error</code> / <code>TDel(ns, id string) error</code></td><td><code>TSET id NS ns TEXT …</code> / <code>TDEL id NS ns</code></td><td>Text up to 1&nbsp;MiB. <code>TCPConn.TSet</code> rejects text containing a newline; <code>BinaryConn</code> carries it.</td></tr>
+<tr><td><code>TSearch(k int, query string, opts TextSearchOptions) ([]VectorResult, error)</code></td><td><code>TSEARCH k NS ns [FILTER …] QUERY text</code></td><td><code>TextSearchOptions{NS, FilterField, FilterOp, FilterValue}</code>.</td></tr>
+<tr><td><code>HSearch(k int, vec []float32, query string, opts HybridSearchOptions) ([]VectorResult, error)</code></td><td><code>HSEARCH k NS ns [EF] [ALPHA] [CAND] [FILTER …] [VEC …] QUERY text</code></td><td><code>HybridSearchOptions{NS, Alpha *float64, Ef, Candidates, FilterField, FilterOp, FilterValue}</code>; <code>Alpha nil</code> = 0.5, <code>Candidates 0</code> = max(50, 4k). <code>k</code> must be &gt; 0; either half may be empty, not both.</td></tr>
+<tr><td><code>IdxCreate(name, field string) error</code> / <code>IdxDrop(name string) error</code> / <code>IdxQuery(name, value string, limit int) ([]string, error)</code></td><td><code>IDXCREATE</code> / <code>IDXDROP</code> / <code>IDXQUERY name value [LIMIT n]</code></td><td>Secondary index on a record field; <code>=</code> filters on an indexed field are served from it.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout warn">
+<span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+<span><span class="callout-title">Things the code does that you might not expect</span> After a restart, searches return an error until the node has rebuilt its indexes from the persisted vectors and documents (<code>search_ready=1</code> in <a class="inline-link" href="../reference/admin-api.html#info"><code>INFO</code></a>), unless the server runs with <code>-search-allow-partial</code>. <code>BinaryConn.Put</code> takes a <code>ttl</code> argument but does not send it (the value is stored without a TTL). <code>Client.Put</code> accepts <code>WithTTL</code> / <code>WithConsistency</code> options but sends neither; the server's <code>-consistency</code> setting decides. <code>TCPConn.Get</code> (and so <code>Client.Get</code>) returns <code>nil, nil</code> for any <code>ERR</code> reply, not only a missing key.</span>
+</div>
+
+<p>In a cluster, send searches to any node: with <code>-search-fanout</code> (default on) the server runs them on every node and merges the results; a peer that does not answer within <code>-search-timeout-ms</code> fails the request unless <code>-search-allow-partial</code>. Filters, memory layouts, tuning and measured recall are on <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>; the flags are in <a class="inline-link" href="../reference/server-configuration.html#cluster-replication">Server Configuration</a>.</p>
+
+<h2 id="cluster-aware-variant">Cluster-aware client</h2>
+<p><code>client.NewClient</code> from the in-repo package discovers the cluster topology over the data port (<code>TOPOLOGY</code>), builds a consistent-hash ring identical to the server's (64 virtual nodes per node), routes each key to its owner, follows up to 3 <code>MOVED</code> redirects to the current Raft leader, and refreshes the topology every 30&nbsp;s by default. It speaks the text protocol through <code>TCPConn</code> and has only <code>Put(ctx, key, value, opts...)</code>, <code>Get(ctx, key, opts...)</code>, <code>Delete(ctx, key)</code>, <code>Topology()</code> and <code>Close()</code>. Reads go to the key's owner node, so they can be stale in <code>raft</code> mode unless the server runs with <code>-linearizable-reads</code>. For search against a cluster, use a <code>BinaryConn</code> to any node. See <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a>.</p>
 
     <div class="page-nav">
 <a class="prev" href="../client-sdks/index.html"><span class="dir">&larr; Previous</span><span>SDK Overview</span></a>

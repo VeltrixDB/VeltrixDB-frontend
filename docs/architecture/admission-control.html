@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -98,28 +99,28 @@
 <p>NVMe bandwidth and IOPS are shared between three consumers: foreground reads, foreground writes, and background VLog GC. Without coordination, a burst of write traffic (or a GC pass reclaiming a large garbage backlog) can saturate the disk queue and push read tail latency into double-digit milliseconds. VeltrixDB's admission control closes this loop automatically: it watches read latency and, when it degrades, throttles the traffic that is competing with reads — rather than requiring an operator to manually cap write rate or pause GC during an incident.</p>
 
 <h2 id="read-latency-ewma">The read-latency EWMA</h2>
-<p>Every <code>Get()</code> call feeds an exponentially-weighted moving average of read latency (<code>ReadLatencyEWMANs</code>). This single signal drives every decision described below.</p>
+<p><code>Get()</code> calls feed an exponentially-weighted moving average of read latency (<code>ReadLatencyEWMANs</code>, α = 1/8). This single signal drives every decision described below.</p>
 <p>To keep the EWMA update itself from becoming a bottleneck at multi-million-ops/sec read throughput, the CAS-loop update is <strong>sampled 1-in-64</strong> reads rather than run on every read — at 2M reads/sec this adds at most ~32 microseconds of lag to the signal, far below the millisecond-scale thresholds it drives.</p>
 
 <h2 id="admission-ladder">The admission-control ladder</h2>
 <p>As read latency rises, VeltrixDB escalates through a small set of protective actions:</p>
 
 <div class="table-wrap"><table><thead><tr><th>Read EWMA</th><th>Action</th></tr></thead><tbody>
-<tr><td>&lt; 15 ms</td><td>Normal — GC runs at full speed</td></tr>
-<tr><td>≥ 15 ms</td><td>GC bandwidth capped at 60 MB/s (<code>gcLatencyThresholdNs</code>)</td></tr>
-<tr><td>&gt; 20 ms</td><td>GC paused entirely, and each <code>PUT</code> sleeps 2 ms before submitting to WAL/VLog (<code>admissionThrottleNs</code>)</td></tr>
+<tr><td>≤ 15 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>&gt; 15 ms</td><td>GC bandwidth capped at 60 MB/s (<code>gcLatencyThresholdNs</code>); 200 MB/s once garbage ≥ 50%</td></tr>
+<tr><td>&gt; 20 ms</td><td><code>GCPaused</code> set, and each <code>PUT</code> sleeps 2 ms before submitting to WAL/VLog (<code>admissionThrottleNs</code>)</td></tr>
 <tr><td>&lt; 10 ms</td><td>Everything resumes — throttle cleared, GC unpaused (<code>admissionResumeNs</code>)</td></tr>
-<tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale — GC resumes automatically</td></tr>
+<tr><td>No reads for 4 minutes</td><td>At the next GC pass the EWMA is treated as stale: reset to 0, pause and write throttle cleared (<code>gcEWMAStaleDuration</code>)</td></tr>
 </tbody></table></div>
 
 <p>Two things are worth calling out about this ladder:</p>
 <ul>
-<li><strong>The GC bandwidth cap fires before the full write throttle.</strong> At 15 ms EWMA, GC is capped to 60 MB/s — a soft signal that gives GC a chance to back off before things get bad enough to touch client-visible write latency. Only above 20 ms does the system start actively slowing down <code>PUT</code> calls.</li>
+<li><strong>The GC bandwidth cap fires before the full write throttle.</strong> Above 15 ms EWMA, GC is capped to 60 MB/s — a soft signal that gives GC a chance to back off before things get bad enough to touch client-visible write latency. Only above 20 ms does the system start actively slowing down <code>PUT</code> calls.</li>
 <li><strong>The resume threshold (10 ms) is lower than the trigger threshold (20 ms).</strong> This hysteresis gap prevents the system from flapping in and out of throttled mode when latency is oscillating right around a single threshold.</li>
 </ul>
 
 <h3>The staleness guard</h3>
-<p>If no <code>Get()</code> call arrives for 4 minutes, the EWMA is treated as stale and GC is unconditionally resumed. Without this guard, a single slow read early in a write-only workload (e.g. a bulk load or benchmark with no read traffic) could latch the EWMA above the throttle threshold and never clear it — permanently blocking VLog GC because there are no subsequent fast reads to bring the average back down. The staleness window is tracked via <code>LastReadNs</code>, stamped on every <code>Get()</code>.</p>
+<p>If no <code>Get()</code> call has arrived for 4 minutes (2 × the default 120 s <code>DefragInterval</code>), the next GC pass that finds <code>GCPaused</code> set logs <code>[gc] disk=N stale EWMA cleared … resuming compaction</code>, resets the EWMA to 0 and clears the pause and the write throttle. Without this guard, a single slow read early in a write-only workload (e.g. a bulk load or benchmark with no read traffic) could latch the EWMA above the throttle threshold and never clear it — permanently blocking VLog GC because there are no subsequent fast reads to bring the average back down. The staleness window is tracked via <code>LastReadNs</code>, stamped on every <code>Get()</code>.</p>
 
 <h2 id="interaction-with-gc-tiers">Interaction with VLog GC tiers</h2>
 <p>The read-EWMA ladder above and the garbage-ratio-driven GC tiers (see <a class="inline-link" href="storage-engine.html#vlog-gc-tiers">Storage Engine: VLog GC tiers</a>) are two independent signals that combine at GC decision time:</p>
@@ -129,13 +130,16 @@
 <tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s</td><td>Yes</td><td>60 s</td></tr>
 <tr><td>≥ 65% (emergency)</td><td>Unlimited</td><td><strong>No</strong></td><td>30 s</td></tr>
 </tbody></table></div>
+<p>Bandwidth reads "unlimited while the read EWMA ≤ 15 ms / capped above it" — the caps never apply while reads are fast. The 30% trigger is <code>--gc-threshold</code> (default 0.30, <code>DefragThreshold</code>); intervals are <code>DefragInterval</code> (default 120 s), halved and quartered by the worst disk's ratio.</p>
 <p>In plain terms: as long as garbage is below 65%, a paused-by-admission-control state (read EWMA &gt; 20 ms) is <strong>honored</strong> — GC stands down and gives reads the full disk. Only once garbage crosses the 65% emergency threshold does GC override that pause. This ordering is deliberate: below 65%, protecting read latency is the priority; above 65%, the system is already in enough trouble that continuing to defer GC would make things categorically worse.</p>
 
 <h2 id="emergency-tier">The emergency tier: breaking the death spiral</h2>
 <p>The scenario the emergency tier exists to prevent: read latency rises → admission control pauses GC → garbage keeps accumulating because nothing reclaims it → VLog grows → cache hit rate drops (more cold data to page through) → read latency rises further → GC stays paused indefinitely. This is a genuine death spiral — without an escape hatch, a transient latency spike can turn into a permanent, self-reinforcing degradation.</p>
 <p>At ≥ 65% garbage ratio, VeltrixDB breaks the cycle unconditionally: <code>GCPaused</code> is bypassed, GC bandwidth is uncapped, and the defrag interval is quartered so the system checks in on the disk far more frequently. Every emergency pass logs loudly:</p>
-<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
-<p>and increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>.</p>
+<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2% ≥ 65%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
+<p>and increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>. The counter moves only when a pass actually bypasses a pause; an emergency-ratio disk with no pause in force simply runs uncapped.</p>
+<h3>GC CAS back-pressure</h3>
+<p>Separately from the read-latency ladder: when more than 20% of a GC batch loses its CAS to concurrent writes, each <code>Put</code> sleeps 1 ms for the next 200 ms (<code>GCBackpressureUntilNs</code>), giving GC a quieter commit window.</p>
 
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Treat emergency GC as an incident, not routine operation</span> The emergency tier is a safety valve, not a steady-state mode. If you regularly see <code>veltrixdb_vlog_gc_emergency_runs_total</code> incrementing, it means sustained write rate is outpacing GC reclaim throughput on that disk — add IOPS headroom or reduce write load rather than relying on the emergency override to keep up indefinitely.</span></div>
 
@@ -145,11 +149,11 @@
 <div class="table-wrap"><table><thead><tr><th>Metric</th><th>What it tells you</th></tr></thead><tbody>
 <tr><td><code>veltrixdb_vlog_garbage_ratio</code></td><td>Current dead-space fraction of the VLog per disk. Drives which GC tier is active.</td></tr>
 <tr><td><code>veltrixdb_vlog_gc_emergency_runs_total</code></td><td>Count of GC passes that bypassed the admission-control pause. Should be at or near zero in steady state.</td></tr>
-<tr><td><code>veltrixdb_storage_write_admission_throttles_total</code></td><td>Count of <code>PUT</code> operations delayed by the write-throttle ladder. Non-zero indicates read latency has crossed the throttle threshold.</td></tr>
+<tr><td><code>veltrixdb_storage_write_admission_throttles_total</code></td><td>Count of <code>PUT</code> operations delayed by admission control (read EWMA &gt; 20 ms). Non-zero indicates read latency has crossed the throttle threshold.</td></tr>
 </tbody></table></div>
 
 <h3>Healthy pattern</h3>
-<p>In a well-provisioned cluster, the garbage ratio oscillates within the 30–50% band, GC bandwidth stays at the normal cap, the write-admission-throttle counter is flat at zero (or increments only briefly during isolated traffic spikes and then stops), and the emergency-runs counter never moves. Read EWMA stays comfortably under the 15 ms first-tier threshold under normal load.</p>
+<p>In a well-provisioned cluster, the garbage ratio oscillates within the 30–50% band, GC bandwidth stays at the normal cap, the write-admission-throttle counter is flat at zero (or increments only briefly during isolated traffic spikes and then stops), and the emergency-runs counter never moves. Read EWMA stays comfortably under the 15 ms first-tier threshold under normal load. (These are operating expectations, not measured thresholds.)</p>
 
 <h3>Unhealthy pattern</h3>
 <p>Watch for these signals together, since any one in isolation can be a false alarm but the combination is not:</p>

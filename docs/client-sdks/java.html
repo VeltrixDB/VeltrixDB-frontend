@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -312,6 +313,9 @@ VeltrixDBPool pool = new VeltrixDBPool(cfg); // all connections auto-auth on con
     // connection dropped by the server
 }</code></pre>
 <p><code>VeltrixDBException</code> (extends <code>Exception</code>) is thrown for any non-OK, non-NOT_FOUND status the server returns; it optionally wraps a lower-level <code>Throwable</code> cause. Missing keys and missing hash fields return <code>null</code> rather than throwing — check for <code>null</code> first.</p>
+
+<h2 id="search">Vector, text and hybrid search</h2>
+<p>This SDK has no search methods: the Veltrixdb-client SDKs were not updated with the v1.11 search release. The search commands (<code>VCREATE</code>, <code>VSET … NS</code>, <code>VSEARCH</code>, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code>, <code>IDXCREATE</code>/<code>IDXQUERY</code>) are available over the text and binary protocols, and as typed methods only in the Go <code>client</code> package in the server repository (<a class="inline-link" href="go.html#search">Go &rarr; Search</a>; its cluster-aware <code>client.Client</code> has none). From Java, open a plain TCP socket to the server's <code>-addr</code> and send one text command per line; each search answers <code>id score</code> lines then <code>END</code>, or one <code>ERR …</code> line. Text cannot contain newlines and filter values cannot contain spaces on this protocol. Syntax: <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
 
     <div class="page-nav">
 <a class="prev" href="../client-sdks/nodejs.html"><span class="dir">&larr; Previous</span><span>Node.js</span></a>

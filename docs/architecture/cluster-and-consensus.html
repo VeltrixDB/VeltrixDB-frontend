@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,47 +91,50 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Architecture<span class="sep">/</span>Cluster & Consensus</div>
     <h1>Cluster &amp; Consensus</h1>
-<p class="page-lede">VeltrixDB distributes data across nodes with a consistent-hash partition map, detects failures via gossip, and offers three deployment modes with distinct consistency guarantees — from single-node linearizability to Raft-backed quorum writes to configurable async/quorum/strong replication.</p>
+<p class="page-lede">VeltrixDB distributes data across nodes with a consistent-hash ring, detects failures via gossip, fans searches out to every node, and offers three deployment modes with distinct consistency guarantees — from single-node linearizability to Raft-backed quorum writes to configurable async/quorum/strong replication.</p>
 
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scope</span> This page goes deep on partitioning, gossip failure detection, deployment-mode consistency semantics, the Raft FSM, replication ACK behavior, and the cluster-aware client. For the system diagram and single-node write/read path, see <a class="inline-link" href="overview.html">Architecture Overview</a>.</span></div>
 
 <h2 id="partition-map">Consistent-hash partition map</h2>
 <p>The <code>ConsistentHashRing</code> (<code>cluster/partition_map.go</code>) maps a 64-bit hash space onto physical nodes using virtual nodes:</p>
 <ul>
-<li>Keys are hashed with <strong>FNV-1a</strong>, and (since v1.1.0) the result is passed through the <strong>fmix64 finalizer</strong> (the MurmurHash3 64-bit finalization step) to a <code>uint64</code>.</li>
+<li>Keys are hashed with <strong>FNV-1a</strong>, and (since v1.1.0) the result is passed through the <strong>fmix64 finalizer</strong> (the MurmurHash3 64-bit finalization step) to a <code>uint64</code>. What is hashed is <code>RoutingKey(key)</code>: the key itself, except that derived search keys route as their record — <code>@vec/&lt;ns&gt;/&lt;id&gt;</code> and <code>@txt/&lt;ns&gt;/&lt;id&gt;</code> as <code>&lt;id&gt;</code>, <code>@idx/&lt;rule&gt;/&lt;value&gt;/&lt;primary&gt;</code> as <code>&lt;primary&gt;</code> — so a record, its vector, its document and its index entries stay on one node.</li>
 <li>Each physical node is assigned <strong>64 virtual nodes</strong> on the ring by default.</li>
 <li>Routing is a binary search for the first virtual-node hash ≥ the key's hash, wrapping around to the start of the ring if none is found.</li>
 </ul>
 <p>The finalizer matters: raw FNV-1a has weak avalanche for inputs that differ only in a short suffix, so sequential key patterns (<code>user:0001</code>…<code>user:0999</code>) landed within a few multiples of the FNV prime of each other — far closer together than one vnode arc — and entire sequential runs collapsed onto <strong>one node</strong>. fmix64 makes every input bit affect every output bit, restoring uniform placement for sequential keys. Because both the server and the cluster client route through the same <code>cluster.HashKey</code> function, they stay mutually consistent — but <strong>changing this hash re-shards ring placement</strong> (the v1.1.0 switch was made as a pre-GA breaking change for exactly that reason).</p>
 <p>Virtual nodes solve two problems that a naive one-hash-per-node ring has: they even out load across physical nodes (more virtual nodes per physical node means a more even share of the ring), and they make rebalancing gradual — adding one physical node moves roughly <code>1/N</code> of the ring's data instead of a bulk reshuffle.</p>
-<p>Above the ring, a <code>PartitionMap</code> divides the hash space into <strong>256 fixed partitions</strong>, each with a primary node and up to <code>ReplicationFactor - 1</code> replica nodes (default replication factor: 3). Every mutation to the partition map — node add, node remove, state change, rebalance — increments a monotonic <code>Version</code>.</p>
+<p>Above the ring, a <code>PartitionMap</code> divides the hash space into <strong>256 fixed partitions</strong>, each with a primary node and up to <code>ReplicationFactor - 1</code> replica nodes (default replication factor: 3). Every mutation to the partition map — node add, node remove, state change, rebalance — increments a monotonic <code>Version</code>, reported in topology and gossip but not used to reject anything. The partition table is metadata (topology views, admin); key placement and migration use the ring.</p>
+<h3>Static membership, client-side routing</h3>
+<p>Membership is <strong>static</strong>: each server registers the nodes named in <code>--peers id@host:port,...</code> (or <code>--seeds</code>) at startup. There is no command or admin endpoint that adds, drains or removes a node at runtime, and gossip does not carry membership — to add a node, restart every node with it in <code>--peers</code>. The server also does not forward a request to the key's owner: routing is done by the cluster-aware client (below). In raft mode the leader takes every write and followers answer <code>MOVED</code>.</p>
 
 <h3>Rack-aware replica placement (v1.1.0)</h3>
 <p>Placement is failure-domain-aware when nodes are started with <code>--rack-id &lt;zone&gt;</code> (e.g. <code>--rack-id=asia-south1-a</code>): partition placement during rebalance and <code>GetReplicasForKey</code> never put two copies of the same partition in the same rack — unless the replication factor exceeds the number of distinct racks, in which case placement falls back to filling with distinct nodes while still spanning every rack available. Rack labels propagate between members via gossip digests (a node's self-reported entry is authoritative; third-party entries only fill blanks), so each node only needs its own flag, and <code>/admin/cluster</code> reports a <code>"rack"</code> field per node. Clusters with no rack labels keep the exact previous deterministic round-robin placement.</p>
 
 <h3>Epoch fencing</h3>
-<p>Because the partition map version increases on every topology change, nodes can detect when they are routing against a stale view: if a node's local <code>PartitionMap.Version</code> is behind the cluster's current version, it fetches the latest map before continuing to route. This epoch mechanism prevents a node that missed a topology update from silently routing requests to the wrong owner during a rebalance.</p>
+<p>The fencing check is a separate membership <strong>epoch</strong> (<code>cluster/epoch.go</code>), advanced by every <code>AddNode</code> / <code>RemoveNode</code> and by newer epochs seen in gossip. Every key-migration batch carries the sender's epoch; a receiver whose epoch is newer refuses it with <strong>HTTP 409</strong>, so a node with a stale view cannot push keys into a cluster that has moved on. No node fetches a partition map from a peer.</p>
 
 <h2 id="failure-detection">Gossip-based failure detection</h2>
-<p>Cluster topology and node health propagate via epidemic gossip: every node sends its view of cluster state to <strong>3 random peers every second</strong>. A receiver that sees a higher partition-map version than its own fetches the latest map. Convergence across the cluster happens in <code>O(log N)</code> gossip rounds — a 100-node cluster converges in roughly 7 rounds (~7 seconds at a 1-second gossip interval).</p>
+<p>Node liveness propagates via epidemic gossip: every second a node advances its own heartbeat counter and exchanges a JSON digest with <strong>3 random peers</strong> over one short TCP connection each. A node whose heartbeat counter advanced in a digest counts as alive, so liveness spreads transitively. A receiver adopts gossip addresses and racks (self-reported entries win) and newer epochs, ignores nodes it does not know, and does not adopt the sender's view of node states — each node derives states locally from heartbeat ages, checked every second.</p>
 
 <h3>The heartbeat state machine</h3>
 <p>Each node cycles through a small set of states, driven by how long it's been since the last heartbeat was observed:</p>
 <div class="table-wrap"><table><thead><tr><th>State</th><th>Trigger</th><th>Meaning</th></tr></thead><tbody>
-<tr><td><code>ACTIVE</code></td><td>—</td><td>Fully operational, accepting reads and writes</td></tr>
-<tr><td><code>SUSPECT</code></td><td>Missing heartbeats for 3 s</td><td>Health uncertain, not yet removed from routing</td></tr>
-<tr><td><code>FAILED</code></td><td>Missing heartbeats for 10 s</td><td>Removed from routing</td></tr>
-<tr><td><code>RECOVERING</code></td><td>Node responds to a health check after being <code>FAILED</code></td><td>Being re-integrated into the ring</td></tr>
-<tr><td><code>DRAINING</code></td><td>Operator-initiated graceful departure</td><td>Ring already updated, data evacuating</td></tr>
+<tr><td><code>ACTIVE</code></td><td>—</td><td>Fully operational</td></tr>
+<tr><td><code>SUSPECT</code></td><td>No heartbeat for 3 s</td><td>Health uncertain; back to <code>ACTIVE</code> on the next heartbeat</td></tr>
+<tr><td><code>FAILED</code></td><td>No heartbeat for 10 s</td><td>Left out of <code>Rebalance</code>'s partition table and of search fan-out. It <strong>stays on the ring</strong>, so keys it owns still route to it</td></tr>
+<tr><td><code>RECOVERING</code></td><td>A <code>FAILED</code> node heartbeats again or answers the recovery ping</td><td>Like <code>FAILED</code>, left out of <code>Rebalance</code>. <strong>Nothing moves it back to <code>ACTIVE</code></strong> — it stays <code>RECOVERING</code> (visible in <code>/admin/cluster</code>)</td></tr>
+<tr><td><code>DRAINING</code></td><td>Set by the library call <code>RemoveNodeAndRebalance</code> just before removal</td><td>Deliberate departure; the server itself never calls it</td></tr>
 </tbody></table></div>
-<p>The two-stage <code>SUSPECT → FAILED</code> transition (3 s, then 10 s) exists to absorb transient network blips without immediately evicting a healthy node from routing — a brief GC pause or packet loss burst produces a <code>SUSPECT</code> flap, not a full failover. A background recovery worker pings <code>FAILED</code> nodes periodically (up to 3 attempts, 5 s apart); if a node comes back it transitions through <code>RECOVERING</code> back to <code>ACTIVE</code>, triggering a rebalance.</p>
+<p>The two-stage <code>SUSPECT → FAILED</code> transition (3 s, then 10 s) exists to absorb transient network blips without immediately evicting a healthy node from routing — a brief GC pause or packet loss burst produces a <code>SUSPECT</code> flap, not a full failover. A background recovery worker pings a <code>FAILED</code> node (TCP <code>PING</code>, 2 s timeout) up to 3 times back to back; if it answers, the node becomes <code>RECOVERING</code> and a rebalance is triggered. If all attempts fail it stays <code>FAILED</code> until a heartbeat arrives.</p>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Known gap: no way back to ACTIVE</span> A node that was marked <code>FAILED</code> ends up <code>RECOVERING</code> at best and never returns to <code>ACTIVE</code>, so it stays out of the partition table until the cluster restarts. Separately, in <code>replicated</code> mode a replica whose send failed is marked <code>FAILED</code> by the replication engine and is skipped by replication and anti-entropy until the primary restarts.</span></div>
 
 <h2 id="deployment-modes">Deployment modes and consistency guarantees</h2>
-<p>The distributed layer is wired into <code>cmd/server</code> through a <strong>write coordinator</strong> (<code>cmd/server/coordinator.go</code>) that fronts the storage engine. Every mutating client operation — <code>PUT</code>, <code>DELETE</code>, <code>MultiPut</code>, <code>CAS</code>, <code>INCR</code>, <code>DECR</code>, <code>SETNX</code>, <code>TXN</code>, and (since v1.1.0) namespace, hash-field, vector, secondary-index, and list/set writes, on both text and binary protocols — goes through it. In raft mode each of these is a dedicated FSM op replayed deterministically on every member; in replicated mode they decompose to plain KV writes on composite internal keys (<code>ns\x00key</code>, <code>key\x01field</code>, <code>@vec/…</code>, <code>key\x02seq</code>, <code>key\x03member</code>) and ship as ordinary replication traffic. The <code>--mode</code> flag selects one of three behaviors:</p>
+<p>The distributed layer is wired into <code>cmd/server</code> through a <strong>write coordinator</strong> (<code>cmd/server/coordinator.go</code>) that fronts the storage engine. Every mutating client operation — <code>PUT</code>, <code>DELETE</code>, <code>MultiPut</code>, <code>CAS</code>, <code>INCR</code>, <code>DECR</code>, <code>SETNX</code>, <code>TXN</code>, and (since v1.1.0) namespace, hash-field, vector, secondary-index, and list/set writes, on both text and binary protocols — goes through it. In raft mode each of these is a dedicated FSM op replayed deterministically on every member; in replicated mode they decompose to plain KV writes on composite internal keys (<code>ns\x00key</code>, <code>key\x01field</code>, <code>@vec/…</code>, <code>key\x02seq</code>, <code>key\x03member</code>) and ship as ordinary replication traffic. The <code>--mode</code> flag selects one of three behaviors. Raft and replicated mode are <strong>mutually exclusive</strong>: the server builds either a Raft coordinator or a replicated one, never both, and in raft mode no replication engine exists.</p>
 
 <div class="table-wrap"><table><thead><tr><th><code>--mode</code></th><th>How writes are handled</th><th>Consistency guarantee</th></tr></thead><tbody>
 <tr><td><code>standalone</code> (default)</td><td>Straight to the local engine — byte-for-byte the pre-existing single-node path. No Raft, no replication, no redirects.</td><td>Single-node linearizable (one writer, one copy).</td></tr>
-<tr><td><code>raft</code></td><td>Ops are gob-encoded and submitted to a Raft log, committed by quorum, and applied on every node via a storage-backed FSM. Non-leaders reject writes with a <code>MOVED &lt;leader-addr&gt;</code> redirect.</td><td><strong>Linearizable writes</strong> (single Raft group, quorum commit). Reads default to local applied state (fast, possibly stale); with <code>--linearizable-reads</code>, <code>GET</code> runs the <a class="inline-link" href="#read-index">ReadIndex fence</a> — quorum-confirmed, never stale.</td></tr>
+<tr><td><code>raft</code></td><td>Ops are gob-encoded and submitted to a Raft log, committed by quorum, and applied on every node via a storage-backed FSM. Non-leaders reject writes with <code>MOVED &lt;leader-addr&gt; &lt;leader-id&gt;</code> (<code>MOVED - (leader unknown, retry)</code> while no leader is known).</td><td><strong>Linearizable writes</strong> (single Raft group, quorum commit). Reads default to local applied state (fast, possibly stale on followers); a new leader holds <code>GET</code> / <code>MGET</code> until its no-op applies. With <code>--linearizable-reads</code>, <code>GET</code> and <code>MGET</code> run the <a class="inline-link" href="#read-index">ReadIndex fence</a> — quorum-confirmed, never stale.</td></tr>
 <tr><td><code>replicated</code></td><td>The write is applied to the local engine, then handed to the replication engine. The <code>--consistency</code> flag decides when the client is ACKed.</td><td>Primary-copy durability across N copies; <strong>not</strong> linearizable under concurrent writers (no single-writer ordering). Reads are local.</td></tr>
 </tbody></table></div>
 
@@ -140,7 +144,7 @@
 <h3>Replication consistency levels (<code>replicated</code> mode)</h3>
 <p>The <code>--consistency</code> flag controls when the client receives its ACK:</p>
 <ul>
-<li><code>eventual</code> (async) — ACK immediately after the local write; replicas catch up in the background.</li>
+<li><code>eventual</code> (async, the server default) — ACK immediately after the local write; replicas catch up in the background.</li>
 <li><code>quorum</code> — ACK only after a majority of replicas (counting the local copy) have applied the write.</li>
 <li><code>strong</code> — ACK only after <strong>all</strong> replicas have applied the write.</li>
 </ul>
@@ -159,9 +163,15 @@
 <ul>
 <li><strong><code>Apply</code></strong> decodes a gob-encoded write command and runs the engine's own <code>Put</code>/<code>Delete</code>/atomic/txn method directly. This is deterministic because Raft guarantees every node sees the identical log order — replaying the same sequence of engine calls on every node produces identical state.</li>
 <li>Results for operations that return a value or status (<code>CAS</code>, <code>INCR</code>, <code>SETNX</code>, <code>TXN</code>) are delivered back to the submitting client through a per-request result side-channel keyed by a node-unique request ID — the FSM's <code>Apply</code> itself has no direct return path to the original client connection.</li>
-<li><strong><code>Snapshot</code></strong> / <strong><code>Restore</code></strong> dump and reload the entire keyspace using the engine's paginated <code>ScanCursor</code>, allowing log compaction without keeping the full history of every write.</li>
+<li><strong><code>Snapshot</code></strong> / <strong><code>Restore</code></strong> dump and reload the entire keyspace using the engine's paginated <code>ScanCursor</code>, allowing log compaction (default threshold 8192 entries) without keeping the full history of every write. Limits: the snapshot is capped at 256 MB (a larger one is skipped and the log keeps growing), and TTLs are not preserved — restored keys become immortal.</li>
+<li><strong><code>ApplyBatch</code></strong> (<code>raft_fsm_batch.go</code>) coalesces consecutive committed PUTs into one <code>MultiPut</code>; other ops break the run and apply singly, in log order.</li>
 </ul>
-<p>Non-leader nodes reject writes with a <code>MOVED &lt;leader-addr&gt;</code> redirect rather than silently forwarding or queuing them — this keeps the write path simple and pushes leader discovery to the client (see the cluster-aware client below).</p>
+<p>Non-leader nodes reject writes with a <code>MOVED &lt;leader-addr&gt; &lt;leader-id&gt;</code> redirect rather than silently forwarding or queuing them — this keeps the write path simple and pushes leader discovery to the client (see the cluster-aware client below).</p>
+
+<h2 id="leader-read-barrier">Reads on a new leader: the no-op barrier <span class="badge good">New in v1.12</span></h2>
+<p>A newly elected leader appends a no-op entry in its own term (Raft §5.4.2). Until that no-op is applied, its state machine may not yet contain entries its predecessor committed and acknowledged, so a local <code>GET</code> right after failover could return "not found" for an acknowledged write. <code>RaftNode.WaitLeaderApplied</code> now holds reads on a leader until <code>lastApplied</code> reaches the no-op (bounded by 2 s); after that it is one atomic load. Followers never wait — their local reads are stale by design.</p>
+<p>Every read that passes <code>coordinator.readBarrier()</code> gets this — <code>GET</code> and every <code>MGET</code> path. In a unit test, a read right after failover missed the acknowledged write in 20 of 20 failovers without the barrier and 0 of 20 with it.</p>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Known gap: other reads skip the barrier</span> Namespace, hash-field, list/set and <code>RANGE</code> / <code>SCANCUR</code> reads do not pass <code>readBarrier()</code>, so they get neither the new-leader barrier nor the ReadIndex fence, even with <code>--linearizable-reads</code>.</span></div>
 
 <h2 id="read-index">Linearizable reads: the ReadIndex fence</h2>
 <p>A local read on the Raft leader can still be stale: a partitioned ex-leader may keep serving reads after a new leader has committed writes elsewhere. <code>--linearizable-reads</code> (v1.1.0, raft mode only) closes that hole with the Raft §6.4 <strong>ReadIndex</strong> protocol (<code>consensus/read_index.go</code>), which never writes to the log:</p>
@@ -170,7 +180,7 @@
 <li><strong>Confirm leadership with a quorum heartbeat round.</strong> The leader sends a fresh <code>AppendEntries</code> heartbeat to every peer; any reply whose term does not exceed the leader's counts as an acknowledgement (a log-lagging follower still recognises the leader). Reaching a quorum proves no higher-term leader existed at the moment of the round. A reply with a higher term deposes the leader instead.</li>
 <li><strong>Wait for apply catch-up, then read.</strong> The read blocks until the local state machine has applied up to the fence, then the coordinator performs the actual storage read.</li>
 </ol>
-<p>Cost and routing: one heartbeat round-trip per <code>GET</code> (a single-node cluster skips the round — the leader <em>is</em> the quorum), plus any apply catch-up, bounded by a 2-second per-read timeout (<code>ErrReadIndexTimeout</code>). Followers reject linearizable reads with a <code>MOVED &lt;leader-addr&gt;</code> redirect, exactly like writes.</p>
+<p>Cost and routing: one heartbeat round-trip per <code>GET</code> or <code>MGET</code> (a single-node cluster skips the round — the leader <em>is</em> the quorum), plus any apply catch-up, bounded by a 2-second per-read timeout (<code>ErrReadIndexTimeout</code>). Followers reject linearizable reads with a <code>MOVED &lt;leader-addr&gt; &lt;leader-id&gt;</code> redirect, exactly like writes.</p>
 
 <h2 id="auto-rebalance">Auto-rebalance and the TransferAgent</h2>
 <p>Before v1.1.0, <code>cluster/partition_transfer.go</code> was fully implemented but never instantiated by the server: a node join or leave updated the ring (routing) while the data stayed put. <code>cmd/server/rebalancer.go</code> closes that gap by subscribing to <code>PartitionMap</code> <strong>membership events</strong> (<code>SubscribeMembership</code>) and wiring them to physical key migration:</p>
@@ -180,31 +190,48 @@
 pm.Rebalance(pm.PartitionCount())   — recompute partition ownership
 ta.MigrateToNewOwners()             — stream re-owned keys, delete local copies</code></pre>
 <ul>
-<li><strong>Event filtering:</strong> local heartbeat state flaps don't move data; only topology-relevant transitions (joins, removals, hard failures, recoveries) reset the debounce window.</li>
+<li><strong>Event filtering:</strong> <code>SUSPECT</code> flaps don't move data; joins, removals and transitions to <code>FAILED</code>, <code>ACTIVE</code> or <code>RECOVERING</code> reset the debounce window.</li>
 <li><strong>Transfer transport:</strong> the <code>TransferAgent</code> runs a dedicated partition-transfer HTTP listener on <strong>client port +5</strong> (override with <code>-transfer-addr</code>); when the <code>-cluster-tls-*</code> flags are set, transfers use the same inter-node TLS/mTLS configuration.</li>
-<li><strong>Safe retry:</strong> <code>MigrateToNewOwners</code> deletes a local key only after the destination confirms receipt, so a failed migration is retried on the next membership event and re-sends only the unconfirmed remainder.</li>
+<li><strong>Safe retry:</strong> keys move in 500-key batches (<code>POST /transfer/keys</code>); <code>MigrateToNewOwners</code> deletes a local key only after the destination acknowledged its batch with HTTP 200, so a failed migration is retried on the next membership event and re-sends only the unconfirmed remainder.</li>
+<li><strong>Epoch fencing:</strong> each batch carries the sender's membership epoch; a receiver with a newer epoch refuses it with HTTP 409.</li>
+<li><strong>Pinned keys:</strong> <code>@vecns/&lt;ns&gt;</code> (vector namespace settings) and <code>@idxdef/&lt;name&gt;</code> (secondary-index definitions) are needed on every node, so they are <em>copied</em> to each destination ahead of the migrated keys and never deleted locally.</li>
+<li><strong>Search follows the keys:</strong> the destination's <code>Put</code> and the source's <code>Delete</code> run the search hooks, so migrated vectors and documents become searchable on the new owner and disappear from the old one.</li>
+<li><strong>Authentication:</strong> with <code>--cluster-secret-file</code> (or <code>VELTRIXDB_CLUSTER_SECRET</code>; at least 16 bytes, whitespace trimmed, same on every node) every request on the transfer listener carries <code>X-Veltrix-Cluster-Time</code> and an HMAC-SHA256 <code>X-Veltrix-Cluster-Auth</code> over time, method, path and body, and is refused with HTTP 401 if it does not verify or is more than 5 minutes off. <code>/transfer/health</code> stays open. Without a secret or <code>--cluster-mtls</code> the server logs <code>[transfer] WARNING: listener &lt;addr&gt; is unauthenticated …</code>.</li>
 <li><strong>Opt-out:</strong> <code>--auto-rebalance=false</code> disables the automatic trigger (the transfer listener still starts, so other nodes can push keys to this one).</li>
 </ul>
 
+<h2 id="search-fanout">Distributed search fan-out <span class="badge good">New in v1.11</span></h2>
+<p>Search writes (<code>VSET</code>, <code>TSET</code>, <code>VCREATE</code>, <code>IDXCREATE</code>, …) go through the normal raft / replicated write path. Search <em>reads</em> — every vector, text and hybrid search, plus <code>QUERY</code> and <code>IDXQUERY</code> — run on <strong>every non-failed node</strong> and are merged (<code>cmd/server/search_fanout.go</code>):</p>
+<ul>
+<li><strong>Transport:</strong> peers are asked over the transfer listener (client port +5) at <code>POST /internal/search</code>, with the same TLS and HMAC signing as key migration.</li>
+<li><strong>BM25 in two phases:</strong> nodes first sum their corpus statistics, so every node scores with the same cluster-wide idf.</li>
+<li><strong>Fail closed:</strong> a peer that does not answer within <code>--search-timeout-ms</code> (2000, per phase) fails the whole request with an error naming it — <code>search incomplete: n of m peers did not answer: … (retry, or start the server with --search-allow-partial)</code>. A peer still rebuilding its indexes after a restart fails it too. <code>--search-allow-partial</code> answers with the rest instead (logged).</li>
+<li>Nodes the failure detector marked <code>FAILED</code> are not asked, so after a node dies searches fail until it is marked failed (about 10 s), then run on the remaining nodes.</li>
+<li><code>--search-fanout=false</code> keeps searches local — correct only if every node holds every record.</li>
+</ul>
+<p>A search costs one round trip to every node, so its cost grows with the cluster. See <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a> for commands and measurements.</p>
+
 <h2 id="cluster-aware-client">The cluster-aware client</h2>
-<p><code>client.Client</code> (<code>client/client.go</code>) is a real topology-aware client, not a dumb connection wrapper:</p>
+<p><code>client.Client</code> (<code>client/client.go</code>, the Go client in the server repo) is a real topology-aware client, not a dumb connection wrapper:</p>
 <ul>
 <li>It fetches cluster topology over the storage port via the <code>TOPOLOGY</code> command (also exposed at <code>/admin/cluster</code>).</li>
-<li>It builds a consistent-hash ring <strong>identical</strong> to the server's — same <code>cluster.HashKey</code> function, same 64 virtual nodes per physical node — so it can compute key ownership locally instead of asking the server on every request.</li>
+<li>It builds a consistent-hash ring <strong>identical</strong> to the server's — same <code>cluster.HashKey</code> function (FNV-1a + fmix64), same 64 virtual nodes per physical node — so it can compute key ownership locally instead of asking the server on every request.</li>
 <li>It routes each key directly to its owning node using that locally-built ring.</li>
-<li>It follows <code>MOVED</code> redirects to find the current Raft leader when a write lands on a non-leader node.</li>
+<li>It follows <code>MOVED</code> redirects (up to 3 hops per request) to find the current Raft leader when a write lands on a non-leader node.</li>
 </ul>
 <p><code>/admin/cluster</code> additionally reports node role, Raft term and leader, peer list, partition epoch, and per-replica replication lag — useful both for the client's own topology refresh and for operator diagnostics.</p>
 
 <h2 id="known-gaps">Remaining gaps</h2>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">What is still node-local or best-effort as of v1.1.0</span>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">What is still node-local or best-effort</span>
 <ul>
-<li><strong>Replicated-mode secondary-index metadata is node-local.</strong> <code>IDXCREATE</code>/<code>IDXDROP</code> apply only to the node that receives them in <code>replicated</code> mode — replicas index incoming writes only if the same index is created on them too. <code>raft</code> mode replicates the metadata itself.</li>
-<li><strong><code>QUERY</code> / <code>RANGE</code> / <code>SCANCUR</code> reads are always local</strong> in cluster modes — they scan the receiving node's applied state only.</li>
+<li><strong><code>RANGE</code> / <code>SCANCUR</code> reads are local</strong> in cluster modes — they scan the receiving node only. (<code>QUERY</code>, <code>IDXQUERY</code> and the searches fan out; <code>IDXCREATE</code> / <code>IDXDROP</code> replicate in both modes via <code>@idxdef/</code> keys.)</li>
+<li><strong>Only <code>GET</code> / <code>MGET</code> pass the Raft read barrier</strong>; namespace, hash, list/set and range reads skip it.</li>
+<li><strong>Search indexes are not persisted</strong>; each node rebuilds them at startup and refuses searches until done.</li>
+<li><strong>Membership is static</strong> (<code>--peers</code>), a <code>FAILED</code> node never returns to <code>ACTIVE</code>, and <code>ForceRemoveNode</code> re-creates no lost copies.</li>
 <li><strong><code>repl-ship</code> has no back-pressure to the source</strong> and resolves cross-region conflicts last-write-wins only.</li>
 </ul>
 </span></div>
-<p>Everything else that was node-local in the previous phase — namespace, hash-field, vector, secondary-index <em>data</em>, and list/set writes, plus linearizable reads and physical data rebalancing — is now wired end-to-end through the coordinator, ReadIndex, and TransferAgent paths described above.</p>
+<p>Namespace, hash-field, vector, text, secondary-index and list/set writes, linearizable reads and physical data rebalancing are wired end-to-end through the coordinator, ReadIndex and TransferAgent paths described above.</p>
 
 <div class="card-grid">
 <a class="card" href="storage-engine.html"><div class="card-title">Storage Engine →</div><div class="card-desc">WAL group commit, VLog append-only design, block packing, and the LIRS cache.</div></a>

@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,18 +91,22 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Operations<span class="sep">/</span>Replication & CDC</div>
     <h1>Replication &amp; CDC</h1>
-<p class="page-lede">VeltrixDB exposes an in-process change data capture (CDC) stream over HTTP, and ships a standalone <code>repl-ship</code> binary that tails it to forward writes to a remote cluster for cross-region or cross-cluster replication.</p>
+<p class="page-lede">VeltrixDB exposes an in-process change data capture (CDC) stream over HTTP, a durable catch-up feed, and a standalone <code>repl-ship</code> binary that forwards writes to a remote cluster. In-cluster replication (Raft or the replication engine) is a separate mechanism, summarised at the end.</p>
 
 <h2 id="cdc-stream">In-process CDC</h2>
-<p>Every applied write or delete is published to an in-process CDC stream, exposed as newline-delimited JSON (NDJSON) over HTTP:</p>
-<pre class="code-block"><code>curl http://localhost:2112/admin/cdc?prefix=</code></pre>
-<p>The optional <code>prefix</code> query parameter filters the stream to keys starting with that prefix; an empty prefix streams every event. Each line is a JSON object describing the operation:</p>
+<p>Single-key writes and deletes are published to an in-process CDC stream, exposed as newline-delimited JSON (NDJSON) over HTTP on the admin port (loopback-only unless <code>-admin-token</code> is set):</p>
+<pre class="code-block"><code>curl "http://localhost:2112/admin/cdc?prefix=&amp;buffer=1024"</code></pre>
+<p>The optional <code>prefix</code> query parameter filters the stream to keys starting with that prefix; an empty prefix streams every event. <code>buffer</code> sets this subscription's channel depth (default 1024). Each line is a JSON object describing the operation:</p>
 <pre class="code-block"><code>{"Op":"PUT","Key":"orders/4521","Value":"...","Timestamp":1751464805123456}
 {"Op":"DEL","Key":"orders/4400","Timestamp":1751464806012345}</code></pre>
 <p><code>Timestamp</code> is microseconds since the Unix epoch, and <code>Value</code> is base64 (JSON encoding of the raw bytes). This endpoint is a live subscription — the connection stays open and streams events as they happen, similar to tailing a log.</p>
+<div class="callout limitation">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">What the live stream does and does not carry.</span> Events are emitted only by the engine's single-key <code>PUT</code> and <code>DEL</code>. Batched writes &mdash; <code>MPUT</code>, pipelined PUTs the server coalesces into one batch, transactions, Raft's coalesced apply &mdash; and atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) produce <strong>no live event</strong>; their final state is visible only through the <a class="inline-link" href="#durable-catch-up"><code>/admin/changes</code></a> feed. The broker never blocks the writer: when a subscriber's channel is full the event is dropped for that subscriber (<code>cdc_dropped_total</code> in <code>/admin/stats</code>, not a Prometheus metric), and after <strong>3 drops in total</strong> over its lifetime (not consecutive) the subscription is closed.</span>
+</div>
 
 <h2 id="repl-ship">Cross-process forwarding with repl-ship</h2>
-<p>The <code>repl-ship</code> binary subscribes to a local node's <code>/admin/cdc</code> endpoint and forwards each event to a remote VeltrixDB cluster over its binary protocol — each <code>PUT</code> event becomes a binary <code>PUT</code> (<code>0x01</code>) and each <code>DEL</code> event a binary <code>DEL</code> (<code>0x03</code>), sent one at a time:</p>
+<p>The <code>repl-ship</code> binary subscribes to a local node's <code>/admin/cdc</code> endpoint and forwards each event to a remote VeltrixDB cluster over its binary protocol — each <code>PUT</code> event becomes a binary <code>PUT</code> (<code>0x01</code>) and each <code>DEL</code> event a binary <code>DEL</code> (<code>0x03</code>), sent one at a time. It is not in the server image; build it from the main repository:</p>
 <pre class="code-block"><code>go build -o repl-ship ./cmd/repl-ship
 
 repl-ship --src http://primary:2112 \
@@ -126,7 +131,7 @@ repl-ship --src http://primary:2112 \
 </table>
 </div>
 <p>When the source node's admin API is guarded (<code>-admin-token</code> — see <a class="inline-link" href="security.html#admin-api-access-control">Admin API access control</a>), pass the same token to <code>repl-ship</code> via <code>--src-token</code> or the <code>VELTRIX_ADMIN_TOKEN</code> environment variable so it can authenticate against <code>/admin/cdc</code> and <code>/admin/changes</code>.</p>
-<p><code>repl-ship</code> maintains one persistent TCP connection to the destination and reconnects on error. On remote-write failure it reconnects and retries with exponential backoff (100 ms, 200 ms, 400 ms, &hellip;) up to <code>--max-retries</code>, then appends the event to the deadletter file for manual replay. Conflict resolution beyond last-write-wins relies on the remote cluster's own version-vector deduplication — <code>repl-ship</code> does not resolve conflicts itself.</p>
+<p><code>repl-ship</code> maintains one persistent TCP connection to the destination and reconnects on error. On remote-write failure it reconnects and retries with exponential backoff (100 ms, 200 ms, 400 ms, &hellip;) up to <code>--max-retries</code>, then appends the event to the deadletter file for manual replay. There is no conflict resolution: each event is applied at the destination as a plain <code>PUT</code>/<code>DEL</code> in arrival order (last write wins). The destination does no version-vector deduplication either &mdash; version vectors exist in the replication library but are not used.</p>
 
 <h2 id="durable-catch-up">Durable cross-region catch-up</h2>
 <p>The live CDC stream is in-memory: a subscriber that is down misses every event published while it was away. The <strong><code>/admin/changes</code></strong> feed closes that gap. It is an index-backed catch-up feed — it scans the index for entries written at or after a microsecond cursor, so a restarted shipper can replay exactly the delta it missed before rejoining the live stream:</p>
@@ -139,31 +144,48 @@ repl-ship --src http://primary:2112 \
 <ul>
 <li><strong>Tombstones are included</strong> (<code>Op:"DEL"</code>) — deletes made during shipper downtime reach the remote region too. Expired-TTL entries are skipped (they expire remotely on their own).</li>
 <li><strong>The <code>since</code> boundary is inclusive</strong> (<code>&gt;=</code>): events sharing the checkpoint's exact microsecond re-ship rather than being lost. Destination applies are last-write-wins puts/deletes, so replays are harmless.</li>
-<li><strong>Pagination:</strong> when <code>more</code> is <code>true</code> in the trailer, resume from the returned <code>cursor</code> (the timestamp of the last event on the page — inclusive, per the point above). <code>limit</code> defaults to 10,000 and is capped at 100,000.</li>
+<li><strong>Pagination:</strong> when <code>more</code> is <code>true</code> in the trailer, resume from the returned <code>cursor</code> (the timestamp of the last event on the page — inclusive, per the point above). <code>limit</code> defaults to 10,000; a value above 100,000 (or &le; 0) falls back to 10,000.</li>
+<li><strong>Last state only:</strong> the feed is built from the index, so it returns each key's current value or tombstone, not intermediate versions. It does cover batched writes and atomic ops, which the live stream misses.</li>
 </ul>
 <p>To make <code>repl-ship</code> use the feed, run it with a checkpoint file:</p>
 <pre class="code-block"><code>repl-ship --src http://primary:2112 \
   --dst-tcp replica.us-east:9000 \
   --checkpoint /var/lib/repl-ship/ckpt \
   --checkpoint-every 256</code></pre>
-<p><code>repl-ship</code> persists the last shipped write-timestamp (µs) to the checkpoint file — atomically, via tmp-file + rename — after every <code>--checkpoint-every</code> shipped events and on shutdown. On restart it first pages through <code>/admin/changes</code> from the checkpoint cursor, shipping the entire missed delta, and only then subscribes to the live <code>/admin/cdc</code> stream — zero event loss across shipper downtime, at last-write-wins semantics. Without <code>--checkpoint</code>, no catch-up runs on restart and events published while the shipper was down are still missed.</p>
+<p><code>repl-ship</code> persists the last shipped write-timestamp (µs) to the checkpoint file — atomically, via tmp-file + rename — after every <code>--checkpoint-every</code> shipped events and on shutdown. On restart it first pages through <code>/admin/changes</code> from the checkpoint cursor, shipping the entire missed delta, and only then subscribes to the live <code>/admin/cdc</code> stream — no lost final states across shipper downtime, at last-write-wins semantics (intermediate versions of a key are not replayed). Without <code>--checkpoint</code>, no catch-up runs on restart and events published while the shipper was down are still missed.</p>
 <div class="callout limitation">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">Remaining caveats.</span> Conflict resolution is <strong>last-write-wins only</strong> — <code>repl-ship</code> relies on the remote cluster's own version-vector deduplication and does not resolve conflicts itself. And there is still <strong>no back-pressure signal to the source</strong>: local writes keep succeeding even while the destination is degraded or unreachable.</span>
+  <span><span class="callout-title">Remaining caveats.</span> Conflict resolution is <strong>last-write-wins only</strong>, with no deduplication at the destination. While <code>repl-ship</code> is running it ships only what the live stream carries, so batched writes and atomic ops reach the destination only after a restart with <code>--checkpoint</code> replays <code>/admin/changes</code>. And there is <strong>no back-pressure signal to the source</strong>: local writes keep succeeding even while the destination is degraded or unreachable.</span>
 </div>
 <p>Treat <code>repl-ship</code>-based replication as asynchronous, eventually-consistent geo-distribution. For durability across copies within a cluster, use the <a class="inline-link" href="../architecture/cluster-and-consensus.html">Raft or replication-engine consistency modes</a> described below, and use <a class="inline-link" href="backup-and-restore.html">backup/PITR</a> for point-in-time recoverability.</p>
 
-<h2 id="replication-modes">Replication consistency modes</h2>
-<p>CDC and <code>repl-ship</code> are one of two replication mechanisms in VeltrixDB. The other — Raft consensus for linearizable writes, and the primary-copy replication engine with <code>eventual</code>/<code>quorum</code>/<code>strong</code> consistency levels — operates independently of CDC and is the primary durability and consistency mechanism for clustered deployments. Those modes, their guarantees, and their trade-offs are covered in full in <a class="inline-link" href="../architecture/cluster-and-consensus.html">Cluster &amp; Consensus</a>; this page only covers the CDC/forwarding path. Raft mode also compacts its log: once the retained log reaches the snapshot threshold (8192 entries) the node writes <code>raft_snapshot.gob</code>, and a lagging follower is brought up to date with <code>InstallSnapshot</code>.</p>
+<h2 id="replication-modes">In-cluster replication modes</h2>
+<p>CDC and <code>repl-ship</code> are independent of in-cluster replication, which <code>--mode</code> selects. Raft and the replication engine are <strong>mutually exclusive</strong>: a server runs exactly one of them (in raft mode no replication engine exists). Full detail is in <a class="inline-link" href="../architecture/cluster-and-consensus.html">Cluster &amp; Consensus</a>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th></th><th><code>--mode=raft</code></th><th><code>--mode=replicated</code></th></tr></thead>
+<tbody>
+<tr><td>Writes</td><td>Quorum-committed through one Raft log; non-leaders answer <code>MOVED &lt;addr&gt; &lt;id&gt;</code></td><td>Any node writes locally, then ships to its peers (port client + 1)</td></tr>
+<tr><td>Acknowledged after</td><td>Commit and apply on the leader</td><td><code>--consistency</code>: <code>eventual</code> (default) = local write; <code>quorum</code> = RF/2+1 copies; <code>strong</code> = RF copies (10 s timeout)</td></tr>
+<tr><td>Reads</td><td>Local applied state. GET and MGET pass a read barrier (a new leader waits for its no-op; <code>--linearizable-reads</code> adds the ReadIndex fence). Namespace, hash and <code>RANGE</code>/<code>SCANCUR</code> reads skip it and can be stale</td><td>Always local</td></tr>
+<tr><td>Conflicts</td><td>None (single log order)</td><td>None resolved: replicas apply ops in arrival order. Version vectors are defined but never set or compared, and <code>veltrixdb_replication_conflict_resolutions_total</code> stays 0</td></tr>
+<tr><td>Catch-up</td><td>AppendEntries backfill; <code>InstallSnapshot</code> once the log passed 8192 entries (snapshot capped at 256 MB; TTLs not preserved)</td><td>Anti-entropy every 30 s re-sends un-acked ops to <code>LAG</code> replicas only</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout limitation">
+  <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  <span><span class="callout-title">A FAILED replica never recovers on its own.</span> In replicated mode any failed send marks the replica <code>FAILED</code>; failed replicas are skipped by replication and by anti-entropy, and nothing moves them back to <code>SYNC</code> &mdash; in practice a replica stays failed until the primary restarts. Watch <code>/admin/cluster</code> (<code>replication[].state</code>) and <code>veltrixdb_replication_failures_total</code>. Replication lag is exported as <code>veltrixdb_replication_lag_bytes</code>; <code>veltrixdb_replication_lag_nanoseconds</code> is always 0.</span>
+</div>
 <div class="callout warn">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">The C++ network front-end is standalone-only <span class="badge good">New in v1.7</span></span> The experimental <code>-net=cpp|uring|poll</code> front-end writes straight to the local engine, bypassing Raft and replication routing, so the server refuses to start with it in <code>-mode raft</code> or <code>-mode replicated</code>. Clustered nodes must use the default <code>-net=go</code>. A standalone destination running the C++ front-end can still receive <code>repl-ship</code> traffic, since it serves binary <code>MPUT</code> and <code>DEL</code>.</span>
+  <span><span class="callout-title">The C++ network front-end is standalone-only <span class="badge good">New in v1.7</span></span> The experimental <code>-net=cpp|uring|poll</code> front-end writes straight to the local engine, bypassing Raft and replication routing, so the server refuses to start with it in <code>-mode raft</code> or <code>-mode replicated</code>. Clustered nodes must use the default <code>-net=go</code>. A standalone destination running the C++ front-end can still receive <code>repl-ship</code> traffic, since it serves binary <code>PUT</code> and <code>DEL</code>.</span>
 </div>
 
 <div class="card-grid">
   <a class="card" href="../architecture/cluster-and-consensus.html"><div class="card-title">Cluster &amp; Consensus →</div><div class="card-desc">Raft consensus, replication engine, and consistency modes in depth.</div></a>
   <a class="card" href="backup-and-restore.html"><div class="card-title">Backup &amp; Restore →</div><div class="card-desc">Durable, point-in-time recoverable backups via WAL archiving.</div></a>
-  <a class="card" href="monitoring.html"><div class="card-title">Monitoring &amp; Observability →</div><div class="card-desc">Replication lag and cluster metrics to watch.</div></a>
+  <a class="card" href="monitoring.html"><div class="card-title">Monitoring &amp; Observability →</div><div class="card-desc">Replication and cluster metrics to watch, and which ones are always 0.</div></a>
 </div>
 
     <div class="page-nav">

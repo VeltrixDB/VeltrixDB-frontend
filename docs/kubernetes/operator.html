@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -92,6 +93,8 @@
     <h1>Kubernetes Operator</h1>
 <p class="page-lede">The VeltrixDB Kubernetes Operator manages <code>VeltrixCluster</code> custom resources — provisioning the StatefulSet, NVMe storage, and networking, and reconciling scale, upgrade, and recovery events without manual intervention.</p>
 
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Maintained in a separate repository.</span> The Operator lives in <code>VeltrixDB-Kubernetes-Operator</code>, not in the main <code>veltrixdb</code> repository, and is versioned separately. The CRD fields, defaults, status values and reconcile behaviour on this page were taken from that repository and have <strong>not been re-verified for server v1.12</strong> &mdash; treat <code>api/v1alpha1/veltrixcluster_types.go</code> and <code>controllers/veltrixcluster_controller.go</code> in the version you deploy as the source of truth. Statements about what the <em>server</em> does with the flags the Operator passes are checked against the main repository and are called out below.</span></div>
+
 <h2 id="overview">Overview</h2>
 <p>The Operator is built with Kubebuilder and watches a single CRD, <code>VeltrixCluster</code> (group <code>veltrix.io/v1alpha1</code>, short name <code>vc</code>). On each reconcile pass it creates or updates the child resources needed to run a cluster: a <code>StorageClass</code>, an NVMe-provisioning <code>DaemonSet</code>, a <code>ServiceAccount</code>, headless and client <code>Service</code> objects, a <code>ConfigMap</code>, a <code>ServiceMonitor</code> (best-effort, if the Prometheus Operator CRDs are installed), and the <code>StatefulSet</code> itself.</p>
 
@@ -108,8 +111,11 @@
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">GKE requirement</span> Create node pools with <code>--local-ssd-interface=NVME</code>. Without it, GKE merges all local SSDs into a single RAID-0 device and you lose the parallel I/O benefit that VeltrixDB's per-disk WAL/VLog layout depends on.</span></div>
 
 <h2 id="installation">Installation</h2>
-<p>Install the CRDs, then deploy the operator's controller manager:</p>
-<pre class="code-block"><code># 1. Install the CustomResourceDefinitions
+<p>From a checkout of the Operator repository, install the CRDs, then deploy the operator's controller manager:</p>
+<pre class="code-block"><code>git clone https://github.com/VeltrixDB/VeltrixDB-Kubernetes-Operator.git
+cd VeltrixDB-Kubernetes-Operator
+
+# 1. Install the CustomResourceDefinitions
 kubectl apply -f config/crd/bases/
 
 # 2. Deploy the operator (controller manager Deployment + RBAC)
@@ -121,14 +127,14 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
 <p>See <a class="inline-link" href="../operations/nvme-provisioning.html">NVMe Disk Provisioning</a> for why the keeper is required on GKE COS, AWS Bottlerocket, and any OS where kubelet runs inside its own mount namespace.</p>
 
 <h2 id="veltrixcluster-spec">VeltrixCluster spec reference</h2>
-<p>The fields below are read directly from the <code>VeltrixClusterSpec</code> Go type (<code>api/v1alpha1/veltrixcluster_types.go</code>). Defaults marked <span class="badge">operator default</span> are filled in by the reconcile loop's <code>applyDefaults</code> step when the field is left unset in the CR.</p>
+<p>The fields below were read from the <code>VeltrixClusterSpec</code> Go type (<code>api/v1alpha1/veltrixcluster_types.go</code>, Operator repo; not re-checked for this release). Defaults marked <span class="badge">operator default</span> are filled in by the reconcile loop's <code>applyDefaults</code> step when the field is left unset in the CR.</p>
 
 <h3>Core</h3>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>size</code></td><td>int32</td><td><code>3</code></td><td>Number of VeltrixDB nodes. Each node owns a contiguous shard range. Minimum 1.</td></tr>
-<tr><td><code>version</code></td><td>string</td><td><code>1.0.0</code></td><td>Container image tag.</td></tr>
+<tr><td><code>version</code></td><td>string</td><td><code>1.0.0</code></td><td>Container image tag. The default is an old release: set it explicitly to the server version you run.</td></tr>
 <tr><td><code>image</code></td><td>string</td><td><code>ghcr.io/veltrixdb/veltrixdb</code></td><td>Container image repository (combined with <code>version</code> to form the full image reference).</td></tr>
-<tr><td><code>replicationFactor</code></td><td>int32</td><td><code>3</code></td><td>Replica copies per shard (min 1, max 5). The operator reports a <code>ReplicationFactorMet</code> condition when live replicas fall below this.</td></tr>
+<tr><td><code>replicationFactor</code></td><td>int32</td><td><code>3</code></td><td>Replica copies per shard (min 1, max 5). The operator reports a <code>ReplicationFactorMet</code> condition when live replicas fall below this. The server itself has no replication-factor flag (replicated mode uses a fixed RF of 3), so this is a status threshold, not a server setting.</td></tr>
 <tr><td><code>cacheMaxSizeMB</code></td><td>int32</td><td><code>65536</code></td><td>LIRS cache size in MiB, passed as <code>-cache</code>. Minimum 256.</td></tr>
 <tr><td><code>storageClassName</code></td><td>string</td><td><code>local-nvme</code></td><td>StorageClass used for NVMe PVCs — must match the class the provisioner creates.</td></tr>
 <tr><td><code>disksPerNode</code></td><td>int32</td><td><code>8</code></td><td>NVMe disks (and PVCs) per pod. Min 1, max 16.</td></tr>
@@ -138,10 +144,11 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
 
 <h3>Networking</h3>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>gossipPort</code></td><td><code>7946</code></td><td>UDP port for the gossip failure detector.</td></tr>
+<tr><td><code>gossipPort</code></td><td><code>7946</code></td><td>Gossip port. Server fact: gossip is <strong>TCP</strong>, and peers always dial the derived address (client port + 3, i.e. 9003 with the default <code>serverPort</code>) &mdash; a different listen port does not change where peers connect. Leave the server on its derived ports and open client port + 1/2/3/5 between pods.</td></tr>
 <tr><td><code>serverPort</code></td><td><code>9000</code></td><td>TCP port for the binary/text protocol.</td></tr>
 <tr><td><code>metricsPort</code></td><td><code>2112</code></td><td>Prometheus metrics, <code>/healthz</code>, <code>/readyz</code>.</td></tr>
 <tr><td><code>tlsPort</code></td><td><code>9443</code></td><td>TLS listener; only active when <code>tlsSecretName</code> is set. The plain <code>serverPort</code> stays up for internal cluster traffic.</td></tr>
+<tr><td colspan="2">(not in the CRD)</td><td>No field for inter-node TLS (<code>-cluster-tls-*</code>, <code>-cluster-mtls</code>) or the cluster secret (<code>-cluster-secret-file</code> / <code>VELTRIXDB_CLUSTER_SECRET</code>, v1.11) is documented. Without one of them the server's transfer listener is unauthenticated &mdash; supply the secret through pod env if your Operator version cannot.</td></tr>
 </tbody></table></div>
 
 <h3>Scheduling</h3>
@@ -156,7 +163,7 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>numShards</code></td><td><code>1024</code></td><td>Has no effect on the server: the index always uses its compile-time shard count (8192; <code>StorageConfig.NumShards</code> is vestigial) and the server has no shard flag. Leave it at the default.</td></tr>
 <tr><td><code>keyValueSeparation</code></td><td><code>true</code></td><td>Enables WiscKey-style KV separation — only key metadata lives in SSTables; values append to a per-disk VLog.</td></tr>
-<tr><td><code>vlogGCThreshold</code></td><td><code>"0.40"</code> (operator default; CRD doc states 0.30)</td><td>Decimal string in <code>[0.0, 1.0]</code>. VLog garbage fraction that triggers defragmentation.</td></tr>
+<tr><td><code>vlogGCThreshold</code></td><td><code>"0.40"</code> (operator default; CRD doc states 0.30)</td><td>Decimal string in <code>[0.0, 1.0]</code>. VLog garbage fraction that triggers defragmentation (server flag <code>-gc-threshold</code>, server default 0.30).</td></tr>
 <tr><td><code>lirRatio</code></td><td><code>"0.90"</code></td><td>Fraction of the LIRS cache reserved for the high-locality (LIR) resident set.</td></tr>
 <tr><td><code>autoTune</code></td><td><code>false</code></td><td>When true, the binary runs hardware detection at startup and derives cache size, shard count, compaction threads, and I/O mode itself; the operator omits <code>-cache</code> and passes <code>-auto-tune</code> instead.</td></tr>
 <tr><td><code>sysTune</code></td><td><code>true</code></td><td>Host-level tuning (sysctl, hugepages, CPU governor, IRQ balance, <code>RLIMIT_NOFILE</code>) via <code>hardware.SysTune</code>. Linux only; only meaningful when <code>autoTune</code> is true. Requires <code>CAP_SYS_ADMIN</code> or root.</td></tr>
@@ -165,7 +172,7 @@ kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
 
 <h3>WAL / VLog flush</h3>
 <div class="table-wrap"><table><thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit flush window (ms). <strong>Must equal</strong> <code>vlogFlushWindowMs</code>. Overrides the server's own default of 15&nbsp;ms.</td></tr>
+<tr><td><code>walFlushWindowMs</code></td><td><code>10</code></td><td>WAL group-commit flush window (ms). <strong>Must equal</strong> <code>vlogFlushWindowMs</code>. Overrides the server's own default of 15&nbsp;ms. Since v1.12 the server's adaptive group commit (<code>-group-commit=adaptive</code>, default) treats the window as an upper bound: a lone writer is synced at once.</td></tr>
 <tr><td><code>vlogFlushWindowMs</code></td><td><code>10</code></td><td>VLog fdatasync group-commit window (ms). WAL and VLog are submitted concurrently; effective P99 is the max of the two.</td></tr>
 <tr><td><code>walMaxBatchEntries</code></td><td><code>4096</code></td><td>Caps the WAL group-commit batch size before the flush timer fires early. Min 1, max 65536.</td></tr>
 </tbody></table></div>
@@ -264,7 +271,7 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <p>The reconciler compares the StatefulSet's previous replica count to <code>spec.size</code> on every pass. When the cluster has grown (<code>prevSize &lt; spec.size</code>), it calls <code>triggerResharding</code>, which:</p>
 <ol>
 <li>Blocks (up to 5 minutes) until all desired pods report <code>PodReady</code>.</li>
-<li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. The VeltrixDB binary is expected to watch these annotations via the downward API and recompute its consistent-hash partition map / trigger the actual shard rebalance — the operator's role is limited to <strong>triggering</strong> the reshard, not performing the data movement itself.</li>
+<li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. <strong>Server fact: nothing in the VeltrixDB server reads these annotations.</strong> A server builds its membership once at startup from <code>--peers</code> (or <code>--seeds</code>), gossip does not add members, and there is no runtime join command; <code>--auto-rebalance</code> migrates keys only when that static membership changes state. In practice a new node joins the ring only when every pod restarts with it listed in <code>--peers</code>.</li>
 <li>Records <code>status.lastScaleTime</code> and a <code>status.partitionMap</code> summary string.</li>
 </ol>
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scale-down is not specially handled</span> The resharding trigger only fires when the new size is <em>greater</em> than the previous size. Scaling down updates the StatefulSet's replica count (removing the highest-ordinal pods) but does not go through the same annotate-and-wait resharding path.</span></div>
@@ -278,15 +285,16 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scope of "self-healing"</span> Pod replacement is delegated to the built-in StatefulSet controller, not a bespoke operator routine. Data rebuild after a replacement is a function of the VeltrixDB binary's own replication/recovery path (WAL replay, replica resync), not code inside the operator's reconcile loop.</span></div>
 
 <h3>Graceful WAL flush on termination — confirmed</h3>
-<p>Every pod gets a <code>preStop</code> lifecycle hook (<code>kill -SIGTERM 1 &amp;&amp; sleep 55</code>) and a 60-second <code>terminationGracePeriodSeconds</code>, giving the engine time to flush its WAL before the container is killed. On <code>VeltrixCluster</code> deletion, the operator's finalizer (<code>veltrix.io/finalizer</code>) annotates pods as <code>draining</code> before removing itself — the actual flush is still performed by the pod's own SIGTERM handling and the grace period, not a separate operator-issued flush command.</p>
+<p>Every pod gets a <code>preStop</code> lifecycle hook (<code>kill -SIGTERM 1 &amp;&amp; sleep 55</code> &mdash; note the official image is distroless with no shell, so an exec hook of this form cannot run there; the kubelet's own SIGTERM still triggers the server's clean shutdown) and a 60-second <code>terminationGracePeriodSeconds</code>, giving the engine time to flush its WAL before the container is killed. On <code>VeltrixCluster</code> deletion, the operator's finalizer (<code>veltrix.io/finalizer</code>) annotates pods as <code>draining</code> before removing itself — the actual flush is still performed by the pod's own SIGTERM handling and the grace period, not a separate operator-issued flush command.</p>
 
 <h2 id="scaling">Scaling</h2>
 <pre class="code-block"><code>kubectl patch veltrixcluster my-cluster -n veltrixdb \
   --type merge --patch '{"spec":{"size":5}}'</code></pre>
-<p>Increasing <code>spec.size</code> triggers the StatefulSet to add pods and, once they are ready, the reshard-trigger flow described above.</p>
+<p>Increasing <code>spec.size</code> triggers the StatefulSet to add pods and, once they are ready, the annotation step described above. Whether the existing pods then learn about the new ones depends on the <code>--peers</code> list your Operator version renders and on a restart; the server does not discover peers at runtime.</p>
 
 <h2 id="node-requirements">Node, seccomp and image notes</h2>
 <ul>
+<li>Server fact: a clean SIGTERM shutdown writes a compacted WAL checkpoint; budget the grace period for it plus, on the next start, the search-index rebuild (searches are refused until <code>INFO</code> shows <code>search_ready=1</code>; <code>/readyz</code> does not wait for it).</li>
 <li>The official image is built with <code>CGO_ENABLED=1</code> (distroless <code>cc-debian12</code> base), so the server uses the off-heap native index by default. <span class="badge good">New in v1.6</span> It needs <code>vm.max_map_count &ge; 262144</code> on the <strong>node</strong> at large key counts &mdash; a container cannot set it. Configure it in the node pool / node image or a privileged DaemonSet, or set <code>VELTRIXDB_INDEX=map</code> in the pod env.</li>
 <li>The <code>RuntimeDefault</code> seccomp profile blocks <code>io_uring_setup</code>. That only matters for the opt-in io_uring VLog write bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>; default off), which then falls back to <code>pwrite</code>. The <code>rawVLog.enabled</code> path above already sets <code>seccompProfile: Unconfined</code>.</li>
 <li>The experimental C++ network front-end (<code>-net=cpp|uring|poll</code>) is refused in <code>-mode raft</code> and <code>-mode replicated</code> and with <code>-auth-config</code>, so any multi-node or RBAC-enabled cluster must keep the default <code>-net=go</code>.</li>
@@ -295,6 +303,7 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause / fix</th></tr></thead><tbody>
 <tr><td>Pod crashes with <code>write /mnt/nvmeN/wal.log: no space left on device</code></td><td>The pod started before the mount-keeper bound real XFS at the PV source path, so kubelet bind-mounted a 256 KB tmpfs placeholder. Confirm the keeper DaemonSet is <code>Running</code>, then delete the pod so kubelet re-creates the bind mount.</td></tr>
+<tr><td>Startup log <code>[transfer] WARNING: listener … is unauthenticated</code></td><td>No cluster secret and no cluster mTLS: set <code>VELTRIXDB_CLUSTER_SECRET</code> (same value, &ge; 16 bytes, on every pod).</td></tr>
 <tr><td>Cluster stuck in <code>Provisioning</code></td><td>Check <code>kubectl get pv</code>; on GKE confirm the node pool used <code>--local-ssd-interface=NVME</code>; check operator logs via <code>kubectl logs -n veltrixdb-system deploy/veltrixdb-controller-manager</code>.</td></tr>
 <tr><td>Resharding not triggering after adding nodes</td><td>The operator only watches <code>spec.size</code> changes on reconcile. Force one with <code>kubectl annotate veltrixcluster my-cluster force-reconcile=$(date +%s)</code>.</td></tr>
 <tr><td>WAL flush timeout on pod termination</td><td>If pods terminate faster than the 30–60s grace window, raise <code>terminationGracePeriodSeconds</code> in the StatefulSet spec.</td></tr>
