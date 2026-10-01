@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,24 +91,24 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Reference<span class="sep">/</span>Admin API</div>
     <h1>Admin API Reference</h1>
-<p class="page-lede">The full HTTP surface exposed on <code>-metrics-addr</code> (default <code>:2112</code>): health probes, Prometheus metrics, and the <code>/admin/*</code> operational endpoints implemented in <code>adminapi/admin.go</code> and <code>cmd/server/admin_cluster.go</code>.</p>
+<p class="page-lede">The full HTTP surface exposed on <code>-metrics-addr</code> (default <code>:2112</code>): health probes, Prometheus metrics, traces, and the <code>/admin/*</code> operational endpoints implemented in <code>adminapi/admin.go</code> and <code>cmd/server/admin_cluster.go</code> &mdash; plus the <code>INFO</code> command on the data port, which is where search-index readiness is reported.</p>
 
 <div class="callout danger">
 <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-<span><span class="callout-title">Access control (v1.1.0)</span> <code>/admin/*</code> is guarded. With no token configured, admin endpoints accept loopback connections only — a non-loopback request gets <code>403</code>. Starting the server with <code>-admin-token &lt;token&gt;</code> (or the <code>VELTRIX_ADMIN_TOKEN</code> environment variable) requires every <code>/admin/*</code> request, loopback included, to send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code>; anything else gets <code>401</code>. The comparison is constant-time. <code>/metrics</code>, <code>/healthz</code>, and <code>/readyz</code> are not guarded, so Prometheus scrapes and Kubernetes probes need no configuration. Several endpoints still mutate live state (<code>/admin/quotas</code> mutates live limits, <code>/admin/migrate</code> mutates on-disk schema), so treat the token as a second layer: on untrusted networks, keep the port behind a network policy / firewall, and preferably mTLS via a sidecar proxy (Envoy or nginx).</span>
+<span><span class="callout-title">Access control (v1.1.0)</span> <code>/admin/*</code> is guarded (<code>adminapi/guard.go</code>). With no token configured, admin endpoints accept loopback connections only — a non-loopback request gets <code>403</code>. Starting the server with <code>-admin-token &lt;token&gt;</code> (or the <code>VELTRIX_ADMIN_TOKEN</code> environment variable) requires every <code>/admin/*</code> request, loopback included, to send <code>Authorization: Bearer &lt;token&gt;</code> or <code>X-Admin-Token: &lt;token&gt;</code>; anything else gets <code>401</code>. The comparison is constant-time. <code>/metrics</code>, <code>/healthz</code>, <code>/readyz</code> and <code>/traces</code> are not guarded, so Prometheus scrapes and Kubernetes probes need no configuration. The <code>veltrix</code> CLI and <code>kubectl-veltrix</code> never send a token: they work against a server without <code>-admin-token</code> from loopback (directly, or through <code>kubectl port-forward</code>), and get <code>401</code> from a server that has one. Several endpoints still mutate live state (<code>/admin/quotas</code> mutates live limits, <code>/admin/migrate</code> mutates on-disk schema), so treat the token as a second layer: on untrusted networks, keep the port behind a network policy / firewall, and preferably mTLS via a sidecar proxy (Envoy or nginx).</span>
 </div>
 
 <h2 id="health-and-metrics">Health and metrics endpoints</h2>
-<p>These are registered directly in <code>cmd/server/main.go</code>, before the storage engine finishes initializing, so liveness checks never time out during a slow WAL replay.</p>
+<p>These are registered in <code>cmd/server/main.go</code>. <code>/healthz</code> and <code>/readyz</code> are served from the moment the process starts, so liveness checks never time out during a slow WAL replay; <code>/metrics</code>, <code>/traces</code> and every <code>/admin/*</code> path are added only after the storage engine has opened and return <code>404</code> until then.</p>
 
 <div class="table-wrap">
 <table>
 <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><span class="badge">GET</span></td><td><code>/healthz</code></td><td>Liveness probe. Always returns <code>200 ok</code> once the HTTP listener is up &mdash; it does not depend on the storage engine being ready. Suitable for a Kubernetes <code>livenessProbe</code>.</td></tr>
-<tr><td><span class="badge">GET</span></td><td><code>/readyz</code></td><td>Readiness probe. Returns <code>503 initializing</code> until the storage engine has finished startup (WAL replay, VLog device open, etc.), then <code>200 ready</code>. Suitable for a Kubernetes <code>readinessProbe</code>.</td></tr>
-<tr><td><span class="badge">GET</span></td><td><code>/metrics</code></td><td>Prometheus exposition endpoint (OpenMetrics-enabled). Backed by <code>veltrixmetrics.NewVeltrixCollector</code>, registered on a dedicated <code>prometheus.Registry</code>. Exposes 60+ metrics covering storage, cache, WAL, VLog GC, replication, and cluster state.</td></tr>
-<tr><td><span class="badge">GET</span></td><td><code>/traces</code></td><td>Recent OpenTelemetry-compatible spans from the in-process ring buffer (default retains 2048 spans). Only slow operations (&ge;50&nbsp;ms) and errors are guaranteed to appear regardless of the 1% trace sampler. Returned as newline-delimited JSON.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/readyz</code></td><td>Readiness probe. Returns <code>503 initializing</code> until the storage engine has finished startup (WAL replay, VLog device open, etc.), then <code>200 ready</code>. Returns <code>503 degraded: disks [...] failed</code> while a disk circuit breaker is tripped (reads keep being served). Does not wait for the search-index rebuild &mdash; see <a class="inline-link" href="#info"><code>INFO</code></a>. Suitable for a Kubernetes <code>readinessProbe</code>.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/metrics</code></td><td>Prometheus exposition endpoint (OpenMetrics-enabled). Backed by <code>veltrixmetrics.NewVeltrixCollector</code>, registered on a dedicated <code>prometheus.Registry</code>. Exposes about 80 metric families covering storage, cache, WAL, VLog GC, replication, and cluster state.</td></tr>
+<tr><td><span class="badge">GET</span></td><td><code>/traces</code></td><td>Recent OpenTelemetry-compatible spans from the in-process ring buffer (default retains 2048 spans). Only slow operations (&ge;50&nbsp;ms) and errors are guaranteed to appear regardless of the 1% trace sampler. Returned as newline-delimited JSON. Query params: <code>limit=N</code> (at most N spans) and <code>error=true</code> (only spans with an error status).</td></tr>
 </tbody>
 </table>
 </div>
@@ -115,10 +116,10 @@
 <pre class="code-block"><code>curl http://localhost:2112/healthz
 curl http://localhost:2112/readyz
 curl http://localhost:2112/metrics | head -30
-curl http://localhost:2112/traces</code></pre>
+curl "http://localhost:2112/traces?limit=50&amp;error=true"</code></pre>
 
 <h2 id="admin-stats">GET /admin/stats</h2>
-<p>Returns a full JSON snapshot of engine state: index size, cumulative op counters, cache stats, WAL totals, CDC counters, per-disk VLog stats, and namespace list. This is the endpoint the <code>veltrix status</code>, <code>veltrix compaction</code>, <code>veltrix cache</code>, and <code>veltrix top</code> subcommands poll.</p>
+<p>Returns a full JSON snapshot of engine state: index size, cumulative op counters, cache stats, WAL totals, CDC counters, per-disk VLog stats, and namespace list. This is the endpoint the <code>veltrix status</code>, <code>compaction</code>, <code>cache</code>, <code>wal</code>, <code>replication</code>, <code>cdc</code> and <code>top</code> subcommands poll. Methods other than <code>GET</code> get <code>405</code>.</p>
 
 <pre class="code-block"><code>curl http://localhost:2112/admin/stats</code></pre>
 
@@ -171,14 +172,14 @@ curl http://localhost:2112/traces</code></pre>
 </tbody>
 </table>
 </div>
-<p>Non-<code>POST</code> requests receive <code>405 GET or POST</code> is not accepted here &mdash; only <code>POST</code> is allowed.</p>
+<p>Any method other than <code>POST</code> gets <code>405 POST only</code>; a failed checkpoint returns <code>500</code> with the error text.</p>
 
 <h2 id="admin-quotas">GET / POST /admin/quotas</h2>
 <p>Reads or mutates per-namespace rate-limit and key-count quotas (token-bucket write throttling plus a hard key-count cap).</p>
 
 <h3>GET &mdash; list current quotas</h3>
 <pre class="code-block"><code>curl http://localhost:2112/admin/quotas</code></pre>
-<p>Returns a JSON array of <code>storage.QuotaSnapshot</code> objects, one per namespace with a configured limit.</p>
+<p>Returns a JSON array of <code>storage.QuotaSnapshot</code> objects, one per namespace with a configured limit. The struct has no JSON tags, so the fields are capitalised: <code>Namespace</code>, <code>WritesPerSec</code>, <code>BurstWrites</code>, <code>MaxKeys</code>, <code>KeyCount</code>, <code>TokensLeft</code>. Methods other than <code>GET</code>/<code>POST</code> get <code>405 GET or POST</code>.</p>
 
 <h3>POST &mdash; set a namespace quota</h3>
 <p>Accepts form-encoded parameters (not JSON):</p>
@@ -195,7 +196,7 @@ curl http://localhost:2112/traces</code></pre>
 </div>
 <pre class="code-block"><code>curl -X POST http://localhost:2112/admin/quotas \
   -d "ns=tenant_42&writes_per_sec=5000&burst=10000&max_keys=1000000"</code></pre>
-<p>Response: <code>{"status": "ok", "ns": "tenant_42"}</code>.</p>
+<p>Response: <code>{"status": "ok", "ns": "tenant_42"}</code>. Omitted or non-numeric fields are set to <code>0</code>; the request always replaces the namespace's whole limit.</p>
 
 <h2 id="admin-migrate">POST /admin/migrate</h2>
 <p>Runs schema migrations across all keys currently below <code>current_schema_version</code>.</p>
@@ -228,7 +229,7 @@ curl http://localhost:2112/traces</code></pre>
 
 <pre class="code-block"><code>curl "http://localhost:2112/admin/cdc?prefix=orders/&duration_seconds=60"</code></pre>
 
-<p>Each streamed line is one JSON-encoded <code>storage.CDCEvent</code> (operation type, key, and related metadata &mdash; consumed directly by <code>veltrix cdc-tail</code> and by the <code>repl-ship</code> cross-region shipper).</p>
+<p>Each streamed line is one JSON-encoded <code>storage.CDCEvent</code>: <code>Op</code>, <code>Key</code>, <code>Value</code> (base64, as Go encodes <code>[]byte</code>; <code>null</code> for deletes) and <code>Timestamp</code> (&micro;s). It is consumed by the <code>repl-ship</code> cross-region shipper; <code>veltrix cdc-tail</code> reads it too, but its formatter looks for lowercase field names, so its op/key columns print <code>&mdash;</code> (see <a class="inline-link" href="cli-reference.html#veltrix">CLI Reference</a>).</p>
 
 <div class="callout limitation">
 <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
@@ -250,10 +251,10 @@ curl http://localhost:2112/traces</code></pre>
 
 <pre class="code-block"><code>curl "http://localhost:2112/admin/changes?since=1752800000000000&amp;limit=1000"</code></pre>
 
-<p>The response is newline-delimited JSON (<code>application/x-ndjson</code>): one <code>storage.CDCEvent</code> per line (<code>Op</code> <code>"PUT"</code> or <code>"DEL"</code>, <code>Key</code>, <code>Value</code> — empty for deletes — and <code>Timestamp</code> in µs), ordered by write timestamp, followed by a single trailer line:</p>
+<p>The response is newline-delimited JSON (<code>application/x-ndjson</code>): one <code>storage.CDCEvent</code> per line (<code>Op</code> <code>"PUT"</code> or <code>"DEL"</code>, <code>Key</code>, <code>Value</code> &mdash; base64, <code>null</code> for deletes &mdash; and <code>Timestamp</code> in µs), ordered by write timestamp, followed by a single trailer line. Methods other than <code>GET</code> get <code>405</code>.</p>
 
-<pre class="code-block"><code>{"Op":"PUT","Key":"orders/1042","Value":"...","Timestamp":1752800000123456}
-{"Op":"DEL","Key":"orders/0999","Timestamp":1752800000234567}
+<pre class="code-block"><code>{"Op":"PUT","Key":"orders/1042","Value":"eyJ0b3RhbCI6NDJ9","Timestamp":1752800000123456}
+{"Op":"DEL","Key":"orders/0999","Value":null,"Timestamp":1752800000234567}
 {"cursor":1752800000234567,"more":false}</code></pre>
 
 <div class="table-wrap">
@@ -274,7 +275,7 @@ curl http://localhost:2112/traces</code></pre>
 </ul>
 
 <h2 id="admin-backup">POST /admin/backup</h2>
-<p>Triggers a full or incremental backup from a live engine, writing to a local destination directory on the server's filesystem. Only registered when the server is started with a non-nil <code>BackupEngine</code> (always true for <code>cmd/server</code>).</p>
+<p>Triggers a full or incremental backup from the running engine, written by the server process to a local destination directory on the server's filesystem. This (or <code>veltrix backup DEST_DIR</code>, which calls it) is the way to back up a <strong>running</strong> server: the offline <code>veltrixdb-backup</code> tool opens its own engine on the data dirs and must only be pointed at a stopped server's directories &mdash; against a live server it truncated the live <code>wal.log</code> and <code>vlog_active.dat</code> in testing. The endpoint is always registered by <code>cmd/server</code>.</p>
 
 <p>Request body (JSON):</p>
 <pre class="code-block"><code>{
@@ -288,7 +289,7 @@ curl http://localhost:2112/traces</code></pre>
 <tbody>
 <tr><td><code>type</code></td><td>No</td><td><code>"full"</code> (default) or <code>"incremental"</code>.</td></tr>
 <tr><td><code>dest_dir</code></td><td>Yes</td><td>Local destination directory on the server host.</td></tr>
-<tr><td><code>base_dir</code></td><td>Only for incremental</td><td>Path to the base backup's manifest, used to compute the delta.</td></tr>
+<tr><td><code>base_dir</code></td><td>Only for incremental</td><td>Directory of the base backup (it must contain that backup's <code>manifest.json</code>), used to compute the delta.</td></tr>
 </tbody>
 </table>
 </div>
@@ -297,7 +298,9 @@ curl http://localhost:2112/traces</code></pre>
   -H "Content-Type: application/json" \
   -d '{"type":"full","dest_dir":"/backup/2026-07-05"}'</code></pre>
 
-<p>Response includes <code>status</code>, <code>type</code>, <code>backup_id</code>, <code>dest_dir</code>, <code>num_disks</code>, <code>duration_ms</code>, and the full <code>manifest</code> object. This is what <code>veltrix backup DEST_DIR</code> calls under the hood.</p>
+<pre class="code-block"><code>curl -X POST http://localhost:2112/admin/backup \
+  -d '{"type":"incremental","dest_dir":"/backup/2026-07-05-1500","base_dir":"/backup/2026-07-05"}'</code></pre>
+<p>Response includes <code>status</code>, <code>type</code>, <code>backup_id</code>, <code>dest_dir</code> (and <code>base_dir</code> for incremental), <code>num_disks</code>, <code>duration_ms</code>, and the full <code>manifest</code> object. Errors: <code>400</code> for a bad body, a missing <code>dest_dir</code>, a missing or unreadable <code>base_dir</code>, or an unknown <code>type</code>; <code>500</code> if the backup itself fails; <code>405</code> for non-<code>POST</code>. <code>veltrix backup DEST_DIR</code> sends <code>{"type":"full","dest_dir":DEST_DIR}</code>.</p>
 
 <h2 id="admin-cluster">GET /admin/cluster (alias: /admin/topology)</h2>
 <p>Returns the live distributed-layer topology: node role, Raft term/leader (in <code>raft</code> mode), replication lag (in <code>replicated</code> mode), partition count, and fencing epoch. Registered separately from the rest of the admin API, in <code>cmd/server/admin_cluster.go</code>, via <code>registerClusterAdmin</code>.</p>
@@ -315,12 +318,35 @@ curl http://localhost:2112/traces</code></pre>
 <tr><td><code>consistency</code></td><td>string</td><td>Present only in <code>replicated</code> mode &mdash; <code>eventual</code>/<code>quorum</code>/<code>strong</code>.</td></tr>
 <tr><td><code>raft</code></td><td>object</td><td>Present only in <code>raft</code> mode: <code>role</code>, <code>term</code>, <code>leader_id</code>, <code>is_leader</code>.</td></tr>
 <tr><td><code>replication</code></td><td>array</td><td>Present only in <code>replicated</code> mode: per-replica <code>node_id</code>, <code>state</code>, <code>last_ack_seq</code>, <code>lag_bytes</code>, <code>lag_ns</code>.</td></tr>
-<tr><td><code>nodes</code></td><td>array</td><td>Every known node: <code>node_id</code>, <code>address</code>, <code>port</code>, <code>state</code>.</td></tr>
+<tr><td><code>nodes</code></td><td>array</td><td>Every known node: <code>node_id</code>, <code>address</code>, <code>port</code>, <code>rack</code> (omitted when unset; see <code>-rack-id</code>), <code>state</code>.</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>This is the endpoint the bundled cluster-aware client (<code>client.NewClient</code>) calls to bootstrap consistent-hash routing and discover the current Raft leader, and it is what <code>veltrix nodes</code> renders as a table.</p>
+<p><code>veltrix nodes</code> renders this endpoint as a table. The same JSON, on one line, is returned by the <code>TOPOLOGY</code> text command on the data port &mdash; that is what the bundled cluster-aware client (<code>client.NewClient</code>) uses to build its consistent-hash ring and find the Raft leader, so it needs no admin access. Non-<code>GET</code> methods get <code>405</code>.</p>
+
+<h2 id="info">INFO (data port, not HTTP)</h2>
+<p><code>INFO</code> is a text-protocol command on <code>-addr</code> (default <code>:9000</code>), not an HTTP endpoint, but it is the one place a node reports whether its search indexes are ready. With <code>-auth-config</code> it needs the admin permission. The reply is one line of <code>key=value</code> pairs:</p>
+<pre class="code-block"><code>$ printf 'INFO\nQUIT\n' | nc 127.0.0.1 9000
+keys=1203 writes=5120 reads=880 deletes=4 cache_hits=812 cache_misses=68 hit_rate=0.92 wal_flushes=311 compaction_runs=0 version=5128 search_ready=0 search_loaded=4100/9000 disk[0]=./veltrixdb-data:12.4MB
+BYE</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>keys</code></td><td>Live key count in the index.</td></tr>
+<tr><td><code>writes</code>, <code>reads</code>, <code>deletes</code></td><td>Cumulative operation counters.</td></tr>
+<tr><td><code>cache_hits</code>, <code>cache_misses</code>, <code>hit_rate</code></td><td>LIRS cache counters and hit rate (2 decimals).</td></tr>
+<tr><td><code>wal_flushes</code>, <code>compaction_runs</code></td><td>WAL <code>fdatasync</code> flushes and compaction runs.</td></tr>
+<tr><td><code>version</code></td><td>The engine's current write-version counter.</td></tr>
+<tr><td><code>search_ready</code></td><td><span class="badge good">New in v1.11</span> <code>1</code> once the startup rebuild of the vector / text indexes from the persisted <code>@vec/</code> and <code>@txt/</code> keys has finished. While it is <code>0</code>, vector / text / hybrid searches are refused with <code>search indexes are still rebuilding after restart (loaded x of y; …)</code> unless the server runs with <code>-search-allow-partial</code>; KV traffic, <code>QUERY</code> and <code>IDXQUERY</code> are not affected. <code>/readyz</code> does not wait for this.</td></tr>
+<tr><td><code>search_loaded</code></td><td><span class="badge good">New in v1.11</span> Present only while <code>search_ready=0</code>: <code>loaded/total</code> keys rebuilt so far.</td></tr>
+<tr><td><code>disk[N]</code></td><td>Per disk: <code>path:segmentMB</code>.</td></tr>
+<tr><td><code>FAILED_DISKS</code></td><td>Present only when a disk has failed: the failed disk indexes.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The binary <code>INFO</code> frame (<code>0x05</code>) returns a shorter string &mdash; <code>keys</code>, <code>writes</code>, <code>reads</code>, <code>cache_hit_rate</code>, <code>wal_flushes</code> &mdash; without the search fields, so use the text command to poll readiness. <code>veltrix-admin stats</code> prints the text reply as a table.</p>
 
 <h2 id="admin-ui">GET /admin/ui</h2>
 <p>Serves the built-in HTML/JS web dashboard (implemented in <code>adminapi/ui.go</code>). Also mounted as the catch-all at <code>/admin/</code>, so any unmatched path under <code>/admin/</code> falls through to the dashboard.</p>
@@ -335,6 +361,7 @@ curl http://localhost:2112/traces</code></pre>
 <tr><td><span class="badge">GET</span></td><td><code>/readyz</code></td><td><span class="badge red">none</span></td><td>Readiness probe</td></tr>
 <tr><td><span class="badge">GET</span></td><td><code>/metrics</code></td><td><span class="badge red">none</span></td><td>Prometheus scrape endpoint</td></tr>
 <tr><td><span class="badge">GET</span></td><td><code>/traces</code></td><td><span class="badge red">none</span></td><td>Recent slow/error OTel spans</td></tr>
+<tr><td>text cmd</td><td><code>INFO</code> on <code>-addr</code></td><td>RBAC admin (with <code>-auth-config</code>)</td><td>Counters, <code>search_ready</code> / <code>search_loaded</code>, disks</td></tr>
 <tr><td><span class="badge">GET</span></td><td><code>/admin/stats</code></td><td><span class="badge good">loopback / token</span></td><td>Full engine snapshot</td></tr>
 <tr><td><span class="badge">GET</span></td><td><code>/admin/version</code></td><td><span class="badge good">loopback / token</span></td><td>Schema version + encryption flag</td></tr>
 <tr><td><span class="badge">POST</span></td><td><code>/admin/checkpoint</code></td><td><span class="badge good">loopback / token</span></td><td>Force WAL checkpoint</td></tr>

@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -103,7 +104,7 @@
 </div>
 
 <h2 id="system-diagram">System diagram</h2>
-<p>The serving path is Go, with two C++ exceptions on a cgo build: the per-shard index tables live off the Go heap in C++ (default on every cgo build, macOS included), and <code>--net=cpp</code> swaps in an opt-in C++ network front-end. Dashed boxes are optional / opt-in.</p>
+<p>The serving path is Go, with two C++ exceptions on a cgo build: the per-shard index tables live off the Go heap in C++ (default on every cgo build with Go ≥ 1.21, macOS included), and <code>--net=cpp</code> swaps in an opt-in C++ network front-end. Dashed boxes are optional / opt-in.</p>
 <pre class="code-block"><code>Client (any SDK or nc)
         │ TCP                                  ┆ TCP (opt-in)
         ▼                                      ▼
@@ -132,7 +133,7 @@
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Per NVMe disk — N independent sets                              │
-│ WAL: binary records, CRC32C, one write + one fdatasync / window │
+│ WAL: binary records, CRC32C, one write + one fdatasync / batch  │
 │ VLog: append-only, lock-free reservation,                       │
 │       one pwrite + one fdatasync per batch                      │
 │ Segment writer (O_DIRECT)                                       │
@@ -158,11 +159,11 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <table>
 <thead><tr><th>Component</th><th>Role</th></tr></thead>
 <tbody>
-<tr><td><strong>In-memory index</strong></td><td>One table per shard. On a cgo build it is an off-heap C++ table (<code>storage/native_index.cpp</code>) invisible to the Go GC; <code>CGO_ENABLED=0</code>, <code>VELTRIXDB_INDEX=map</code> or <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> select a Go map. Each entry stores disk offset, disk index, value size, flags, TTL and a monotone version counter — about 64 bytes per key, no value bytes. Large engines on the native table need <code>vm.max_map_count ≥ 262144</code>. A separate ordered skiplist serves <code>RANGE</code> / <code>SCANCUR</code>. (The C++ ART index under <code>cpp/</code> is not wired to Go.)</td></tr>
+<tr><td><strong>In-memory index</strong></td><td>One table per shard. On a cgo build it is an off-heap C++ table (<code>storage/native_index.cpp</code>) invisible to the Go GC; <code>CGO_ENABLED=0</code>, <code>VELTRIXDB_INDEX=map</code> or <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> select a Go map. Each entry is a 64-byte <code>IndexEntry</code> (<code>storage/types.go</code>): key hash, disk offset, disk index, on-disk and plaintext value sizes, key size, write timestamp, TTL deadline, plaintext CRC32C, shard ID, flags and schema version — no value bytes (the version counter goes into the WAL record, not the entry). Large engines on the native table need <code>vm.max_map_count ≥ 262144</code>. A separate ordered skiplist serves <code>RANGE</code> / <code>SCANCUR</code>. (The C++ ART index under <code>cpp/</code> is not wired to Go.)</td></tr>
 <tr><td><strong>LIRS cache</strong></td><td>Scan-resistant eviction. Small values (≤256 B) get eviction priority 2 vs. priority 1 for larger values, so a big sequential scan can't push your hot working set out of RAM. Split across up to 256 independent caches, each with its own mutex. Sized with <code>-cache &lt;MB&gt;</code> (default 256 MB).</td></tr>
-<tr><td><strong>WAL (Write-Ahead Log)</strong></td><td>Group-commit: many concurrent writers share one <code>write(2)</code> and one <code>fdatasync</code> per flush window (default 15 ms). One WAL file per disk. Records are binary and checksummed with CRC32C.</td></tr>
+<tr><td><strong>WAL (Write-Ahead Log)</strong></td><td>Group-commit: many concurrent writers share one <code>write(2)</code> and one <code>fdatasync</code>. <span class="badge good">New in v1.12</span> Adaptive by default (<code>storage/group_commit.go</code>): the 15 ms window is an upper bound — a lone writer is synced at once, concurrent writers after an idle gap equal to the EWMA fdatasync time (clamped to 20 µs–2 ms), or as soon as 4096 records are queued (<code>--wal-max-batch</code>); <code>--group-commit=fixed</code> waits the whole window. The VLog flusher uses the same pacer. One WAL file per disk. Records are binary and checksummed with CRC32C.</td></tr>
 <tr><td><strong>VLog (Value Log)</strong></td><td>Append-only file per disk. Values live here; the index holds only metadata (this is the WiscKey KV-separation). Appends are lock-free via atomic offset reservation; a batch reserves its whole extent with one add and writes it with one <code>pwrite</code> and one <code>fdatasync</code>.</td></tr>
-<tr><td><strong>Block packing</strong></td><td>Batched writes (MultiPut) pack up to 26 records per 4&nbsp;KB VLog block. For 128 B values each record takes 152 bytes (24 B header + value) instead of a whole 4096-byte block — a 27× density improvement. A single <code>Put</code> stays on the unpacked fast path.</td></tr>
+<tr><td><strong>Block packing</strong></td><td>Batched writes (<code>MultiPut</code> and GC relocation, through <code>VLogBatcher</code>) pack up to ~26 records per 4&nbsp;KB VLog block. For 128 B values each record takes 152 bytes (24 B header + value) instead of a whole 4096-byte block — ~26× denser. A single <code>Put</code> stays on the unpacked path, one 4 KB-aligned block per record.</td></tr>
 </tbody>
 </table>
 </div>
@@ -170,27 +171,28 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <h2 id="write-path">Write path</h2>
 <p>What happens on <code>PUT user:42 value</code>:</p>
 <ol>
-<li>Hash the key → shard 307 → disk 2 (<code>307 % 8</code>)</li>
+<li>Hash the key → shard 450 (<code>FNV-1a &amp; 0x1FFF</code>) → disk 2 (<code>450 % 8</code>, with 8 disks)</li>
+<li>Compress, then encrypt the value (<code>transformForWrite</code>, the single chokepoint)</li>
 <li>Atomically reserve a VLog offset and write the value</li>
-<li>Write a WAL entry (key + VLog offset)</li>
-<li>WAL and VLog <code>fdatasync</code> race concurrently — the client waits for the slower of the two</li>
-<li>Update the shard 307 index entry (disk offset, version++)</li>
+<li>Append a WAL record (key, VLog offset, on-disk length, transform flags, version)</li>
+<li>WAL and VLog <code>fdatasync</code> race concurrently — the client waits for the slower of the two, not their sum</li>
+<li>Install the shard 450 index entry (disk offset, disk index)</li>
 <li>Insert the value into the LIRS cache</li>
 <li>Return <code>OK</code></li>
 </ol>
 <div class="callout note">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span>If the process crashes after step 2 but before step 3, the value is orphaned on disk but was never made visible to any reader — that's safe by construction, not an edge case that's merely tolerated.</span>
+  <span>If the process crashes after the VLog write but before the WAL fdatasync, the value is orphaned on disk but was never made visible to any reader — that's safe by construction, not an edge case that's merely tolerated.</span>
 </div>
 <p>The batch path (<code>MultiPut</code>) keeps the same order per disk, with one <code>pwrite</code> for the VLog extent and one WAL item for the batch. <span class="badge good">New in v1.6</span> It refreshes only keys already in the cache (<code>PutIfPresent</code>) instead of inserting, so bulk writes do not evict the read working set; a single <code>Put</code> stays write-through. The ordered (range-scan) index is touched only when a key becomes live, not on overwrites.</p>
 
 <h2 id="read-path">Read path</h2>
 <p>What happens on <code>GET user:42</code>:</p>
 <ol>
-<li>Hash the key once → cache shard (high bits) and index shard 307 (low 13 bits)</li>
+<li>Hash the key once → cache shard (high bits) and index shard 450 (low 13 bits)</li>
 <li>LIRS cache hit → return the value with no disk I/O (~92 ns in-process)</li>
 <li>Cache miss → Bloom filter says "definitely absent" → <code>NOT_FOUND</code> with no index lookup</li>
-<li>Otherwise take a read lock on shard 307 and look up the index entry; absent → <code>NOT_FOUND</code>, expired TTL → expired</li>
+<li>Otherwise take a read lock on shard 450 and look up the index entry; absent → <code>NOT_FOUND</code>, expired TTL → expired</li>
 <li>Found → read the value from the VLog at the recorded disk offset: a Go 4 KB-aligned <code>pread</code> that verifies magic and CRC32C</li>
 <li>Decrypt → decompress, then insert the value into the cache</li>
 <li>Return the value</li>
@@ -203,11 +205,11 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <table>
 <thead><tr><th>Read EWMA</th><th>Action</th></tr></thead>
 <tbody>
-<tr><td>&lt; 15 ms</td><td>Normal — GC runs at full speed</td></tr>
-<tr><td>≥ 15 ms</td><td>GC bandwidth capped at 60 MB/s</td></tr>
-<tr><td>&gt; 20 ms</td><td>GC paused entirely; each <code>PUT</code> sleeps 2 ms to shed load</td></tr>
-<tr><td>&lt; 10 ms (recovery)</td><td>Everything resumes at full speed</td></tr>
-<tr><td>No reads for 4 minutes</td><td>EWMA is treated as stale and GC resumes regardless</td></tr>
+<tr><td>≤ 15 ms</td><td>Normal — GC runs at full speed</td></tr>
+<tr><td>&gt; 15 ms</td><td>GC bandwidth capped at 60 MB/s (200 MB/s once garbage ≥ 50%)</td></tr>
+<tr><td>&gt; 20 ms</td><td>GC paused; each <code>PUT</code> sleeps 2 ms to shed load</td></tr>
+<tr><td>&lt; 10 ms (recovery)</td><td>Pause and write throttle cleared</td></tr>
+<tr><td>No reads for 4 minutes</td><td>At the next GC pass the EWMA is treated as stale: reset to 0, pause and throttle cleared</td></tr>
 </tbody>
 </table>
 </div>
@@ -234,15 +236,41 @@ shard ID % numDisks → which disk (WAL + VLog + compaction)</code></pre>
 <p><code>--net=go</code> (default) is one goroutine per connection and serves every protocol and command. <code>--net=cpp</code> / <code>uring</code> / <code>poll</code> selects the C++ front-end in <code>netfront/</code>: one event loop per core (<code>--net-threads</code>, default NumCPU), each with its own <code>SO_REUSEPORT</code> listener, io_uring on Linux and <code>poll()</code> elsewhere. Each loop iteration calls Go once (<code>vxnfExec</code>) for all parsed requests. Reads that need no disk are answered inline via <code>GetNoIO</code>; reads that need a VLog read, and all writes, run on goroutines, and a connection with such a request in flight is not parsed further, so each connection stays strictly ordered. At shutdown the server logs a per-stage latency report.</p>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Experimental</span> The C++ front-end serves only the binary protocol's PUT, GET, DEL, PING, MPUT and MGET, only in <code>--mode=standalone</code>, and the server refuses it with <code>--auth-config</code>. TLS, AUTH, the text protocol and extended binary commands stay on <code>--net=go</code>. On a 4-CPU CI runner (measured before reads were deferred) it cut read P50 against <code>--net=go</code> but had a worse read P99 and ~12% lower batch-write throughput. It is not faster overall; benchmark it on your own hardware.</span></div>
 
+<h2 id="search-subsystem">Search subsystem <span class="badge good">New in v1.11–v1.12</span></h2>
+<p>Vector, full-text and hybrid search are <strong>derived state over reserved keys</strong>. A vector, a text document and the KV record that share an id describe one thing; the vector and document are stored as ordinary keys, and the in-RAM indexes are built from them:</p>
+<pre class="code-block"><code>PUT / Delete / MultiPut of a reserved key
+  @vec/&lt;ns&gt;/&lt;id&gt;  float32 blob → HNSW index of &lt;ns&gt;
+  @txt/&lt;ns&gt;/&lt;id&gt;  UTF-8 text   → BM25 index of &lt;ns&gt;
+  @vecns/&lt;ns&gt;     settings     → create / re-encode &lt;ns&gt;
+  @idxdef/&lt;name&gt;  field        → create / drop a
+                                 secondary index
+       │
+       └─ storage/search_hooks.go runs after the
+          write commits</code></pre>
+<ul>
+<li><strong>Hooks, not call sites.</strong> <code>Put</code>, <code>Delete</code> and <code>MultiPut</code> call the search hooks after the write commits, so the indexes follow the KV state whichever path wrote it — the API, Raft apply, replication apply, snapshot restore, partition transfer on rebalance, or backup restore. A hook failure is logged; the KV write has already committed.</li>
+<li><strong>HNSW per namespace</strong> (cosine; M = 16, 32 on layer 0, efConstruction = 200, efSearch = 64). Each namespace keeps float32 vectors in RAM by default, or int8 / product-quantized codes that re-rank candidates against the float32 vectors read back from the VLog; from v1.12 the layer-0 edges can live in a memory-mapped file (<code>GRAPH disk</code>). Deletes are tombstones compacted in the background.</li>
+<li><strong>BM25</strong> (k1 = 1.2, b = 0.75) over a Unicode tokenizer, and <strong>hybrid</strong> search that fuses the vector and text rankings by weighted reciprocal rank (rrfK = 60, α default 0.5).</li>
+<li><strong>Rebuild on restart.</strong> The graphs and the inverted index are not persisted. After WAL replay, <code>RebuildSearchIndexes</code> applies the <code>@vecns/</code> settings and then loads every vector and document on all cores. Until it finishes, searches are refused (<code>search indexes are still rebuilding after restart</code>) unless <code>--search-allow-partial</code>; <code>INFO</code> reports <code>search_ready=0 search_loaded=x/y</code>, then <code>search_ready=1</code>. KV traffic is not affected.</li>
+<li><strong>Clusters.</strong> The ring routes <code>@vec/</code>, <code>@txt/</code> and <code>@idx/</code> keys as the record they belong to, so filters run locally on each node, and each search fans out to every node — see <a class="inline-link" href="cluster-and-consensus.html#search-fanout">Cluster &amp; Consensus</a>.</li>
+</ul>
+<p>Commands, memory layouts, filters and measured recall are in <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+
 <h2 id="cluster-layer">Cluster layer at a glance</h2>
-<pre class="code-block"><code>cluster/      partition_map.go     consistent-hash ring (FNV-1a, 64 vnodes/node), epoch fencing
-              failure_detection.go heartbeat SUSPECT → FAILED state machine
-              gossip.go            TCP gossip listener + digest exchange
+<pre class="code-block"><code>cluster/      partition_map.go      consistent-hash ring
+                                    (FNV-1a + fmix64, 64 vnodes/node),
+                                    256 partitions, RoutingKey
+              epoch.go              epoch fencing (stale → HTTP 409)
+              failure_detection.go  Active → Suspect (3 s)
+                                    → Failed (10 s) → Recovering
+              gossip.go             TCP gossip + digest exchange
+              partition_transfer.go key migration (/transfer/keys)
 
-replication/  async / quorum / strong replication modes
-              vector clocks, anti-entropy, tombstone watermarks
+replication/  eventual / quorum / strong replication
+              anti-entropy (re-sends un-acked writes)
 
-consensus/    Raft — leader election + log replication + snapshots</code></pre>
+consensus/    Raft — election, log replication, snapshots,
+              ReadIndex, single-server membership changes</code></pre>
 <p>Full detail in <a class="inline-link" href="cluster-and-consensus.html">Cluster &amp; Consensus</a>, including which deployment mode (<code>standalone</code> / <code>raft</code> / <code>replicated</code>) gives you which consistency guarantee.</p>
 
 <h2 id="next-steps">Next steps</h2>

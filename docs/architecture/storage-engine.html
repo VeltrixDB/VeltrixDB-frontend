@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -104,7 +105,24 @@
 <tr><td>cgo (default builds, macOS included) <span class="badge good">New in v1.6</span></td><td>Off-heap native C++ table (<code>storage/native_index.cpp</code>): 64 B records, 8 B tag/position slots and a per-shard key arena, invisible to the Go GC. With 5M keys this took a full GC from 21 ms to 0.27 ms and settled RSS from 168 to 142 B/key, at ~19 ns more per cache-miss lookup.</td></tr>
 <tr><td><code>CGO_ENABLED=0</code></td><td>Go <code>map[string]IndexEntry</code></td></tr>
 </tbody></table></div>
-<p><code>VELTRIXDB_INDEX=map</code> opts a cgo build out of the native table (<code>=native</code> forces it); <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> also selects the map.</p>
+<p><code>VELTRIXDB_INDEX=map</code> opts a cgo build out of the native table (<code>=native</code> forces it); <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> also selects the map, and so does a toolchain older than Go 1.21 (the native table is built only with <code>cgo &amp;&amp; go1.21</code>). The server logs the choice at startup: <code>[index] implementation=native</code> or <code>=map</code>.</p>
+<h3 id="index-entry">IndexEntry (64 bytes, one cache line)</h3>
+<p><code>storage/types.go</code> checks the size at init. No value bytes are stored; the engine's version counter goes into the WAL record, not the entry.</p>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Size</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>KeyHash</code></td><td>8 B</td><td>FNV-1a of the key (bloom fast path)</td></tr>
+<tr><td><code>DiskOffset</code></td><td>8 B</td><td>Byte offset in the VLog (or segment file with KV separation off)</td></tr>
+<tr><td><code>SegmentID</code></td><td>4 B</td><td>Disk index with KV separation on; segment file ID otherwise</td></tr>
+<tr><td><code>ValueSize</code></td><td>4 B</td><td>On-disk length after compress + encrypt</td></tr>
+<tr><td><code>UncompressedSize</code></td><td>4 B</td><td>Plaintext length</td></tr>
+<tr><td><code>KeySize</code></td><td>4 B</td><td>Key length</td></tr>
+<tr><td><code>WriteTimestampUs</code></td><td>8 B</td><td>Write time, µs since epoch</td></tr>
+<tr><td><code>TTLExpiryUs</code></td><td>8 B</td><td>Absolute expiry (0 = none)</td></tr>
+<tr><td><code>CRC32C</code></td><td>4 B</td><td>Castagnoli checksum of the plaintext value</td></tr>
+<tr><td><code>ShardID</code></td><td>2 B</td><td>Shard 0–8191</td></tr>
+<tr><td><code>Flags</code></td><td>1 B</td><td>Tombstone, compressed, encrypted, has-TTL, read-repair, pinned, packed (<code>0x40</code>), tiered</td></tr>
+<tr><td><code>SchemaVersion</code></td><td>1 B</td><td>Rolling migration version</td></tr>
+<tr><td><code>_reserved</code></td><td>8 B</td><td>Future use</td></tr>
+</tbody></table></div>
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">vm.max_map_count</span> The native table mmaps every array of a page or more individually, so large engines need <code>vm.max_map_count ≥ 262144</code> (see <code>scripts/sysctl.conf</code>). Below that, an insert can fail with ENOMEM.</span></div>
 <p>A separate ordered skiplist (~90 B/key) serves <code>RANGE</code> and <code>SCANCUR</code>; <code>--disable-ordered-index</code> turns it off. A key is inserted into it only when it becomes live (absent or tombstoned before) — overwriting a live key does not touch it.</p>
 
@@ -143,10 +161,15 @@
 <li>The whole batch is written with one <code>write(2)</code>, and one <code>fdatasync</code> call covers it.</li>
 <li>All callers waiting on that batch unblock together after the single fdatasync returns.</li>
 </ol>
-<p>The default flush window is <strong>15 ms</strong> (<code>--wal-flush-window-ms</code>). At 1,000 writes/s the batch is roughly 15 entries; at 100,000 writes/s the batch is roughly 1,500 entries — both pay exactly one <code>fdatasync</code>. This is the single biggest lever for write throughput: N writers sharing one fsync instead of paying N fsyncs turns the durability cost from O(N) into O(1) per window.</p>
+<p><strong>When a batch is flushed</strong> (<code>storage/group_commit.go</code>, <code>--group-commit</code>):</p>
+<ul>
+<li><strong><code>adaptive</code></strong> (default) <span class="badge good">New in v1.12</span> — the flush window (<strong>15 ms</strong>, <code>--wal-flush-window-ms</code>) is only an upper bound. A writer that is alone (the batch holds one request and recent batches held about one) is synced immediately. Otherwise the batch stays open until no request has arrived for an idle gap of about one fdatasync (an EWMA of measured sync time, clamped to 20 µs–2 ms), the window expires, or 4096 records are queued (<code>--wal-max-batch</code>). Requests that arrive during a sync form the next batch.</li>
+<li><strong><code>fixed</code></strong> — every batch waits the whole window: at 1,000 writes/s roughly 15 entries per batch, at 100,000 writes/s roughly 1,500, each paying one <code>fdatasync</code>.</li>
+</ul>
+<p>The VLog flusher uses the same pacer. Durability is identical in both modes: no caller is answered before the fdatasync that covers its bytes. Measured on macOS with an emulated 300 µs sync: a lone writer's P50 was 0.45 ms adaptive vs 16 ms fixed; 64 writers reached 37.5K vs 4.0K writes/s at the same 64 writes per fdatasync.</p>
 
 <h3>Tuning the flush window</h3>
-<p>The WAL and VLog flush windows (<code>WALFlushWindowMs</code> / <code>--wal-flush-window-ms</code>, <code>VLogFlushWindowMs</code> / <code>--vlog-flush-window-ms</code>) should always be kept equal — both default to 15 ms. Lowering the window (e.g. to 5 ms) trades a smaller batch size (lower latency per write) for more frequent fdatasyncs (lower peak throughput); raising it does the opposite. Because the VLog write path is lock-free (see below), widening the window well past the default yields only marginal batch-size gains — the durability floor, not lock contention, is the binding constraint once the window is wide enough.</p>
+<p>The WAL and VLog flush windows (<code>WALFlushWindowMs</code> / <code>--wal-flush-window-ms</code>, <code>VLogFlushWindowMs</code> / <code>--vlog-flush-window-ms</code>) should always be kept equal — both default to 15 ms. In <code>fixed</code> mode, lowering the window (e.g. to 5 ms) trades a smaller batch size (lower latency per write) for more frequent fdatasyncs (lower peak throughput); raising it does the opposite. In <code>adaptive</code> mode the window only caps how long a busy batch may stay open. Because the VLog write path is lock-free (see below), widening the window well past the default yields only marginal batch-size gains — the durability floor, not lock contention, is the binding constraint once the window is wide enough.</p>
 
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Concurrent fsync race</span> WAL and VLog <code>beginAppend()</code> calls run concurrently, not sequentially. The caller waits for <code>max(WAL_wait, VLog_wait)</code>, not their sum — serializing the two would roughly double P99 write latency for no durability benefit.</span></div>
 
@@ -161,9 +184,9 @@
  12      4    Reserved (future: compression/schema flags)
  16      8    WriteTimestampUs (int64, µs since epoch)
 ─────────────────────────────────────────────────────
- 24   ValLen  Value bytes (plaintext after encrypt → compress pipeline)
-24+V   pad    Zero-padding to next 512-byte sector boundary</code></pre>
-<p>Records are sector-aligned to 512 bytes to satisfy <code>O_DIRECT</code> requirements on Linux; on NVMe drives with 4Kn geometry, padding extends to 4096 bytes.</p>
+ 24   ValLen  Value bytes as stored (output of compress → encrypt)
+24+V   pad    Zero-padding to the next 4096-byte block boundary</code></pre>
+<p>Every record offset is <strong>4 KB-aligned</strong> (<code>vlogBlockSize</code> = 4096), which is <code>O_DIRECT</code>-safe on both XFS and 4Kn NVMe drives. A single <code>Put</code> pads its record to a whole 4 KB block. The CRC32C here covers the stored bytes; <code>IndexEntry.CRC32C</code> is the checksum of the plaintext. With <code>--raw-vlogs</code> (Linux) the VLog is a raw NVMe block device with a 4 KB superblock at offset 0.</p>
 
 <h3>Lock-free offset reservation</h3>
 <p>The VLog write path avoids a mutex entirely. Offset reservation is a single atomic increment:</p>
@@ -178,11 +201,11 @@ pwrite64(fd, value, offset)                     // POSIX-safe concurrent writes<
 <p><span class="badge good">New in v1.7</span> <code>GetNoIO</code> runs the same steps but stops before the VLog read and returns <code>needIO=true</code> instead; <code>GetAfterNoIO</code> completes that key, and the pair counts as one read. It exists for callers that must not block on disk, such as the opt-in C++ network front-end's event loops.</p>
 
 <h2 id="block-packing">Block packing: high-density mode</h2>
-<p>Small values are the worst case for a naive "one record per aligned block" layout: a 128-byte value padded out to a 4096-byte sector wastes over 96% of the block. The <code>VLogBatcher</code> solves this by packing multiple records into a single 4 KB block on the batched write path (<code>MultiPut</code>, GC relocations, the write batcher) — the single-<code>Put</code> hot path stays on the simpler unpacked fast path.</p>
-<p>For 128-byte values: header (24 B) + value (128 B) = 152 B per record, so a 4096-byte block holds up to <strong>26 records</strong> — a <strong>27x density improvement</strong> over one record per 4 KB block.</p>
+<p>Small values are the worst case for a naive "one record per aligned block" layout: a 128-byte value padded out to a 4096-byte sector wastes over 96% of the block. The <code>VLogBatcher</code> solves this by packing multiple records into a single 4 KB block on the batched write paths — <code>MultiPut</code> and GC relocation, the only two callers of <code>VLogBatcher</code>. A single <code>Put</code> stays on the unpacked path, one block per record.</p>
+<p>For 128-byte values: header (24 B) + value (128 B) = 152 B per record, so a 4096-byte block holds up to <strong>26 records</strong> — roughly <strong>26× denser</strong> than one record per 4 KB block.</p>
 <ul>
 <li><code>FlagPacked</code> (<code>0x40</code>) is set on the <code>IndexEntry</code> for packed records.</li>
-<li><code>MarkDead(valueLen)</code> subtracts only <code>header + value</code> bytes (not the full 4 KB block) when <code>FlagPacked</code> is set — this keeps the garbage-ratio accounting accurate under packing.</li>
+<li><code>MarkDead(valueLen, packed)</code> subtracts only <code>header + value</code> bytes (not the full 4 KB block) when <code>packed</code> is true (callers pass <code>entry.IsPacked()</code>) — this keeps the garbage-ratio accounting accurate under packing.</li>
 <li>The read path is unchanged: <code>ReadValue(DiskOffset, ValueSize)</code> rounds the offset <strong>down</strong> to the nearest 4 KB block boundary and extracts the record at <code>offset % 4096</code>. Packed records simply have non-4K-aligned <code>DiskOffset</code> values (e.g. <code>blockOff + 152</code>, <code>blockOff + 304</code>, …).</li>
 </ul>
 <p>Oversized records (header + value larger than one block) automatically fall back to the unpacked path inside the batcher, so packing never has to special-case large values.</p>
@@ -192,50 +215,55 @@ pwrite64(fd, value, offset)                     // POSIX-safe concurrent writes<
 <ul>
 <li><strong>Small values (≤ 256 bytes)</strong> are assigned <code>priority = 2</code> — scan-resistant and harder to evict.</li>
 <li><strong>Large values</strong> are assigned <code>priority = 1</code>.</li>
-<li>A 16-entry scan window is used to pick the largest cold victim for eviction.</li>
-<li>Cache size is configurable via <code>-cache &lt;MB&gt;</code>; production deployments typically size it at 256 GB or larger.</li>
+<li>A 16-entry scan window picks the victim with the highest size ÷ priority.</li>
+<li>The cache is split into up to 256 independent LIRS shards, each with its own lock and a slice of the budget, selected by the <strong>high</strong> bits of the key hash (the index uses the low 13). A single cache-wide mutex had put 21.7% of CPU in one lock; sharding took a cache hit from 711 ns to 92 ns. The trade-off: per-shard budgets are not one global budget, so a skewed keyspace can evict from a hot shard while a cold one has room.</li>
+<li>Default size 256 MB (<code>-cache &lt;MB&gt;</code>; <code>--read-heavy</code> presets 400 GB).</li>
 </ul>
 <p>The priority split matters operationally: high-cardinality small-value workloads (e.g. counters, session flags, feature lookups) are exactly the pattern most vulnerable to premature eviction under LRU, and the priority-2 treatment keeps them resident even when a large scan (backup, range query, GC read pass) runs concurrently.</p>
 
 <h2 id="vlog-gc-tiers">VLog garbage collection: three-tier escalation</h2>
-<p>Dead VLog space accumulates from overwrites and deletes. The <strong>Defragmenter</strong> reclaims it by walking live index entries, rewriting live records to a fresh VLog position, updating <code>IndexEntry.DiskOffset</code> via CAS (safe under concurrent reads), calling <code>MarkDead(oldValueLen)</code> to account for freed bytes, and issuing <code>fallocate(PUNCH_HOLE)</code> or <code>BLKDISCARD</code> (on raw NVMe) to return dead pages to the OS.</p>
+<p>Dead VLog space accumulates from overwrites and deletes.</p>
+<p>The <strong>Defragmenter</strong> (<code>storage/defrag.go</code>) wakes every <code>DefragInterval</code> (120 s; 300 s with <code>--read-heavy</code>) and compacts every disk whose garbage ratio is at least <code>--gc-threshold</code> (default 0.30). It snapshots the VLog end as the horizon, skips keys written in the last 30 s, restages live records oldest-first through a <code>VLogBatcher</code> (256 records per pwrite + fdatasync), moves <code>IndexEntry.DiskOffset</code> by CAS (a concurrent <code>Put</code> that wins leaves the new copy as garbage; if more than 20% of a batch loses its CAS, each <code>Put</code> sleeps 1 ms for 200 ms), marks the old copy dead, and punches out the dead head of the file with <code>fallocate(PUNCH_HOLE)</code> or <code>BLKDISCARD</code> on a raw device. Every pass ends by rebuilding the bloom filters.</p>
 <p>GC bandwidth and pacing escalate automatically as garbage accumulates, specifically to avoid a <strong>death spiral</strong>: high read latency pauses GC, which lets garbage keep growing, which increases cache misses and disk seeks, which keeps read latency high — permanently suppressing GC. The three-tier design exists to break that cycle before it becomes irreversible.</p>
 
 <div class="table-wrap"><table><thead><tr><th>Garbage ratio</th><th>GC bandwidth</th><th>Admission pause honored?</th><th>Defrag interval</th></tr></thead><tbody>
 <tr><td>&lt; 30%</td><td>No GC</td><td>—</td><td>—</td></tr>
-<tr><td>30–50%</td><td>Unlimited / 60 MB/s (throttled)</td><td>Yes</td><td>120 s</td></tr>
-<tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s (throttled)</td><td>Yes</td><td>60 s</td></tr>
+<tr><td>30–50%</td><td>Unlimited / 60 MB/s</td><td>Yes</td><td>120 s</td></tr>
+<tr><td>50–65% (critical)</td><td>Unlimited / 200 MB/s</td><td>Yes</td><td>60 s</td></tr>
 <tr><td>≥ 65% (emergency)</td><td>Unlimited</td><td><strong>No</strong></td><td>30 s</td></tr>
 </tbody></table></div>
+<p>Bandwidth reads "unlimited while the read EWMA ≤ 15 ms / capped above it": the caps apply only when reads are slow. Intervals are <code>DefragInterval</code>, halved and quartered by the worst disk's ratio.</p>
 
 <p>The <strong>emergency tier</strong> is the escape hatch: once garbage crosses 65%, GC <strong>bypasses</strong> the admission-control pause entirely, runs at uncapped bandwidth, and checks in on a quartered interval. The system logs this loudly and increments a dedicated counter so operators can see it happening:</p>
-<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
+<pre class="code-block"><code>[gc] disk=N EMERGENCY  garbage=67.2% ≥ 65%  ewma=21.4ms  bypassing admission-control pause to escape death spiral</code></pre>
 <p>Metric: <code>veltrixdb_vlog_gc_emergency_runs_total</code>. A persistent non-zero rate on this counter is the canonical production signal that sustained write rate is outpacing GC reclaim throughput — the fix is to investigate disk IOPS headroom or reduce write load, not to disable the emergency tier.</p>
 <p>For how the read-latency EWMA interacts with these tiers, and the full admission-control ladder, see <a class="inline-link" href="admission-control.html">Admission Control &amp; GC</a>.</p>
 
 <h2 id="on-disk-layout">On-disk layout (per disk)</h2>
 <pre class="code-block"><code>/data-dir-N/
-├── wal.log              — Write-Ahead Log (group-commit, binary records)
-├── vlog_active.dat      — Value Log (24-byte header + sector-aligned values)
-├── seg_XXXXXXXX.dat     — Segment files (O_DIRECT sequential, 64-byte header)
-├── vlog_punch_watermark — GC punch offset watermark for defragmentation
-└── raft_state.gob       — Raft persistent state (term, votedFor, log entries)</code></pre>
-<p>With multiple disks (<code>-data-dirs /mnt/nvme0,...,/mnt/nvme7</code>), each disk gets its own independent WAL, VLog, segment files, and compaction goroutine. Shard <code>i</code> always lives on disk <code>i % numDisks</code> — a failure on one disk does not affect the other disks' shards.</p>
+├── wal.log          — Write-Ahead Log (group-commit, binary records)
+├── wal.log.ckpt     — transient: checkpoint being written
+├── vlog_active.dat  — Value Log (24 B header, 4 KB-aligned)
+├── seg_active.dat   — Segment file (KV separation off only)
+└── .vlog_punch_wm   — GC punch-hole watermark (8 B offset)</code></pre>
+<p>The first data dir also holds <code>index_defs.json</code> (secondary-index definitions). Raft state is not per disk: in <code>--mode=raft</code> it lives in <code>&lt;--data&gt;/raft/</code> (<code>raft_state.gob</code>, <code>raft_snapshot.gob</code>).</p>
+<p>With multiple disks (<code>-data-dirs /mnt/nvme0,...,/mnt/nvme7</code>), each disk gets its own independent WAL, VLog, segment file, and compaction goroutine. Shard <code>i</code> always lives on disk <code>i % numDisks</code> — a failure on one disk does not affect the other disks' shards.</p>
 
 <h2 id="value-transform-pipeline">Value transform pipeline</h2>
 <pre class="code-block"><code>Write path:   plaintext  →  compress  →  encrypt  →  VLog bytes on disk
 Read  path:   disk bytes →  decrypt   →  decompress →  plaintext</code></pre>
 <p>Compression runs <strong>before</strong> encryption: encrypted ciphertext has high entropy and is effectively incompressible, so compressing after encryption would waste CPU for no space savings. <code>FlagCompressed</code> and <code>FlagEncrypted</code> are stored per-record on the <code>IndexEntry</code>, so records written before encryption was enabled remain readable — the flags, not a global setting, decide which transforms the read path applies.</p>
-<p>Compression uses zstd and is enabled for values ≥ 256 bytes. Encryption uses AES-256-GCM with a unique 12-byte nonce per record, keyed from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64) or a <code>--encryption-key-path</code> file.</p>
+<p>Compression uses zstd (level 1) by default, is attempted for values ≥ 256 bytes, and is kept only when it actually shrinks the value. Encryption uses AES-256-GCM with a unique 12-byte nonce per record, keyed from the <code>VELTRIXDB_ENCRYPTION_KEY</code> environment variable (base64) or a <code>--encryption-key-path</code> file.</p>
 
 <h2 id="crash-recovery">Crash recovery</h2>
-<p>On unclean shutdown (crash, OOM kill, SIGKILL):</p>
+<p>Every startup replays the WAL; after an unclean shutdown (crash, OOM kill, SIGKILL) that is the full write history since the last checkpoint:</p>
 <ol>
 <li><code>replayWAL()</code> opens <code>wal.log</code> on each disk.</li>
 <li>Each record (binary or legacy text) is decoded and its CRC32C is checked. Crash replay, the PITR archiver and PITR restore share one decoder (<code>walReader</code>). A torn or corrupt record ends replay: everything before it is applied, and the server logs where it stopped.</li>
-<li><code>applyWALReplay()</code> rebuilds the in-memory sharded index.</li>
+<li><code>applyWALReplay()</code> rebuilds the in-memory sharded index <strong>in the background</strong>. The engine accepts traffic immediately; replay never overwrites a live write that arrived during warm-up.</li>
 <li>For KV-separated records (<code>vlogOffset &gt; 0</code>), the VLog already holds the value bytes — the WAL entry only re-establishes the index pointer, without re-reading the value.</li>
-<li>Legacy 6-, 7- and 8-field text entries are still parsed for backward compatibility.</li>
+<li>Legacy 6-, 7-, 8- and 10-field text entries are still parsed for backward compatibility.</li>
+<li>After replay the server rebuilds the search indexes from the persisted <code>@vec/</code>, <code>@txt/</code> and <code>@vecns/</code> keys and refuses searches until that finishes (<code>INFO</code> → <code>search_ready</code>); see <a class="inline-link" href="overview.html#search-subsystem">Search subsystem</a>.</li>
 </ol>
 <p>On clean shutdown (<code>SIGTERM</code>) the checkpoint described above has already rewritten <code>wal.log</code> as one record per live key, so the next startup replays O(live keys) records rather than the full write history. The checkpoint uses the current <code>--wal-format</code>.</p>
 <p>If a process crashes after the VLog write but before the WAL write completes, the value bytes are orphaned but were never referenced by the index — they are simply reclaimable garbage on next GC, and the client never received an acknowledgment. This ordering (VLog write, then WAL write) is what keeps crash recovery safe without requiring the two writes to be atomic with each other.</p>

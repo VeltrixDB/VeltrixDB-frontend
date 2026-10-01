@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>VeltrixDB — Values on NVMe, index in DRAM</title>
-<meta name="description" content="VeltrixDB keeps values on NVMe and only the index in DRAM, so you stop paying RAM prices to hold your dataset. Measured: 427K reads/s on YCSB (100M keys, single node). Apache 2.0, self-hosted, Kubernetes-first." />
+<meta name="description" content="VeltrixDB keeps values on NVMe and only the index in DRAM, so you stop paying RAM prices to hold your dataset. Measured: 427K reads/s on YCSB (100M keys, single node). Built-in vector, BM25 full-text and hybrid search. Apache 2.0, self-hosted, Kubernetes-first." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='55%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M13 2L3 14h7l-1 8 11-13h-7l0-7z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,8 @@
 
 <!-- ============ ANNOUNCEMENT BAR ============ -->
 <div class="topbar">
-  VeltrixDB is now open source — Apache 2.0. 427K reads/s measured on YCSB.
+  New in v1.11–v1.12: vector, full-text and hybrid search · adaptive group commit. Apache 2.0.
+  <a href="docs/concepts/vector-search.html">Vector search docs →</a>
   <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">★ Star us on GitHub ↗</a>
 </div>
 
@@ -75,7 +76,7 @@
         <span class="pill"><span class="tag">MEASURED</span><span>YCSB 0.17 · 100M keys · 0 errors</span><span class="dot"></span></span>
         <h1>Values on NVMe.<br>Index in DRAM.<br><span class="em">RAM bill optional.</span></h1>
         <p class="hero-sub"><b>VeltrixDB stores values on NVMe and keeps only the index in memory</b> — so the dataset is priced like SSD, not DRAM, and it runs on any cloud or bare metal.</p>
-        <p class="hero-meta">Free &amp; open source (Apache 2.0) · one binary · self-hosted, with a Helm chart and Kubernetes operator.</p>
+        <p class="hero-meta">Free &amp; open source (Apache 2.0) · one binary · vector, full-text and hybrid search built in · self-hosted, with a Helm chart and Kubernetes operator.</p>
         <div class="hero-actions">
           <a class="btn primary" href="docs/getting-started/quickstart.html">Get started free <span class="arrow">↗</span></a>
           <a class="btn ghost-light" href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Star on GitHub</a>
@@ -112,7 +113,7 @@
   <div class="wrap">
     <div class="cap">Built on the systems primitives you already trust</div>
     <div class="logo-row">
-      <span>O_DIRECT NVMe</span><span>WiscKey KV-separation</span><span>group-commit WAL</span><span>CRC32C checksums</span><span>FNV-1a sharding</span><span>Raft</span><span>Prometheus / Grafana</span><span>Kubernetes operator</span>
+      <span>O_DIRECT NVMe</span><span>WiscKey KV-separation</span><span>group-commit WAL</span><span>CRC32C checksums</span><span>FNV-1a sharding</span><span>Raft</span><span>HNSW · BM25 · RRF</span><span>Prometheus / Grafana</span><span>Kubernetes operator</span>
     </div>
   </div>
 </section>
@@ -126,7 +127,7 @@
         <div class="lead">At large key counts, you're not paying for a database. You're paying for <span class="rt">RAM</span>.</div>
       </div>
       <div class="reveal">
-        <p class="muted-lead">Redis and other in-memory stores keep <b>every value in DRAM</b> — hot or cold. Cloud RAM costs 15–20× more per gigabyte than NVMe SSD, so the bigger your dataset grows, the more you pay simply to hold it in memory. That's a bill that scales with your data, not your revenue.</p>
+        <p class="muted-lead">Redis and other in-memory stores keep <b>every value in DRAM</b> — hot or cold. Cloud RAM costs far more per gigabyte than NVMe SSD, so the bigger your dataset grows, the more you pay simply to hold it in memory. That's a bill that scales with your data, not your revenue.</p>
       </div>
     </div>
 
@@ -189,6 +190,39 @@
   </div>
 </section>
 
+<!-- ============ SEARCH ============ -->
+<section class="paper" id="search">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Vector, full-text &amp; hybrid search · since v1.11</span>
+      <h2 class="sh wide">Search the records <span class="em">in the same database</span>.</h2>
+      <p class="sh-sub">One id names one record: <code>PUT doc-42 {"lang":"en"}</code>, <code>VSET doc-42 ...</code> and <code>TSET doc-42 ...</code> describe the same thing. Vectors and documents are written through the same WAL and value log as any key; the search indexes in RAM are derived from them.</p>
+    </div>
+    <div class="shift reveal">
+      <div class="cell">
+        <div class="cn">01 · Vectors</div>
+        <h3>HNSW, quantized if you want</h3>
+        <p>One cosine HNSW graph per namespace. RAM holds float32, int8 or product-quantized codes, and the layer-0 graph can sit in a mapped file; the full vectors stay on NVMe and re-rank the candidates. At 768 dimensions that is 3.4&nbsp;KB down to ~0.4&nbsp;KB of heap per vector (measured, 10K vectors).</p>
+      </div>
+      <div class="cell">
+        <div class="cn">02 · Text + hybrid</div>
+        <h3>BM25, fused by rank</h3>
+        <p><code>TSEARCH</code> scores with BM25 over a Unicode tokenizer (no stemming or phrase queries). <code>HSEARCH</code> fuses the vector and text rankings with weighted reciprocal-rank fusion, and every search can filter on the KV record with the same id.</p>
+      </div>
+      <div class="cell">
+        <div class="cn">03 · Clusters</div>
+        <h3>Fan-out that fails closed</h3>
+        <p>In raft and replicated mode a search runs on every live node and the results are merged, with BM25 scored on cluster-wide statistics. A peer that misses the timeout fails the request unless you allow partial answers; node-to-node traffic can be HMAC-signed or mTLS.</p>
+      </div>
+    </div>
+    <p class="cost-foot reveal" style="margin-top:22px">Measured on one macOS laptop (Apple silicon), 2026-09-30: GloVe-100, 100K real word vectors, in-process, one query at a time — recall@10 <b>0.953</b> at p50 <b>0.77&nbsp;ms</b> (float32, ef&nbsp;256). Over the network, 20K vectors, int8, 8 clients on the same machine: <b>24.6K QPS</b> at recall 0.894. Not a comparison: no same-hardware run against another vector database exists. The index lives in RAM, is rebuilt at every start, and has been tested to 100K real vectors.</p>
+    <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn primary" href="docs/concepts/vector-search.html">How vector search works <span class="arrow">↗</span></a>
+      <a class="btn" href="product.html#search">Use cases &amp; limits</a>
+    </div>
+  </div>
+</section>
+
 <!-- ============ PROOF (STATS) ============ -->
 <section class="stats-strip">
   <div class="wrap">
@@ -206,7 +240,7 @@
       <div class="stat reveal">
         <div class="v">18K<sup>/s</sup></div>
         <div class="l">Durable writes / sec</div>
-        <div class="d">Measured — 100M-key load, fdatasync on every write, P99 47 ms.</div>
+        <div class="d">Measured — 100M-key load, fdatasync on every write, P99 47 ms. June run, fixed 5 ms window (before adaptive group commit).</div>
       </div>
       <div class="stat reveal">
         <div class="v">0</div>
@@ -258,7 +292,7 @@
           <span class="idx">Time to value</span>
         </div>
         <h3>Days to production, <span class="em">not quarters</span>.</h3>
-        <p>One Helm install deploys the StatefulSet, NVMe StorageClass, PodDisruptionBudget, and Prometheus scraping — 60+ metrics and alert rules included. No specialist hire, no dark weeks.</p>
+        <p>One Helm install deploys the StatefulSet, NVMe StorageClass, PodDisruptionBudget, and Prometheus scraping — 70+ metric families and a PrometheusRule included. The chart and the operator live in their own repositories, next to the server&rsquo;s.</p>
         <div class="metric"><span class="num"><span class="acc">1</span> command</span><span class="lbl">helm install</span></div>
       </div>
     </div>
@@ -291,11 +325,12 @@
     <div class="doc-strip-text reveal">
       <span class="eyebrow">Documentation</span>
       <h2>Everything you need to <span class="em">ship on VeltrixDB</span></h2>
-      <p>Architecture deep-dives, client SDKs for 6 languages, a full config reference, and Kubernetes guides — in one place.</p>
+      <p>Architecture deep-dives, vector and hybrid search, client SDKs for 6 languages, a full config reference, and Kubernetes guides — in one place.</p>
     </div>
     <div class="doc-strip-links reveal">
       <a href="docs/getting-started/quickstart.html">Quickstart →</a>
       <a href="docs/architecture/overview.html">Architecture →</a>
+      <a href="docs/concepts/vector-search.html">Vector search →</a>
       <a href="docs/client-sdks/index.html">Client SDKs →</a>
       <a href="docs/reference/server-configuration.html">Config reference →</a>
       <a href="docs/kubernetes/operator.html">Kubernetes →</a>
@@ -367,7 +402,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

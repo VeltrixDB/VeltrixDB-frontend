@@ -386,7 +386,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-body">
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>Update (Sept 2026):</b> this post has been corrected to match the code. The original version described parts of the engine that do not run. The on-disk read path is a Go <code>pread</code>, not io_uring SQPOLL. The io_uring VLog <i>write</i> bridge is opt-in and off by default. The per-shard index is a hash table, not an ART: the C++ ART exists under <code>cpp/</code> but nothing calls it. There are 8192 index shards, not 1024, and the default group-commit window is 15&nbsp;ms. GC is throttled by read-latency admission control, not by a separate io_uring queue or cgroup weights. The 4.9&nbsp;ms P99, 94.2% hit-rate and 1B-key figures come from an internal GKE run that is <b>unverified</b>. The only reproducible benchmark is the <a class="inline" href="blog-benchmark.html">June 2026 YCSB run</a>.</p>
+          <p><b>Update (Sept 2026):</b> this post has been corrected to match the code. The original version described parts of the engine that do not run. The on-disk read path is a Go <code>pread</code>, not io_uring SQPOLL. The io_uring VLog <i>write</i> bridge is opt-in and off by default. The per-shard index is a hash table, not an ART: the C++ ART exists under <code>cpp/</code> but nothing calls it. There are 8192 index shards, not 1024, and group commit is adaptive since v1.12 (the 15&nbsp;ms window is only an upper bound). GC is throttled by read-latency admission control, not by a separate io_uring queue or cgroup weights. The 4.9&nbsp;ms P99, 94.2% hit-rate and 1B-key figures come from an internal GKE run that is <b>unverified</b>. The only reproducible benchmark is the <a class="inline" href="blog-benchmark.html">June 2026 YCSB run</a>.</p>
         </div>
         <div class="a-kicker">The problem</div>
         <h2 class="a-h">Compaction is the <span class="em">silent tax</span> you pay on every read.</h2>
@@ -409,7 +409,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
           </table>
         </div>
 
-        <p>We have not published a write-amplification measurement. An earlier version of this post claimed <code>1.0×</code>, and we have withdrawn that figure. VeltrixDB still writes more than the client sends: the WAL record, 4 KB block alignment, and VLog GC, which copies live values forward. The measured numbers we do have are on the <a class="inline" href="performance.html#performance">performance page</a>.</p>
+        <p>We have not published a write-amplification measurement. An earlier version of this post claimed a measured <code>1.0×</code>; that was never measured, and ~1× is a design property of batched (packed) writes, not a benchmark result. VeltrixDB still writes more than the client sends: a WAL record per write (header and key, no value bytes), 4 KB block alignment — a single small <code>Put</code> takes a whole 4 KB block — and VLog GC, which copies live values forward. The measured numbers we do have are on the <a class="inline" href="performance.html#performance">performance page</a>.</p>
       </div>
     </section>
 
@@ -424,7 +424,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <p>The original WiscKey paper proved it worked in a research setting. VeltrixDB takes the idea further — we re-architected it around three production realities the paper sidestepped:</p>
         <ul>
           <li><b>Sharding and multiple disks</b> · the index is split into 8192 shards (low 13 bits of FNV-1a), each with its own RWMutex and Bloom filter. Each NVMe disk has one WAL and one VLog, and shard <code>i</code> lives on disk <code>i % numDisks</code></li>
-          <li><b>Group commit</b> · many writers share one WAL <code>write(2)</code> and one <code>fdatasync</code> per window, and a batch goes to the VLog as one <code>pwrite</code> plus one <code>fdatasync</code>. (An io_uring VLog write bridge exists but is opt-in via <code>VELTRIXDB_URING_BRIDGE</code> and off by default.)</li>
+          <li><b>Group commit</b> · concurrent writers share one WAL <code>write(2)</code> and one <code>fdatasync</code>, a lone writer is synced at once (adaptive pacing, v1.12), and a batch goes to the VLog as one <code>pwrite</code> plus one <code>fdatasync</code>. (An io_uring VLog write bridge exists but is opt-in via <code>VELTRIXDB_URING_BRIDGE</code> and off by default.)</li>
           <li><b>Caching</b> · the paper had a basic LRU; we replaced it with LIRS, which dramatically improves hit rate under skewed access</li>
         </ul>
 
@@ -451,7 +451,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
           </div>
         </div>
 
-        <p>The whole live key space has to fit in RAM, and that is why the <a class="inline" href="product.html#requirements">fit check</a> is upfront about the RAM budget. The figure we have measured: with 5M keys, the native index settled at <b>~142 bytes of RSS per key</b>, including key bytes. Numbers for larger key counts would be extrapolations; we have not measured them. The payoff is that no index compaction ever rewrites value bytes.</p>
+        <p>The whole live key space has to fit in RAM, and that is why the <a class="inline" href="product.html#requirements">fit check</a> is upfront about the RAM budget. The figure we have measured: with 5M keys, the native index settled at <b>~142 bytes of RSS per key</b>, including key bytes, plus ~90 B per key for the ordered index that serves <code>RANGE</code> / <code>SCANCUR</code> unless you start with <code>--disable-ordered-index</code>. So the RAM saving over an all-in-RAM store depends on value size: with 128 B values the index is about as large as the values; with 1 KB values it is roughly 4–7× less RAM. Numbers for larger key counts would be extrapolations; we have not measured them. The payoff is that no index compaction ever rewrites value bytes.</p>
       </div>
     </section>
 
@@ -476,11 +476,12 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         </div>
 
         <h3>Group-commit WAL</h3>
-        <p>There is one WAL per disk. Writers enqueue their record on a channel. A single flusher goroutine drains up to 4096 records per cycle, writes the whole batch with <b>one <code>write(2)</code></b>, and covers it with <b>one <code>fdatasync</code></b>. Then every waiting writer is released. The default window is <b>15&nbsp;ms</b> (<code>--wal-flush-window-ms</code>, which must match <code>--vlog-flush-window-ms</code>).</p>
-        <p>The <code>fdatasync</code> cost is <b>amortized across every concurrent writer in the batch</b>: at 1,000 writes/s a 15 ms window holds about 15 records, and at 100K writes/s about 1,500, and both pay one sync. Records are binary: a 48-byte header, then the key, then a CRC32C over the whole record. So keys containing <code>|</code> or newlines are safe. The binary WAL format shipped in v1.6 and the single-<code>write(2)</code> flusher in v1.5.</p>
+        <p>There is one WAL per disk. Writers enqueue their record on a channel. A single flusher goroutine drains up to 4096 records per cycle, writes the whole batch with <b>one <code>write(2)</code></b>, and covers it with <b>one <code>fdatasync</code></b>. Then every waiting writer is released. The window is <b>15&nbsp;ms</b> (<code>--wal-flush-window-ms</code>, which must match <code>--vlog-flush-window-ms</code>).</p>
+        <p>Since v1.12 the pacing is <b>adaptive</b> by default (<code>--group-commit=adaptive</code>): a writer that is alone is synced immediately, and concurrent writers are flushed after an idle gap of about one fdatasync, so the window is only an upper bound. <code>--group-commit=fixed</code> restores the full-window wait. Measured with an emulated 300&nbsp;µs fdatasync on macOS: a lone writer's P50 went from 16&nbsp;ms to 0.45&nbsp;ms, and 64 writers from 4.0K to 37.5K writes/s at the same 64 writes per sync.</p>
+        <p>Either way the <code>fdatasync</code> cost is <b>amortized across every concurrent writer in the batch</b>, and no caller is answered before the sync that covers its bytes. Records are binary: a 48-byte header, then the key, then a CRC32C over the whole record. So keys containing <code>|</code> or newlines are safe. The binary WAL format shipped in v1.6 and the single-<code>write(2)</code> flusher in v1.5.</p>
 
         <h3>VLog append</h3>
-        <p>The value goes to the VLog, a single append-only file per disk (<code>vlog_active.dat</code>). There is no mutex: a writer reserves its offset with an atomic add and issues a <code>pwrite</code>. On Linux the file is opened with <code>O_DIRECT</code>, and records are sector-aligned for it. A <code>MultiPut</code> batch packs small values into 4 KB blocks and writes the whole extent with one <code>pwrite</code> and one <code>fdatasync</code>.</p>
+        <p>The value goes to the VLog, a single append-only file per disk (<code>vlog_active.dat</code>). There is no mutex: a writer reserves its offset with an atomic add and issues a <code>pwrite</code>. On Linux the file is opened with <code>O_DIRECT</code>, and every record starts on a 4 KB boundary — a single <code>Put</code> pads its record to a whole 4 KB block. A <code>MultiPut</code> batch (and GC relocation) instead packs small values into shared 4 KB blocks — up to ~26 records of 128 B (24 B header + value) per block — and writes the whole extent with one <code>pwrite</code> and one <code>fdatasync</code>.</p>
         <p>Values are never overwritten in place. Space from overwrites and deletes is reclaimed later by the defragmenter, which copies live records forward and punches holes (<code>fallocate(PUNCH_HOLE)</code>, or <code>BLKDISCARD</code> on raw block devices).</p>
 
         <h3>Index update</h3>
@@ -534,7 +535,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
         <div class="callout">
           <div class="ico">i</div>
-          <p><b>Value-aware eviction.</b> Small values (≤ 256 B) get <b>priority 2</b>, larger ones priority 1, so small hot keys are harder to evict during cold scans. The cache is split into up to 256 independently locked shards: a read mutates LIRS state, so a single cache-wide lock would serialise every read. Sharding took a cache hit from 711 ns to 92 ns. The trade-off is that each shard has its own budget, so a skewed keyspace can evict from a hot shard while a cold one has room.</p>
+          <p><b>Value-aware eviction.</b> Small values (≤ 256 B) get <b>priority 2</b>, larger ones priority 1. To evict, the cache looks at a 16-entry window at the cold end and drops the entry with the highest size ÷ priority — so large cold values go first and small hot keys are kept longer. The cache is split into up to 256 independently locked shards: a read mutates LIRS state, so a single cache-wide lock would serialise every read. Sharding took a cache hit from 711 ns to 92 ns. The trade-off is that each shard has its own budget, so a skewed keyspace can evict from a hot shard while a cold one has room.</p>
         </div>
       </div>
     </section>
@@ -546,14 +547,14 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">Garbage collection</div>
         <h2 class="a-h">GC backs off <span class="em">when reads slow down</span>.</h2>
         <p class="a-lede">Tombstones, deletes, and overwrites leave dead values in the VLog. We reclaim that space, and the engine throttles or pauses that work automatically when read latency rises.</p>
-        <p>The defragmenter walks live index entries and copies live records forward in the VLog. It updates each entry's offset with a CAS, which is safe under concurrent reads, then punches holes to return the dead pages. How hard it works escalates with the garbage ratio. This is automatic, not a per-shard mode:</p>
+        <p>The defragmenter walks live index entries and copies live records forward in the VLog, oldest first, skipping keys written in the last 30 s because they are likely to be overwritten again. It updates each entry's offset with a CAS, which is safe under concurrent reads, then punches holes to return the dead pages. How hard it works escalates with the garbage ratio. This is automatic, not a per-shard mode:</p>
         <ul>
           <li><b>&lt; 30% garbage</b> · no GC</li>
-          <li><b>30–50%</b> · 60 MB/s cap, respects the admission-control pause, 120 s defrag interval</li>
-          <li><b>50–65% (critical)</b> · 200 MB/s cap, still respects the pause, 60 s interval</li>
+          <li><b>30–50%</b> · 60 MB/s cap while reads are slow (uncapped otherwise), respects the admission-control pause, 120 s defrag interval</li>
+          <li><b>50–65% (critical)</b> · 200 MB/s cap while reads are slow, still respects the pause, 60 s interval</li>
           <li><b>≥ 65% (emergency)</b> · uncapped, ignores the pause so GC can't be starved into a death spiral, 30 s interval</li>
         </ul>
-        <p>What protects reads is <b>admission control</b> driven by a read-latency EWMA. GC and reads share the same disks and I/O path; there is no separate io_uring instance or cgroup weighting. At a read EWMA of 15 ms or more, GC bandwidth is capped at 60 MB/s. Above 20 ms, GC pauses and each PUT sleeps 2 ms. Everything resumes once the EWMA falls below 10 ms.</p>
+        <p>What protects reads is <b>admission control</b> driven by a read-latency EWMA. GC and reads share the same disks and I/O path; there is no separate io_uring instance or cgroup weighting. At a read EWMA of 15 ms or more, GC bandwidth is capped at 60 MB/s. Above 20 ms, GC pauses and each PUT sleeps 2 ms. Everything resumes once the EWMA falls below 10 ms, and a pause left over from a write-only period clears by itself once no read has arrived for 4 minutes.</p>
 
         <div class="callout">
           <div class="ico">!</div>
@@ -572,11 +573,15 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <p>Each decision is independently boring:</p>
         <ul>
           <li><b>Key-value separation</b> · the index holds 64-byte metadata entries in RAM; values are written once to the VLog and moved only by GC</li>
-          <li><b>Group commit + one aligned <code>pread</code></b> · one <code>write(2)</code> and one <code>fdatasync</code> per WAL window, and one checksummed <code>pread</code> per disk read (<code>O_DIRECT</code> on Linux)</li>
+          <li><b>Group commit + one aligned <code>pread</code></b> · one <code>write(2)</code> and one <code>fdatasync</code> per WAL batch, and one checksummed <code>pread</code> per disk read (<code>O_DIRECT</code> on Linux)</li>
           <li><b>Sharded LIRS cache</b> · cold scans have a hard time evicting the hot set</li>
           <li><b>Admission-controlled GC</b> · cleanup is capped or paused when read latency rises</li>
         </ul>
         <p>That's the entire engineering bet. Whether it's worth it for your workload depends on whether you live in the failure mode the design targets: latency spikes from compaction rewriting values. The <a class="inline" href="blog-benchmark.html">benchmark post</a> has the measured numbers and the exact conditions they were taken under.</p>
+        <div class="callout">
+          <div class="ico">i</div>
+          <p><b>Update (Oct 2026): what now sits on the same engine.</b> Since v1.11 the server also does vector, full-text and hybrid search. Vectors and documents are ordinary durable keys (<code>@vec/&lt;ns&gt;/&lt;id&gt;</code>, <code>@txt/&lt;ns&gt;/&lt;id&gt;</code>) written through the same WAL + VLog path. The HNSW graph (float32, int8 or PQ codes) and the BM25 inverted index are RAM structures derived from those keys, rebuilt at startup, and searches are refused until the rebuild finishes. Hybrid search fuses the two rankings by reciprocal rank. See the <a class="inline" href="docs/concepts/vector-search.html">vector &amp; hybrid search docs</a>.</p>
+        </div>
       </div>
     </section>
 
@@ -611,7 +616,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="cta-mini">
         <div>
           <h3>The full <span class="em">technical whitepaper</span>, on your desk.</h3>
-          <p>42 pages — block-by-block diagrams, the durability proof, the sharding model, and the failure modes we test for in chaos engineering.</p>
+          <p>Block-by-block diagrams, the durability argument and its limits, the sharding and replication model, the search subsystem, and the failure modes the crash and soak tests cover.</p>
         </div>
         <div class="actions">
           <a class="btn primary" href="whitepaper.html">Read the whitepaper <span class="arrow">↗</span></a>
@@ -667,7 +672,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

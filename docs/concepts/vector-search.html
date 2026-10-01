@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vector &amp; Hybrid Search — VeltrixDB Docs</title>
+<meta name="description" content="VeltrixDB documentation: vector, BM25 full-text and hybrid search — commands, memory layouts, filters, clusters, restarts and measured recall/latency/RAM" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B5CFF'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-toggle" aria-label="Toggle navigation">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+    <a class="brand" href="../../index.html">
+      <span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19 6 L9 18 H15 L13 26 L23 12 H17 Z" fill="white"/></svg></span>
+      <span>Veltrix<i style="color:var(--ink-3);font-weight:400">DB</i></span>
+      <span class="docs-tag">Docs</span>
+    </a>
+  </div>
+  <div class="topbar-search">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search docs..." id="docsearch" aria-label="Search documentation" />
+    <kbd>&#8984;K</kbd>
+  </div>
+  <div class="topbar-right">
+    <span class="version-pill">v1.12</span>
+    <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
+    <a href="../resources/faq.html">FAQ</a>
+    <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
+  </div>
+</div>
+<div class="docs-shell">
+  <aside class="sidebar">
+    <div class="nav-group"><div class="nav-group-title">Getting Started</div>
+<a href="../getting-started/introduction.html" class="">Introduction to VeltrixDB</a>
+<a href="../getting-started/quickstart.html" class="">Quickstart</a>
+<a href="../getting-started/installation.html" class="">Installation</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Architecture</div>
+<a href="../architecture/overview.html" class="">Architecture Overview</a>
+<a href="../architecture/storage-engine.html" class="">Storage Engine</a>
+<a href="../architecture/admission-control.html" class="">Admission Control & GC</a>
+<a href="../architecture/cluster-and-consensus.html" class="">Cluster & Consensus</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Core Concepts</div>
+<a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="active">Vector &amp; Hybrid Search</a>
+<a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
+<a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Client SDKs</div>
+<a href="../client-sdks/index.html" class="">SDK Overview</a>
+<a href="../client-sdks/go.html" class="">Go</a>
+<a href="../client-sdks/python.html" class="">Python</a>
+<a href="../client-sdks/nodejs.html" class="">Node.js</a>
+<a href="../client-sdks/java.html" class="">Java</a>
+<a href="../client-sdks/rust.html" class="">Rust</a>
+<a href="../client-sdks/cpp.html" class="">C++</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Operations</div>
+<a href="../operations/security.html" class="">Security</a>
+<a href="../operations/backup-and-restore.html" class="">Backup & Restore</a>
+<a href="../operations/replication-and-cdc.html" class="">Replication & CDC</a>
+<a href="../operations/monitoring.html" class="">Monitoring & Observability</a>
+<a href="../operations/nvme-provisioning.html" class="">NVMe Disk Provisioning</a>
+<a href="../operations/performance-tuning.html" class="">Performance Tuning</a>
+<a href="../operations/disaster-recovery.html" class="">Disaster Recovery</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Reference</div>
+<a href="../reference/server-configuration.html" class="">Server Configuration</a>
+<a href="../reference/admin-api.html" class="">Admin API</a>
+<a href="../reference/cli-reference.html" class="">CLI Reference</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Kubernetes</div>
+<a href="../kubernetes/operator.html" class="">Kubernetes Operator</a>
+<a href="../kubernetes/helm-chart.html" class="">Helm Chart</a>
+</div>
+<div class="nav-group"><div class="nav-group-title">Resources</div>
+<a href="../resources/redis-comparison.html" class="">VeltrixDB vs Redis</a>
+<a href="../resources/benchmarking.html" class="">Benchmarking Methodology</a>
+<a href="../resources/limitations-and-roadmap.html" class="">Limitations & Roadmap</a>
+<a href="../resources/faq.html" class="">FAQ</a>
+</div>
+  </aside>
+  <main class="content-col">
+    <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Core Concepts<span class="sep">/</span>Vector &amp; Hybrid Search</div>
+    <h1>Vector &amp; Hybrid Search</h1>
+<p class="page-lede">VeltrixDB serves nearest-neighbour vector search, BM25 full-text search and hybrid (vector + text) search from the same database that holds the records they describe. This page covers how it works, how to use it, how much RAM it needs, and what it measured — every number states where it was measured, and none of them is a comparison with another database run on the same machine.</p>
+<p><span class="badge good">New in v1.11</span> namespaces, filters, <code>VDEL</code>, int8 quantization, BM25 and hybrid search, cluster-wide search &nbsp;<span class="badge good">New in v1.12</span> product quantization, <code>GRAPH disk</code>, the startup-rebuild guard (<code>search_ready</code>). Plain HNSW <code>VSET</code>/<code>VSEARCH</code> on the <code>default</code> namespace has existed since v1.1.0.</p>
+
+<h2 id="model">One id, one record</h2>
+<p>A vector, a text document and a KV record that share an id describe one thing. Filters read the KV record; the vector and the text are searched.</p>
+<pre class="code-block"><code>PUT     doc-42 {"lang":"en","tier":"gold"}          <span class="cmt"># record (filters read this)</span>
+VSET    doc-42 NS docs 0.12 -0.03 ...               <span class="cmt"># vector in namespace "docs"</span>
+TSET    doc-42 NS docs TEXT how to rotate keys ...  <span class="cmt"># text document in "docs"</span>
+HSEARCH 10 NS docs FILTER lang = en VEC 0.1 ... QUERY rotate keys</code></pre>
+<p>Everything is stored as ordinary keys, so it goes through the same WAL, VLog, replication and Raft paths as any other write:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Reserved key</th><th>Holds</th></tr></thead>
+<tbody>
+<tr><td><code>@vec/&lt;ns&gt;/&lt;id&gt;</code></td><td>The vector, float32 little-endian, L2-normalized (similarity is cosine).</td></tr>
+<tr><td><code>@txt/&lt;ns&gt;/&lt;id&gt;</code></td><td>The text document (UTF-8, at most 1 MiB).</td></tr>
+<tr><td><code>@vecns/&lt;ns&gt;</code></td><td>Namespace settings (JSON: dimension, quantization, PQ subspaces, graph placement).</td></tr>
+<tr><td><code>@idxdef/&lt;name&gt;</code> / <code>@idx/&lt;name&gt;/&lt;value&gt;/&lt;id&gt;</code></td><td>Secondary-index definition / entries, used by <code>=</code> filters.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The search indexes in RAM — one HNSW graph and one BM25 inverted index per namespace — are derived from those keys by hooks that run after each write commits, and are rebuilt from them at startup.</p>
+
+<h2 id="quickstart">Quickstart session</h2>
+<p>A real session against a v1.12 server (<code>--data</code> on a local disk, text protocol over <code>nc</code>). The scores are what the server printed for these toy 4-dimensional vectors.</p>
+<pre class="code-block"><code>$ nc localhost 9000
+VCREATE docs 4 QUANT int8
+OK
+PUT doc-1 {"lang":"en","tier":"gold"}
+OK
+PUT doc-2 {"lang":"de","tier":"free"}
+OK
+PUT doc-3 {"lang":"en","tier":"free"}
+OK
+VSET doc-1 NS docs 0.9 0.1 0.0 0.2
+OK
+VSET doc-2 NS docs 0.8 0.3 0.1 0.1
+OK
+VSET doc-3 NS docs 0.1 0.9 0.4 0.0
+OK
+TSET doc-1 NS docs TEXT how to rotate api keys safely
+OK
+TSET doc-2 NS docs TEXT key rotation schedule for the billing service
+OK
+TSET doc-3 NS docs TEXT onboarding checklist for new engineers
+OK
+VSEARCH 2 NS docs 0.85 0.2 0.05 0.15
+doc-1 0.9903372
+doc-2 0.988912
+END
+VSEARCH 2 NS docs EF 128 FILTER lang = en 0.85 0.2 0.05 0.15
+doc-1 0.9903372
+doc-3 0.3244192
+END
+IDXCREATE by_lang lang
+OK
+IDXQUERY by_lang en
+doc-1
+doc-3
+END
+TSEARCH 3 NS docs QUERY rotate keys
+doc-1 1.9616585
+END
+HSEARCH 3 NS docs ALPHA 0.7 CAND 50 VEC 0.85 0.2 0.05 0.15 QUERY rotate keys
+doc-1 0.016393442
+doc-2 0.011290323
+doc-3 0.011111111
+END
+HSEARCH 3 NS docs FILTER tier = free QUERY rotation
+doc-2 0.008196721
+END
+VDEL doc-2 NS docs
+OK
+TDEL doc-2 NS docs
+OK
+VSEARCH 0 NS docs 0.85 0.2 0.05 0.15
+doc-1 0.9903372
+doc-3 0.3244192
+END
+VSET doc-9 NS docs 0 0 0 0
+ERR vector must be non-zero and finite
+VSET doc-9 NS docs 0.1 0.2
+ERR vector namespace "docs" already exists with dim 4 (got 2)
+VCREATE big 768 QUANT pq PQM 96 PQTRAIN 10000 GRAPH disk
+OK</code></pre>
+<p>Things the session shows: <code>TSEARCH ... QUERY rotate keys</code> does not match doc-2 (“key rotation”) because there is no stemming; the <code>HSEARCH</code> scores are reciprocal-rank-fusion scores, not cosine or BM25 (doc-1 is first in both lists: 0.7/61 + 0.3/61 = 0.016393); the filtered <code>HSEARCH</code> without <code>VEC</code> runs only its text half; and <code>VSEARCH 0</code> returns every match (an exact scan).</p>
+
+<h2 id="commands">Commands</h2>
+<p>Text protocol, exactly as <code>cmd/server/main.go</code> parses it. Search commands answer <code>id score</code> lines then <code>END</code>, or one <code>ERR ...</code> line; writes answer <code>OK</code>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>VCREATE ns dim [QUANT none|int8|pq] [PQM m] [PQTRAIN n] [GRAPH memory|disk]</code> <span class="badge good">v1.11</span></td><td>Create or reconfigure a namespace. Optional: the first <code>VSET</code> creates a float32 one. <code>PQM</code>, <code>PQTRAIN</code> and <code>GRAPH</code> are <span class="badge good">v1.12</span>.</td></tr>
+<tr><td><code>VSET id [NS ns] f1 f2 ...</code></td><td>Upsert a vector. <code>NS</code> is v1.11; without it the namespace is <code>default</code>.</td></tr>
+<tr><td><code>VDEL id [NS ns]</code> <span class="badge good">v1.11</span></td><td>Delete a vector.</td></tr>
+<tr><td><code>VSEARCH k [NS ns] [EF n] [FILTER field op value] f1 f2 ...</code></td><td>Top-k by cosine; <code>k = 0</code> returns every match (exact scan). <code>NS</code>/<code>EF</code>/<code>FILTER</code> are v1.11.</td></tr>
+<tr><td><code>TSET id [NS ns] TEXT free text</code> / <code>TDEL id [NS ns]</code> <span class="badge good">v1.11</span></td><td>Upsert / delete a text document (text = rest of the line, at most 1 MiB).</td></tr>
+<tr><td><code>TSEARCH k [NS ns] [FILTER field op value] QUERY free text</code> <span class="badge good">v1.11</span></td><td>Top-k by BM25; <code>k = 0</code> returns every match.</td></tr>
+<tr><td><code>HSEARCH k [NS ns] [EF n] [ALPHA a] [CAND n] [FILTER field op value] [VEC f1 ...] [QUERY text]</code> <span class="badge good">v1.11</span></td><td>Hybrid, fused by reciprocal rank; <code>k &gt; 0</code>; needs <code>VEC</code>, <code>QUERY</code> or both.</td></tr>
+<tr><td><code>IDXCREATE name field</code> / <code>IDXDROP name</code> / <code>IDXQUERY name value [LIMIT n]</code></td><td>Secondary index on a record field (used by <code>=</code> filters); <code>IDXQUERY</code> answers one id per line, then <code>END</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<p>A namespace name must be non-empty and contain no <code>/</code>; the dimension must be 1–4096 and is fixed by <code>VCREATE</code> or the first <code>VSET</code>. Vectors must be non-zero and finite. The option clauses may come in any order, each at most once; the floats (<code>VSEARCH</code>) or the <code>QUERY</code> text come last. The text protocol is whitespace-split and line-based, so filter values cannot contain spaces and <code>TSET</code> text cannot contain newlines — the binary protocol carries both (opcodes in <a class="inline-link" href="wire-protocol.html#search-opcodes">Wire Protocol</a>).</p>
+
+<h3 id="go-client">Go client</h3>
+<p>The Go client (<code>client.BinaryConn</code>, and <code>client.TCPConn</code> for the text protocol) is the only official client with the search API. From other languages, send the text commands above over a TCP socket.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Command</th></tr></thead>
+<tbody>
+<tr><td><code>VCreateWithOptions(ns, dim, VectorNamespaceOptions{Quantization, PQSubspaces, PQTrainAt, Graph})</code>, <code>VCreate(ns, dim, quant)</code></td><td><code>VCREATE</code></td></tr>
+<tr><td><code>VSetNS(ns, id, vec)</code>, <code>VSet(key, vec)</code> (namespace <code>default</code>)</td><td><code>VSET</code></td></tr>
+<tr><td><code>VDel(ns, id)</code></td><td><code>VDEL</code></td></tr>
+<tr><td><code>VSearchWithOptions(k, query, VectorSearchOptions{NS, Ef, FilterField, FilterOp, FilterValue})</code>, <code>VSearch(k, query)</code></td><td><code>VSEARCH</code></td></tr>
+<tr><td><code>TSet(ns, id, text)</code>, <code>TDel(ns, id)</code>, <code>TSearch(k, query, TextSearchOptions{...})</code></td><td><code>TSET</code> / <code>TDEL</code> / <code>TSEARCH</code></td></tr>
+<tr><td><code>HSearch(k, vec, query, HybridSearchOptions{NS, Alpha, Ef, Candidates, Filter...})</code></td><td><code>HSEARCH</code></td></tr>
+<tr><td><code>IdxCreate(name, field)</code>, <code>IdxDrop(name)</code>, <code>IdxQuery(name, value, limit)</code></td><td><code>IDXCREATE</code> / <code>IDXDROP</code> / <code>IDXQUERY</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Results are <code>[]VectorResult{ID, Score}</code>.</p>
+
+<h2 id="memory-layouts">Memory layouts</h2>
+<p>The full float32 vectors are always persisted in the VLog on NVMe. What RAM holds is a per-namespace choice, set with <code>VCREATE</code>:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layout</th><th>RAM holds</th><th>Search</th></tr></thead>
+<tbody>
+<tr><td>float32 (default)</td><td>4 × dim bytes + graph</td><td>Exact scores.</td></tr>
+<tr><td><code>QUANT int8</code> <span class="badge good">v1.11</span></td><td>dim + 4 bytes (codes + scale) + graph</td><td>Graph walk on int8 (beam ≥ 64); top 4 × k re-ranked against the float32 vectors.</td></tr>
+<tr><td><code>QUANT pq [PQM m]</code> <span class="badge good">v1.12</span></td><td>m bytes (default m = dim/8, range 1–dim) + graph, plus one codebook per namespace</td><td>ADC lookup tables; max(4 × k, ef) candidates — the whole beam — re-ranked against the float32 vectors.</td></tr>
+<tr><td><code>... GRAPH disk</code> <span class="badge good">v1.12</span></td><td>As above, minus layer-0 edges</td><td>Layer-0 edges (32 per node, ~97 % of edge memory) in 132-byte records in a memory-mapped scratch file the kernel can page to NVMe.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The re-rank reads the float32 vectors back with one parallel <code>MultiGet</code> (LIRS-cached); a candidate deleted meanwhile is dropped. The disk graph's file is created under <code>&lt;first data dir&gt;/vector-scratch</code> and unlinked at once (it is never read after a restart). If it cannot be created, or on a platform without mmap, the setting is accepted and the graph stays on the heap.</p>
+<p><strong>Measured RAM</strong> — 768-dim, 10,000 synthetic clustered vectors, Go heap per vector (<code>TestVectorMemoryTable</code>, macOS, 2026-09-30):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layout</th><th>Heap / vector</th><th>Mapped file / vector</th><th>vs float32</th></tr></thead>
+<tbody>
+<tr><td>float32</td><td>3,383 B</td><td>—</td><td>1×</td></tr>
+<tr><td>int8</td><td>1,078 B</td><td>—</td><td>3.1× less</td></tr>
+<tr><td>pq, m = 96</td><td>493 B</td><td>—</td><td>6.9× less</td></tr>
+<tr><td>pq, m = 96 + disk graph</td><td>378 B</td><td>216 B</td><td>8.9× less heap</td></tr>
+</tbody>
+</table>
+</div>
+<p>A PQ namespace stores float32 until it holds <code>PQTRAIN</code> vectors (default 10,000, minimum 256), then trains its codebook (k-means, 256 centroids per subspace, 12 Lloyd iterations, at most 10,000 training vectors) in the background and re-encodes; searches keep working throughout. Running <code>VCREATE</code> on an existing namespace with a different quantization, <code>PQM</code> or graph placement re-encodes it from the persisted vectors (changing only <code>PQTRAIN</code> does not; changing the dimension is refused).</p>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Sizing rule of thumb (an estimate, not a measurement)</span> Heap for N vectors of dimension d: float32 ≈ N × (4d + ~310 B), int8 ≈ N × (d + ~310 B), pq ≈ N × (m + ~400 B), pq + disk ≈ N × (m + ~280 B), plus for a disk graph 132 B per vector in the mapped file (up to 2× that while the file grows by doubling — 216 B was measured). The constant is graph edges and Go per-node overhead, derived from the 768-dim measurement above; treat it as an estimate for other dimensions.</span></div>
+
+<h2 id="filters">How filters work</h2>
+<p><code>FILTER field op value</code> (ops <code>= != &gt; &lt; &gt;= &lt;= contains</code>) is evaluated on the KV record whose key is the vector / document id — a JSON object or <code>k=v</code> pairs separated by <code>,</code>, <code>;</code> or space. A record without the field never matches. The ordering ops compare numerically when both sides parse as numbers, else lexicographically.</p>
+<ul>
+<li><strong><code>=</code> on an indexed field</strong> (<code>IDXCREATE</code>) is served from the index: up to 2,048 matching ids are all scored without a graph walk (exact for float32; int8 / pq score the codes and re-rank as above); larger sets restrict the graph walk to members. Every candidate is still checked against its live record.</li>
+<li><strong>Other filters</strong> are checked during the walk, one read per candidate that would enter the results, with the walk capped at 10,000 + 20 × ef visited nodes so a filter matching almost nothing cannot scan the whole graph.</li>
+<li><strong>BM25 filters</strong> are checked best-first on the scored documents until k match.</li>
+</ul>
+
+<h2 id="bm25-hybrid">BM25 and hybrid search</h2>
+<ul>
+<li><strong>Tokenizer:</strong> lowercase runs of Unicode letters, digits and combining marks (so Devanagari, Tamil and other Indic words stay whole), no stemming, no stop words. Scripts without spaces (CJK, Thai) index whole runs.</li>
+<li><strong>Scoring:</strong> Okapi BM25, k1 = 1.2, b = 0.75, idf = ln(1 + (N − df + 0.5) / (df + 0.5)). A query with no tokens is refused (<code>query has no searchable terms</code>).</li>
+<li><strong>Hybrid:</strong> the vector and text searches each return <code>CAND</code> candidates (default max(50, 4k), capped at 10,000); the lists are fused by weighted Reciprocal Rank Fusion, <code>score = α/(60 + rank_vec) + (1 − α)/(60 + rank_text)</code> with 1-based ranks and α = <code>ALPHA</code> in [0, 1] (default 0.5). Ranks, not raw scores, are fused, so cosine and BM25 never need a common scale. Either half may be omitted (or missing: no vector namespace, no text tokens); it is an error only when neither can run.</li>
+</ul>
+
+<h2 id="durability">Durability and restarts</h2>
+<p>A vector or document write is acknowledged after the same WAL + VLog <code>fdatasync</code> as any other write. The HNSW graph and the inverted index are <strong>not</strong> saved: at startup they are rebuilt from the persisted keys on all cores (GOMAXPROCS workers, namespace settings first).</p>
+<p><span class="badge good">New in v1.12</span> Until that rebuild finishes, vector / text / hybrid searches are refused — they would otherwise miss vectors — including when the rebuilding node is a peer in a fan-out:</p>
+<pre class="code-block"><code>ERR search indexes are still rebuilding after restart (loaded x of y; retry, or start the server with --search-allow-partial)</code></pre>
+<p><code>INFO</code> shows <code>search_ready=0 search_loaded=x/y</code> during the rebuild and <code>search_ready=1</code> once done. <code>--search-allow-partial</code> answers anyway. KV traffic, <code>QUERY</code> and <code>IDXQUERY</code> are not affected.</p>
+<p><strong>Measured:</strong> 3 SIGKILL-during-writes cycles (8.5K, 8.4K and 11.9K acknowledged writes) — every acknowledged vector, document and record was present after the rebuild, and no acknowledged delete came back (<code>TestSearchCrashRecovery</code>, macOS; the nightly workflow runs 10 cycles on Linux). Writes in flight at the kill are not checked. A 60-second soak on macOS (<code>TestSearchSoak</code>, 4 writers + 4 searchers): 201,573 writes and 292,079 searches, 288,025 self-queries with 0 misses, RSS flat at ~1.0 GB, exact oracle match before and after a clean restart.</p>
+
+<h2 id="clusters">Clusters <span class="badge good">New in v1.11</span></h2>
+<ul>
+<li><strong>Writes:</strong> <code>VSET</code>, <code>TSET</code>, <code>VCREATE</code>, <code>IDXCREATE</code>, … go through the normal raft / replicated write path.</li>
+<li><strong>Routing keys co-locate:</strong> the ring places <code>@vec/&lt;ns&gt;/&lt;id&gt;</code>, <code>@txt/&lt;ns&gt;/&lt;id&gt;</code> and <code>@idx/&lt;rule&gt;/&lt;value&gt;/&lt;id&gt;</code> on the node that owns <code>&lt;id&gt;</code>, so after a rebalance each node holds whole records and filters locally. <code>@vecns/</code> and <code>@idxdef/</code> keys are copied to every node.</li>
+<li><strong>Fan-out:</strong> every vector / text / hybrid search, <code>QUERY</code> and <code>IDXQUERY</code> runs on all non-failed nodes and is merged. BM25 first sums every node's corpus statistics so all nodes score with the same idf.</li>
+<li><strong>Fail-closed:</strong> a peer that does not answer within <code>--search-timeout-ms</code> (default 2000, per search phase; BM25 has two) fails the request and is named in the error (<code>search incomplete: n of m peers did not answer: ...</code>). <code>--search-allow-partial</code> returns the rest instead (logged). Nodes the failure detector marked failed are not queried. <code>--search-fanout=false</code> keeps searches local.</li>
+<li><strong>Signing:</strong> node-to-node search traffic uses the transfer listener (<code>POST /internal/search</code>). Sign it with <code>--cluster-secret-file</code> or env <code>VELTRIXDB_CLUSTER_SECRET</code> (same secret on every node, at least 16 bytes; HMAC-SHA256 over time, method, path and body; 5-minute clock-skew window), or use mTLS (<code>--cluster-tls-cert</code> / <code>--cluster-tls-key</code> / <code>--cluster-tls-ca</code> with <code>--cluster-mtls</code>). Without either, the server logs that the listener is unauthenticated.</li>
+</ul>
+
+<h2 id="measured">Measured performance</h2>
+<h3 id="glove">Real embeddings — GloVe-100</h3>
+<p>First 100,000 words of GloVe-100 (angular), 100 dimensions, 500 queries, exact cosine ground truth. <strong>In-process, one query at a time, macOS (Apple silicon, GOMAXPROCS = 18), 2026-09-30</strong> (<code>TestRealEmbeddings</code>). Build = 18 parallel durable <code>PutVector</code> writers. Not a Linux NVMe server, and not a comparison with any other database.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layout</th><th>Build</th><th>ef</th><th>recall@10</th><th>p50</th><th>p99</th><th>QPS (1 thread)</th></tr></thead>
+<tbody>
+<tr><td rowspan="4">float32</td><td rowspan="4">57 s</td><td>64</td><td>0.842</td><td>0.25 ms</td><td>0.41 ms</td><td>3,933</td></tr>
+<tr><td>128</td><td>0.906</td><td>0.42 ms</td><td>0.63 ms</td><td>2,351</td></tr>
+<tr><td>256</td><td>0.953</td><td>0.77 ms</td><td>1.12 ms</td><td>1,307</td></tr>
+<tr><td>512</td><td>0.983</td><td>1.43 ms</td><td>1.95 ms</td><td>712</td></tr>
+<tr><td rowspan="4">int8</td><td rowspan="4">50 s</td><td>64</td><td>0.839</td><td>0.61 ms</td><td>0.81 ms</td><td>1,655</td></tr>
+<tr><td>128</td><td>0.905</td><td>0.55 ms</td><td>0.80 ms</td><td>1,905</td></tr>
+<tr><td>256</td><td>0.952</td><td>0.72 ms</td><td>1.08 ms</td><td>1,356</td></tr>
+<tr><td>512</td><td>0.983</td><td>1.18 ms</td><td>1.84 ms</td><td>834</td></tr>
+<tr><td rowspan="4">pq (m = 25)</td><td rowspan="4">42 s</td><td>64</td><td>0.797</td><td>0.56 ms</td><td>0.90 ms</td><td>1,771</td></tr>
+<tr><td>128</td><td>0.870</td><td>0.72 ms</td><td>1.06 ms</td><td>1,367</td></tr>
+<tr><td>256</td><td>0.927</td><td>1.17 ms</td><td>2.91 ms</td><td>780</td></tr>
+<tr><td>512</td><td>0.969</td><td>1.56 ms</td><td>3.44 ms</td><td>604</td></tr>
+<tr><td rowspan="4">pq + disk graph</td><td rowspan="4">45 s</td><td>64</td><td>0.788</td><td>0.55 ms</td><td>0.79 ms</td><td>1,811</td></tr>
+<tr><td>128</td><td>0.875</td><td>0.66 ms</td><td>0.99 ms</td><td>1,506</td></tr>
+<tr><td>256</td><td>0.931</td><td>1.06 ms</td><td>2.18 ms</td><td>907</td></tr>
+<tr><td>512</td><td>0.966</td><td>1.60 ms</td><td>2.97 ms</td><td>613</td></tr>
+</tbody>
+</table>
+</div>
+<p>The quantized layouts are slower per query than float32 at this size because they re-rank from the VLog (a parallel MultiGet — before that change int8 at ef = 64 was p50 1.9 ms / p99 13.8 ms). Their point is RAM: at 100-dim the vectors are small and graph edges dominate; at 768-dim the vector part is 3–9× smaller (see <a class="inline-link" href="#memory-layouts">Memory layouts</a>).</p>
+
+<h3 id="vecbench">Over the network — <code>vecbench</code></h3>
+<p>GloVe-100, first 20,000 words, 300 queries, int8, 8 concurrent clients, <strong>server and client on one macOS machine</strong> (<code>bench/compare/cmd/vecbench</code>):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>ef</th><th>recall@10</th><th>QPS</th><th>p50</th><th>p99</th></tr></thead>
+<tbody>
+<tr><td>64</td><td>0.894</td><td>24,637</td><td>0.28 ms</td><td>0.68 ms</td></tr>
+<tr><td>256</td><td>0.985</td><td>15,629</td><td>0.48 ms</td><td>0.91 ms</td></tr>
+</tbody>
+</table>
+</div>
+<p>Load: 6.4 s (3,146 durable vector writes/s).</p>
+
+<h3 id="quality-gates">CI quality gates (synthetic, every PR)</h3>
+<p>5,000 × 64-dim clustered vectors, 100 queries, recall@10 (<code>TestSearchQualityGate</code>, job <code>node-7-search</code>). A PR fails if a value drops below its gate.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Case</th><th>Measured</th><th>Gate</th></tr></thead>
+<tbody>
+<tr><td>float32</td><td>0.927</td><td>0.90</td></tr>
+<tr><td>float32, ef = 256</td><td>0.998</td><td>0.97</td></tr>
+<tr><td>int8</td><td>0.923</td><td>0.89</td></tr>
+<tr><td>pq</td><td>0.882</td><td>0.85</td></tr>
+<tr><td>pq + disk graph</td><td>0.881</td><td>0.85</td></tr>
+<tr><td>Indexed filter on the graph path</td><td>0.994</td><td>0.96</td></tr>
+<tr><td>After deleting 40 %</td><td>0.96</td><td>0.92</td></tr>
+</tbody>
+</table>
+</div>
+<p>Nightly (<span class="badge good">New in v1.12</span>): recall gates on GloVe-100, a 20-minute search soak against an oracle, and 10 SIGKILL / restart cycles. Full methodology: <code>docs/vector-search.md</code> in the main repo.</p>
+
+<h2 id="tuning">Tuning</h2>
+<ul>
+<li><strong><code>EF</code></strong> is the recall / latency knob. On GloVe-100, ef = 128 gives ~0.90 recall@10 and ef = 256 ~0.95.</li>
+<li><strong>int8</strong> keeps float32 recall at ~⅓ of the RAM; <strong>pq</strong> trades 1.4–4.5 points of recall@10 on GloVe-100 (ef 512 → 64) for ~⅐ of it at 768-dim. Raise <code>PQM</code> (more bytes per vector) for recall.</li>
+<li><strong><code>GRAPH disk</code></strong> helps once edges dominate RAM (many vectors, small codes).</li>
+<li><strong>Filters:</strong> create an <code>IDXCREATE</code> index on fields used with <code>=</code>.</li>
+<li><strong>Clusters:</strong> a search costs one round trip to every node; with <code>--search-fanout=false</code> it is local only — correct only if every node holds every record, i.e. no rebalance has moved keys.</li>
+</ul>
+
+<h2 id="limitations">Limitations</h2>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title"><code>DEL</code> does not delete a record's vector or text</span> Deleting the KV record removes only the record: the vector and document stay searchable (an unfiltered search still returns the id; a filter on that record no longer matches). Use <code>VDEL</code> / <code>TDEL</code> as well.</span></div>
+<ul>
+<li>The graph and inverted index are rebuilt at every start (not persisted); searches are refused until the rebuild ends. Budget for it on large namespaces.</li>
+<li>Graph nodes, ids and the upper HNSW layers stay on the Go heap even with <code>GRAPH disk</code>; the constant ~280–400 B per vector does not shrink with quantization.</li>
+<li>Tested up to 100K vectors (real) and 10K at 768-dim; nothing at 10M+ yet.</li>
+<li>Dimension 1–4096. Text search has no stemming, phrase queries or per-field weighting; one document is at most 1 MiB.</li>
+<li><strong>No same-hardware comparison with other vector databases.</strong> <code>bench/compare/cmd/vecbench</code> contains only a VeltrixDB driver: Aerospike Vector Search and ScyllaDB vector search use client APIs that were not available to test, and VectorDBBench has no client for either.</li>
+<li>Only the Go client has the search API; other SDKs use the text commands over a socket.</li>
+</ul>
+
+<div class="card-grid">
+<a class="card" href="data-model.html"><div class="card-title">Data Model →</div><div class="card-desc">The KV records, namespaces and secondary indexes that filters read.</div></a>
+<a class="card" href="wire-protocol.html#search-opcodes"><div class="card-title">Wire Protocol →</div><div class="card-desc">Binary opcodes for VSETNS, VSEARCHX, VDEL and the SEARCH sub-ops.</div></a>
+<a class="card" href="deployment-modes.html"><div class="card-title">Deployment Modes →</div><div class="card-desc">How raft and replicated modes route the writes behind these indexes.</div></a>
+</div>
+
+    <div class="page-nav">
+<a class="prev" href="../concepts/data-model.html"><span class="dir">&larr; Previous</span><span>Data Model</span></a>
+<a class="next" href="../concepts/wire-protocol.html"><span class="dir">Next &rarr;</span><span>Wire Protocol</span></a>
+</div>
+  </main>
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <div class="toc-list"></div>
+  </aside>
+</div>
+<div class="footer-strip">
+  <span>&copy; 2026 VeltrixDB. Apache 2.0 licensed.</span>
+  <span><a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">Edit this page on GitHub</a></span>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

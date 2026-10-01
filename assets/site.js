@@ -474,61 +474,6 @@ function makePathShapes3D(){
   setTimeout(() => { if (!reported){ io.disconnect(); tagged.forEach(el => el.classList.add('in')); } }, 3000);
 })();
 
-/* ============ Cost Calculator ============ */
-(function(){
-  const slider = document.getElementById('calcSlider');
-  if (!slider) return;
-  const opsEl = document.getElementById('calcOps');
-  const ddbPrice = document.getElementById('ddbPrice');
-  const vdbPrice = document.getElementById('vdbPrice');
-  const ddbB = document.getElementById('ddbBreakdown');
-  const vdbB = document.getElementById('vdbBreakdown');
-  const savEl = document.getElementById('calcSavings');
-  const multEl = document.getElementById('calcMultiplier');
-  const DDB_PER_M = 1.00; // blended $/M ops
-  function fmt(n){ return '$' + Math.round(n).toLocaleString(); }
-  function tier(opsB){
-    if (opsB <= 0.5) return { name:'Starter', base:499, capB:0.5 };
-    if (opsB <= 5)   return { name:'Growth',  base:2490, capB:5 };
-    return { name:'Enterprise', base:2490 + (opsB-5)*50, capB:opsB };
-  }
-  function vdbCost(opsB){
-    if (opsB <= 0.5) return 499;
-    if (opsB <= 5)   return 2490;
-    return Math.round(2490 + (opsB-5) * 50); // $50 per extra billion
-  }
-  function update(){
-    const v = +slider.value;
-    const opsB = v;
-    const opsM = opsB * 1000;
-    const ddb = opsM * DDB_PER_M;
-    const vdb = vdbCost(opsB);
-    const savings = Math.max(0, ddb - vdb);
-    const mult = ddb / Math.max(1, vdb);
-    opsEl.textContent = opsB;
-    ddbPrice.textContent = fmt(ddb);
-    vdbPrice.textContent = fmt(vdb);
-    ddbB.textContent = `$${DDB_PER_M.toFixed(2)} / M blended ops · ${opsB}B ops → ${fmt(ddb)}`;
-    if (opsB <= 0.5) vdbB.textContent = 'Starter tier · single-region cluster';
-    else if (opsB <= 5) vdbB.textContent = 'Growth tier · multi-region replication';
-    else vdbB.textContent = `Growth $2,490 + ${(opsB-5).toFixed(0)}B overflow @ $50/B · same NVMe hardware`;
-    if (savings > 0){
-      savEl.textContent = fmt(savings);
-      savEl.style.color = 'var(--good)';
-      multEl.textContent = mult.toFixed(1) + '× cheaper';
-    } else {
-      savEl.textContent = fmt(-savings);
-      savEl.style.color = 'var(--warm)';
-      multEl.textContent = 'similar at this scale';
-    }
-    // fill colour on track
-    const pct = ((v - +slider.min) / (+slider.max - +slider.min)) * 100;
-    slider.style.backgroundSize = pct + '% 100%';
-  }
-  slider.addEventListener('input', update);
-  update();
-})();
-
 /* ============ Dashboard chart + bars ============ */
 (function(){
   const chart = document.getElementById('dashChart');
@@ -643,21 +588,25 @@ const vxReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced
 
   function verdict(a){
     // Honest disqualifiers first.
-    if (a.q1 === 'fts')   return ['no','Wrong tool &mdash; and we mean it.',
-      'VeltrixDB has no full-text or faceted search and never will. Use Elasticsearch/OpenSearch for search, and pair it with VeltrixDB only if you also have a point-lookup path.'];
+    if (a.q1 === 'fts')   return ['no','A search engine will serve you better.',
+      'VeltrixDB has BM25 full-text and hybrid (vector + text) search, but no stemming, stop words, phrase queries, per-field weighting, facets or aggregations. If search is the product, use Elasticsearch/OpenSearch; VeltrixDB fits when search sits next to a point-lookup path on the same records.'];
     if (a.q1 === 'range') return ['no','A column store will serve you better.',
       'Range scans and analytical queries are exactly what LSM/columnar engines optimize for. VeltrixDB ships a basic RANGE scan, but if scans dominate, ClickHouse or a wide-column store is the honest recommendation.'];
-    if (a.q2 === 'small') return ['no','Stay on Redis &mdash; seriously.',
+    if (a.q1 !== 'vector' && a.q2 === 'small') return ['no','Stay on Redis &mdash; seriously.',
       'Under ~50 GB your entire working set fits in RAM for a modest bill. VeltrixDB&rsquo;s economics only start winning when RAM pricing hurts. Come back at 10× the data.'];
 
     const notes = [];
     let level = 'yes';
+    if (a.q1 === 'vector'){ level = 'partial';
+      notes.push('Vector search fits when you want it collocated with your KV records and the index fits in RAM: one cosine HNSW graph per namespace, float32 / int8 / PQ codes, an optional on-disk layer-0 graph, BM25 and RRF hybrid in the same server, filters on the record, fan-out across cluster nodes. Measured on a laptop (GloVe-100, 100K vectors, one query at a time): recall@10 0.953 at p50 0.77 ms. Caveats: the index lives in RAM (~0.4&ndash;3.4 KB per 768-dim vector) and is rebuilt at every start &mdash; searches are refused until it finishes; tested to 100K real vectors, nothing at 10M+; no GPU; DEL does not remove a vector (use VDEL); no same-hardware comparison with Milvus, Qdrant or any other vector database.'); }
     if (a.q3 === 'writep99'){ level = 'partial';
-      notes.push('Sub-1ms durable writes conflict with group commit: an acknowledged write waits for its batch&rsquo;s fdatasync, so write latency tracks the flush window (15 ms default; the YCSB load averaged 11 ms at a 5 ms window). Batched MPUT amortises it across many keys &mdash; pressure-test this in the demo.'); }
+      notes.push('Sub-1 ms durable P99 depends on your device&rsquo;s fdatasync and your concurrency: an acknowledged write waits for the sync that covers it. Adaptive group commit (default since v1.12) syncs a lone writer at once &mdash; with an emulated 300 µs fdatasync on a laptop, one writer measured P50 0.45 ms / P99 0.52 ms and 64 writers P99 2.6 ms; it has not been measured on Linux NVMe yet. The June YCSB load (fixed 5 ms window, 200 threads) averaged 11 ms. Pressure-test this in the demo.'); }
     if (a.q5 === 'zone'){
-      notes.push('Zero-loss across a zone outage: start each node with --rack-id=&lt;zone&gt; and v1.1.0&rsquo;s rack-aware placement keeps every copy of a partition in a distinct zone &mdash; no manual pinning. It&rsquo;s new in this release, so rehearse the zone-failure drill before you rely on it.'); }
+      notes.push('Zero loss across a zone outage: start each node with --rack-id=&lt;zone&gt; so replicas avoid sharing a zone, and acknowledge writes on more than one zone &mdash; --mode=raft (quorum commit) or --mode=replicated with --consistency=quorum or strong. The default eventual consistency acknowledges after the local write, so losing a zone can lose acknowledged writes. Rehearse the zone-failure drill before you rely on it.'); }
     if (a.q4 === 'fsync') notes.push('Every write fsynced: that&rsquo;s our default posture &mdash; group-commit WAL, durable before ACK.');
-    if (a.q2 === 'huge') notes.push('>10 TB: bring 8 NVMe devices per node and read the NVMe provisioning guide &mdash; density is the whole point.');
+    if (a.q2 === 'huge') notes.push(a.q1 === 'vector'
+      ? '>10 TB: values and full vectors sit on NVMe, but the search index must fit in RAM &mdash; size it per vector (about 0.6 KB at 768-dim with PQ + disk graph, 3.4 KB with float32, measured at 10K vectors) and read the NVMe provisioning guide.'
+      : '>10 TB: bring 8 NVMe devices per node and read the NVMe provisioning guide &mdash; density is the whole point.');
 
     if (level === 'yes') return ['yes','Strong fit. Your workload is the design target.',
       'Point lookups, RAM-priced-out working set, read-latency SLA &mdash; this is exactly the shape VeltrixDB was built for. ' + notes.join(' ')];
@@ -676,7 +625,7 @@ const vxReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced
         '<p>' + body + '</p>' +
         (cls === 'no'
           ? '<p><a href="redis-comparison.html">When each tool wins</a> &middot; <a href="faq.html">FAQ</a></p>'
-          : '<p><a href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Architecture%20Review">Book the architecture review</a> &middot; <a href="performance.html">See the measured numbers</a></p>');
+          : '<p><a href="mailto:veltrixdb@gmail.com?subject=VeltrixDB%20Architecture%20Review">Book the architecture review</a> &middot; <a href="' + (a.q1 === 'vector' ? 'docs/concepts/vector-search.html">Vector search docs' : 'performance.html">See the measured numbers') + '</a></p>');
     });
   });
 })();

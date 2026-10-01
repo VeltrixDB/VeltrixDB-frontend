@@ -343,9 +343,9 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
   <div class="wrap">
     <div class="wp-hero-inner">
       <div>
-        <span class="wp-eyebrow">Technical whitepaper · v1.8</span>
+        <span class="wp-eyebrow">Technical whitepaper · v1.12</span>
         <h1 class="wp-title">The VeltrixDB <span class="em">whitepaper</span>.</h1>
-        <p class="wp-sub">How the storage engine actually works — <b>the read and write paths, the durability argument and its limits, the sharding model, and how the engine handles failure</b>. Written for the engineer who'll be on call for this in production.</p>
+        <p class="wp-sub">How the storage engine actually works — <b>the read and write paths, the durability argument and its limits, the sharding and replication model, the search subsystem, and how the engine handles failure</b>. Written for the engineer who'll be on call for this in production.</p>
 
         <div class="wp-cta">
           <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Send%20me%20the%20VeltrixDB%20whitepaper&body=Hi%20—%20please%20share%20the%20VeltrixDB%20architecture%20whitepaper.%0A%0AName%3A%0ACompany%3A%0ARole%3A%0AScale%20(keys%2Fops)%3A">Email me the PDF <span class="arrow">↗</span></a>
@@ -353,7 +353,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         </div>
         <div class="wp-meta">
           <span><b>Author</b> · Akanksha Gupta</span>
-          <span><b>Updated</b> · Sep 2026</span>
+          <span><b>Updated</b> · Oct 2026</span>
           <span><b>License</b> · Apache 2.0 (open source) · benchmark conditions stated</span>
         </div>
       </div>
@@ -363,7 +363,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="seal">
           <div class="seal-l">
             <b>VeltrixDB</b> · technical reference<br/>
-            covers v1.8 · versions marked<br/>
+            covers v1.12 · versions marked<br/>
             <b>shareable</b>
           </div>
           <div class="seal-r">PDF on request</div>
@@ -372,7 +372,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <p class="sub">A first-principles walk through the storage layer, the I/O model, the sharding scheme, and exactly when an acknowledged write is durable on commodity NVMe — and when it is not.</p>
         <div class="lines"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="stats">
-          <div class="st"><div class="v"><span class="red">v1.8</span></div><div class="l">covers</div></div>
+          <div class="st"><div class="v"><span class="red">v1.12</span></div><div class="l">covers</div></div>
           <div class="st"><div class="v">8192</div><div class="l">index shards</div></div>
           <div class="st"><div class="v">2.0</div><div class="l">Apache license</div></div>
         </div>
@@ -393,7 +393,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <span class="num">01</span>
         <span class="ch">Storage engine</span>
         <h3>Key–value separation, end to end.</h3>
-        <p>How VeltrixDB separates keys from values — the 64 B index entry, the VLog record format (4 KB-aligned, magic + CRC32C), block packing for batched writes, and why write amplification stays near 1× when there is no LSM compaction.</p>
+        <p>How VeltrixDB separates keys from values — the 64 B index entry (~142 B/key of RAM in practice, plus ~90 B/key for the ordered index), the VLog record format (4 KB-aligned, magic + CRC32C), block packing (~26 × 128 B records per 4 KB block, on the <code>MultiPut</code> and GC paths only — a single <code>Put</code> takes a whole block), and why write amplification is ~1× by design (not measured) when there is no LSM compaction.</p>
         <div class="meta"><span>Chapter 1–2</span></div>
       </div>
       <div class="toc-card">
@@ -407,21 +407,21 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <span class="num">03</span>
         <span class="ch">Durability</span>
         <h3>The fsync chain, crash replay and checkpoints.</h3>
-        <p>Group-commit WAL (default 15 ms window), why VLog and WAL fdatasync run concurrently, full replay after a crash, the compacted checkpoint written on clean shutdown, and the conditions under which an acknowledged write can be lost.</p>
+        <p>Adaptive group commit (default since v1.12: a lone writer is synced at once; 15 ms is only the upper bound), why VLog and WAL fdatasync run concurrently, full replay after a crash, the compacted checkpoint written on clean shutdown, Raft vs replicated mode (one or the other, never both), and the conditions under which an acknowledged write can be lost.</p>
         <div class="meta"><span>Chapter 4</span></div>
       </div>
       <div class="toc-card">
         <span class="num">04</span>
         <span class="ch">Sharding &amp; placement</span>
         <h3>8192 index shards · consistent hashing · rack-aware.</h3>
-        <p>One FNV-1a hash drives three placements: 8192 index shards, up to 256 cache shards, and the disk. Cluster routing by consistent hashing, and <code>--rack-id</code> placement that keeps copies of a partition in different racks or zones.</p>
+        <p>One FNV-1a hash drives three placements: 8192 index shards, up to 256 cache shards, and the disk. Across nodes, a consistent-hash ring (64 virtual nodes each) that the <b>client</b> routes on — the server does not forward — over static <code>--peers</code> membership, and <code>--rack-id</code> placement that keeps copies of a partition in different racks or zones.</p>
         <div class="meta"><span>Chapter 5</span></div>
       </div>
       <div class="toc-card">
         <span class="num">05</span>
         <span class="ch">Cache (LIRS)</span>
         <h3>Why LRU lies — and what we replaced it with.</h3>
-        <p>The LIRS algorithm in detail, the priority-2 eviction resistance for small values, and why the cache is split into up to 256 shards (one lock was 21.7% of CPU; a hit went from 711 ns to ~92 ns).</p>
+        <p>The LIRS algorithm in detail, value-aware eviction (values ≤ 256 B get priority 2 and are kept longer; a 16-entry window from the cold end evicts the largest, lowest-priority value first), and why the cache is split into up to 256 shards (one lock was 21.7% of CPU; a hit went from 711 ns to ~92 ns).</p>
         <div class="meta"><span>Chapter 6</span></div>
       </div>
       <div class="toc-card">
@@ -430,6 +430,20 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <h3>How the engine handles failure.</h3>
         <p>Crash restart, silent disk corruption, a slow disk, GC falling behind, node loss. For each: what the engine does, which metric shows it, and what is tested today (end-to-end failover, persistence and backup/restore suites).</p>
         <div class="meta"><span>Chapter 7–8</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">07</span>
+        <span class="ch">Search subsystem</span>
+        <h3>Vector, full-text and hybrid search on the same records.</h3>
+        <p>HNSW vector indexes (float32, int8 or product-quantized; layer-0 graph on the heap or in a mapped file), a BM25 inverted index, and reciprocal-rank fusion of the two — all derived from ordinary durable keys and filtered by the KV record with the same id. Shipped in v1.11 and v1.12.</p>
+        <div class="meta"><span>Chapter 10</span></div>
+      </div>
+      <div class="toc-card">
+        <span class="num">08</span>
+        <span class="ch">Data model</span>
+        <h3>More than GET and PUT — and what it still is not.</h3>
+        <p>TTLs, <code>INCR</code> / <code>CAS</code> / <code>SETNX</code>, hashes with per-field TTL, lists, sets, namespaces, ordered <code>RANGE</code> / <code>SCANCUR</code>, secondary indexes, and one-shot <code>TXN</code> (per-key version check, read-committed, not MVCC). No sorted sets, pub/sub, streams, Lua or RESP.</p>
+        <div class="meta"><span>Chapter 11 · appendix</span></div>
       </div>
     </div>
   </div>
@@ -446,8 +460,8 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="pv-row reveal">
         <div class="pv-text">
           <span class="pk">Figure 03 · Write path</span>
-          <h3>Group-commit WAL with <span class="em">amortized fsync</span>.</h3>
-          <p>A <code>PUT</code> is compressed, then encrypted (if enabled), then appended to the VLog <b>and</b> the WAL concurrently. The caller waits for <code>max(WAL, VLog)</code>, not their sum. Writers inside one flush window (default <code>15 ms</code>) share a single <code>write(2)</code> and a single <code>fdatasync</code>; only then is the index entry installed, the cache updated and the write acknowledged.</p>
+          <h3>Adaptive group commit with <span class="em">amortized fsync</span>.</h3>
+          <p>A <code>PUT</code> is compressed, then encrypted (if enabled), then appended to the VLog <b>and</b> the WAL concurrently. The caller waits for <code>max(WAL, VLog)</code>, not their sum. Concurrent writers share a single <code>write(2)</code> and a single <code>fdatasync</code>; only then is the index entry installed, the cache updated and the write acknowledged. Since v1.12 group commit is <b>adaptive</b> by default: a lone writer is synced at once, concurrent writers after an idle gap of about one fdatasync, and the <code>15 ms</code> window is only the upper bound (<code>--group-commit=fixed</code> restores the full wait). With an emulated 300 µs fdatasync on macOS, a lone writer's P50 went from 16 ms to 0.45 ms and 64 writers from 4.0K to 37.5K writes/s.</p>
           <p>The chapter covers the binary WAL record (48-byte header, CRC32C over the whole record; the default since v1.6, with <code>--wal-format=text</code> as rollback), crash replay, the compacted checkpoint written on clean shutdown, and the exact conditions under which an acknowledged write survives a single-node crash.</p>
         </div>
         <div class="pv-figure">
@@ -455,7 +469,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
           <div class="fig-stack">
             <div class="fig-row"><div class="pre">01 · route</div><div class="post"><span class="fig-node">FNV-1a</span><span class="fig-arr">→</span><span class="fig-node">shard / disk</span></div></div>
             <div class="fig-row"><div class="pre">02 · transform</div><div class="post"><span class="fig-node">compress</span><span class="fig-arr">→</span><span class="fig-node">encrypt</span></div></div>
-            <div class="fig-row"><div class="pre">03 · in parallel</div><div class="post"><span class="fig-node us">VLog append</span><span class="fig-arr">·</span><span class="fig-node us">WAL group-commit</span></div></div>
+            <div class="fig-row"><div class="pre">03 · in parallel</div><div class="post"><span class="fig-node us">VLog append</span><span class="fig-arr">·</span><span class="fig-node us">WAL adaptive group-commit</span></div></div>
             <div class="fig-row"><div class="pre">04 · index</div><div class="post"><span class="fig-node">install entry</span><span class="fig-arr">·</span><span class="fig-node">version++</span></div></div>
             <div class="fig-row"><div class="pre">05 · ack</div><div class="post"><span class="fig-node">cache insert</span><span class="fig-arr">→</span><span class="fig-node">OK</span></div></div>
           </div>
@@ -476,7 +490,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             <div class="fig-row"><div class="pre">bit rot</div><div class="post"><span class="fig-node">CRC32C scrub</span><span class="fig-arr">→</span><span class="fig-node us">scrub_corruption_total</span></div></div>
             <div class="fig-row"><div class="pre">slow disk</div><div class="post"><span class="fig-node">latency EWMA</span><span class="fig-arr">→</span><span class="fig-node us">vlog_disk_slow</span></div></div>
             <div class="fig-row"><div class="pre">GC behind</div><div class="post"><span class="fig-node">65% garbage</span><span class="fig-arr">→</span><span class="fig-node us">emergency GC</span></div></div>
-            <div class="fig-row"><div class="pre">node loss</div><div class="post"><span class="fig-node">failure detector</span><span class="fig-arr">→</span><span class="fig-node us">replica serves</span></div></div>
+            <div class="fig-row"><div class="pre">node loss</div><div class="post"><span class="fig-node">FAILED after 10 s</span><span class="fig-arr">→</span><span class="fig-node us">raft re-election</span></div></div>
           </div>
         </div>
       </div>
@@ -493,21 +507,22 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
     <div class="toc-doc">
       <div class="toc-head">
-        <h3>VeltrixDB · Technical Reference · v1.8</h3>
-        <span class="meta">11 sections · versions marked</span>
+        <h3>VeltrixDB · Technical Reference · v1.12</h3>
+        <span class="meta">12 sections · versions marked</span>
       </div>
       <div class="toc-list">
         <div class="toc-item"><span class="ch">00</span><span class="nm">Preface &amp; notation<span class="sub">Audience, scope, and how to read this paper</span></span><span class="pg">p. 1</span></div>
         <div class="toc-item"><span class="ch us">01</span><span class="nm">The case for key-value separation<span class="sub">Why LSM compaction is the silent tail-latency killer</span></span><span class="pg">p. 4</span></div>
         <div class="toc-item"><span class="ch us">02</span><span class="nm">Storage engine internals<span class="sub">VLog record format, per-shard index (Go map, or off-heap native table since v1.6), garbage collection</span></span><span class="pg">p. 9</span></div>
         <div class="toc-item"><span class="ch us">03</span><span class="nm">Kernel I/O — pread, pwrite, fdatasync<span class="sub">The Go read path, one pwrite per batch, the opt-in io_uring write bridge</span></span><span class="pg">p. 16</span></div>
-        <div class="toc-item"><span class="ch us">04</span><span class="nm">Durability &amp; its limits<span class="sub">Group-commit WAL, binary WAL format (v1.6), crash replay, checkpoints, replication</span></span><span class="pg">p. 22</span></div>
-        <div class="toc-item"><span class="ch us">05</span><span class="nm">Sharding &amp; placement<span class="sub">8192 index shards, consistent-hash routing, rack-aware placement, resharding</span></span><span class="pg">p. 26</span></div>
-        <div class="toc-item"><span class="ch us">06</span><span class="nm">LIRS cache &amp; small-hot-key resistance<span class="sub">The eviction algorithm and the priority-2 tuning</span></span><span class="pg">p. 31</span></div>
+        <div class="toc-item"><span class="ch us">04</span><span class="nm">Durability &amp; its limits<span class="sub">Adaptive group commit (v1.12), binary WAL format (v1.6), crash replay, checkpoints, Raft vs replicated mode</span></span><span class="pg">p. 22</span></div>
+        <div class="toc-item"><span class="ch us">05</span><span class="nm">Sharding &amp; placement<span class="sub">8192 index shards, client-side consistent-hash routing, static <code>--peers</code> membership, rack-aware placement, rebalancing</span></span><span class="pg">p. 26</span></div>
+        <div class="toc-item"><span class="ch us">06</span><span class="nm">LIRS cache &amp; small-hot-key resistance<span class="sub">The eviction algorithm, the priority-2 tuning, large cold values evicted first</span></span><span class="pg">p. 31</span></div>
         <div class="toc-item"><span class="ch us">07</span><span class="nm">Failure modes<span class="sub">Failure matrix, the metric each one raises, what is tested today, runbooks</span></span><span class="pg">p. 34</span></div>
         <div class="toc-item"><span class="ch us">08</span><span class="nm">Security model<span class="sub">TLS / mTLS, AES-256-GCM at rest, auth, plaintext PITR archives</span></span><span class="pg">p. 38</span></div>
-        <div class="toc-item"><span class="ch us">09</span><span class="nm">Engine work — 2026 (v1.6–v1.7)<span class="sub">Native index, binary WAL, ordered-index fix, experimental C++ front-end, what is not wired in</span></span><span class="pg">p. 39</span></div>
-        <div class="toc-item"><span class="ch">10</span><span class="nm">Appendix — wire protocol &amp; metrics reference<span class="sub">Binary protocol spec and the Prometheus metrics reference</span></span><span class="pg">p. 45</span></div>
+        <div class="toc-item"><span class="ch us">09</span><span class="nm">Engine work — 2026 (v1.6–v1.12)<span class="sub">Native index, binary WAL, ordered-index fix, experimental C++ front-end, adaptive group commit, Raft read barrier, what is not wired in</span></span><span class="pg">p. 39</span></div>
+        <div class="toc-item"><span class="ch us">10</span><span class="nm">Search subsystem<span class="sub">HNSW (float32 / int8 / PQ, disk graph), BM25, hybrid RRF, filters, cluster fan-out, rebuild on start</span></span><span class="pg">new · v1.11+</span></div>
+        <div class="toc-item"><span class="ch">11</span><span class="nm">Appendix — data model, wire protocol &amp; metrics reference<span class="sub">Commands and data types, binary protocol spec, Prometheus metrics reference</span></span><span class="pg">p. 45</span></div>
       </div>
     </div>
   </div>
@@ -524,7 +539,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="chaos-cell">
         <div class="ic">01</div>
         <h4>Crash restart</h4>
-        <p>A crash (or <code>kill -9</code>) means a full replay of <code>wal.log</code> on start. Writes are acknowledged only after WAL and VLog fdatasync, so an acknowledged write is on disk. A clean shutdown instead writes a compacted checkpoint (one record per live key) and renames it over the WAL. <b>Covered by the persistence e2e suite.</b></p>
+        <p>A crash (or <code>kill -9</code>) means a full replay of <code>wal.log</code> on start. Writes are acknowledged only after WAL and VLog fdatasync, so on Linux an acknowledged write is on disk (macOS <code>fsync</code> returns at the drive cache: crash-safe, not power-loss-safe). A clean shutdown instead writes a compacted checkpoint (one record per live key) and renames it over the WAL. <b>Covered by the persistence e2e suite.</b></p>
       </div>
       <div class="chaos-cell">
         <div class="ic">02</div>
@@ -544,12 +559,12 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="chaos-cell">
         <div class="ic">05</div>
         <h4>GC falling behind</h4>
-        <p>GC pauses under read pressure, which alone could stall it forever. It escalates in three tiers and at 65% garbage bypasses the pause unconditionally. Each bypass increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>; a persistent rate means writes exceed sustainable GC bandwidth.</p>
+        <p>GC pauses under read pressure, which alone could stall it forever. It escalates in three tiers and at 65% garbage bypasses the pause unconditionally; a pause left over from a write-only period also clears once no read has arrived for 4 minutes. Each bypass increments <code>veltrixdb_vlog_gc_emergency_runs_total</code>; a persistent rate means writes exceed sustainable GC bandwidth.</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">06</div>
         <h4>Node loss</h4>
-        <p>The failure detector marks unresponsive nodes and replicas keep serving, in async, quorum or strong replication or Raft mode. <code>--rack-id</code> keeps copies of a partition in different racks or zones. <b>Covered by the node-failover e2e suite</b>; we don't publish recovery times we haven't measured reproducibly.</p>
+        <p>A node is <code>FAILED</code> after 10 s without a heartbeat and is left out of search fan-out, but it stays on the hash ring, so the client keeps routing its keys to it. In <code>--mode=raft</code> a lost leader is replaced by election (400–800 ms timeout) and writes follow <code>MOVED</code>. In <code>--mode=replicated</code> a replica whose send fails is marked <code>FAILED</code> and is <b>not</b> brought back until the primary restarts; nothing re-creates lost copies. <b>Covered by the node-failover e2e suite</b>; we don't publish recovery times we haven't measured reproducibly.</p>
       </div>
     </div>
   </div>
@@ -559,8 +574,8 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 <section>
   <div class="wrap reveal">
     <span class="sec-eyebrow">Chapter 9 · sample</span>
-    <h2 class="sh">Engine work, <span class="em">v1.6–v1.7</span>.</h2>
-    <p class="sh-sub">Chapter 9 documents the engine changes that shipped in v1.6 and v1.7. Every number states its conditions, including the ones that did not go our way.</p>
+    <h2 class="sh">Engine work, <span class="em">v1.6–v1.12</span>.</h2>
+    <p class="sh-sub">Chapter 9 documents the engine changes that shipped from v1.6 to v1.12. Every number states its conditions, including the ones that did not go our way.</p>
 
     <div class="chaos">
       <div class="chaos-cell">
@@ -589,9 +604,66 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <p>It used to start on every Linux cgo build. A VLog batch is already one pwrite + one fdatasync, and with the C++ storage extras all on the CI runner measured <b>1.12M vs 1.77M keys/s</b> batch writes. Per-part attribution is pending; <code>scripts/net-bench.sh</code> bisects it. <code>VELTRIXDB_URING_BRIDGE</code> defaults to off.</p>
       </div>
       <div class="chaos-cell">
+        <div class="ic">06</div>
+        <h4>Adaptive group commit — v1.12</h4>
+        <p>The WAL and VLog flushers share one pacer. A lone writer is synced at once; concurrent writers after an idle gap of about one fdatasync (EWMA, clamped 20 µs–2 ms); the 15 ms window is only the upper bound. <b>Emulated 300 µs sync, macOS: lone-writer P50 16 &rarr; 0.45 ms; 64 writers 4.0K &rarr; 37.5K writes/s</b> at the same writes per fdatasync. Durability is unchanged.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">07</div>
+        <h4>Raft read barrier — v1.12</h4>
+        <p>A freshly elected leader used to serve a local GET before applying everything its predecessor had acknowledged. Reads now wait (&le; 2 s) for the leader&rsquo;s no-op to apply. Without it a unit test missed the acknowledged write in 20 of 20 failovers; with it, 0 of 20. <b>Covers GET and MGET only</b>: hash, namespace and <code>RANGE</code> / <code>SCANCUR</code> reads stay local.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">08</div>
+        <h4>Soak and crash tests — v1.12</h4>
+        <p>Nightly: a 20-minute search soak checked against an oracle of acknowledged writes, and 10 SIGKILL / restart cycles. In 3 local cycles every acknowledged vector, document and record was present after restart and no acknowledged delete came back. Writes in flight at the kill are not checked.</p>
+      </div>
+      <div class="chaos-cell">
         <div class="ic">—</div>
         <h4>What is not wired in</h4>
         <p><code>cpp/</code> also holds an ART index, a priority io_uring scheduler, an SQPOLL reader, a C++ VLog and an eBPF GC throttle. They compile, and <b>nothing in Go calls them</b>. The read path is Go <code>pread</code>. The chapter says so explicitly rather than listing them as features.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SEARCH SUBSYSTEM — CHAPTER 10 ============ -->
+<section id="search">
+  <div class="wrap reveal">
+    <span class="sec-eyebrow">Chapter 10 · sample</span>
+    <h2 class="sh">The search subsystem, <span class="em">built on the same keys</span>.</h2>
+    <p class="sh-sub">Since v1.11 the engine serves nearest-neighbour vector search, BM25 full-text search and hybrid search next to the records they describe. The full command reference, tuning and every measurement are in the <a href="docs/concepts/vector-search.html" style="color:var(--red);border-bottom:1px solid var(--red)">vector &amp; hybrid search docs</a>.</p>
+
+    <div class="chaos">
+      <div class="chaos-cell">
+        <div class="ic">01</div>
+        <h4>One id, one record</h4>
+        <p><code>PUT doc-42</code>, <code>VSET doc-42</code> and <code>TSET doc-42</code> describe one thing. Vectors persist as <code>@vec/&lt;ns&gt;/&lt;id&gt;</code> (float32), documents as <code>@txt/&lt;ns&gt;/&lt;id&gt;</code>, settings as <code>@vecns/&lt;ns&gt;</code> — ordinary durable keys. The RAM indexes are <b>derived state</b>, updated by engine hooks on Put / Delete / MultiPut, so replication, Raft apply and restore index correctly. Similarity is cosine.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">02</div>
+        <h4>Memory layouts</h4>
+        <p>Full float32 vectors always stay in the VLog; RAM holds per namespace either float32, int8 codes or PQ codes, with the HNSW layer-0 edges optionally in a mapped file (<code>GRAPH disk</code>). <b>Measured heap per 768-dim vector (10K synthetic, macOS): 3,383 B float32 · 1,078 B int8 · 493 B PQ · 378 B PQ + disk graph</b> (+216 B mapped). int8 / PQ re-rank against the float32 vectors with one parallel <code>MultiGet</code>.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">03</div>
+        <h4>BM25 and hybrid</h4>
+        <p>Okapi BM25 (k1 = 1.2, b = 0.75) over a Unicode tokenizer — no stemming, stop words or phrase queries. <code>HSEARCH</code> fuses the vector and text rankings by weighted Reciprocal Rank Fusion, <code>α/(60 + rank)</code>, α = 0.5 by default; ranks are fused, so cosine and BM25 never need a common scale.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">04</div>
+        <h4>Filters</h4>
+        <p><code>FILTER field op value</code> is evaluated on the KV record whose key is the vector id. An <code>=</code> filter on a field with a secondary index (<code>IDXCREATE</code>) is served from the index — up to 2,048 matches are scored exactly without a graph walk; other filters are checked during a capped walk.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">05</div>
+        <h4>Clusters</h4>
+        <p>Search writes go through the normal Raft or replicated path, and the ring places a record&rsquo;s vector, text and index entries on the record&rsquo;s node. Every search runs on all non-failed nodes and is merged (BM25 with cluster-wide statistics). A peer that misses <code>--search-timeout-ms</code> <b>fails the request</b> unless <code>--search-allow-partial</code>. Node-to-node traffic is signed with HMAC-SHA256 (<code>--cluster-secret-file</code>) or mTLS.</p>
+      </div>
+      <div class="chaos-cell">
+        <div class="ic">06</div>
+        <h4>Restarts and limits</h4>
+        <p>The graph and inverted index are not saved: they are rebuilt from the keys at every start, and searches are refused until that finishes (<code>INFO</code> &rarr; <code>search_ready</code>). <b>GloVe-100, 100K real vectors, float32, ef = 256: recall@10 0.953, p50 0.77 ms</b> (one query at a time, macOS). Tested to 100K real vectors; nothing at 10M+, and no same-hardware comparison with another vector database.</p>
       </div>
     </div>
   </div>
@@ -654,7 +726,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

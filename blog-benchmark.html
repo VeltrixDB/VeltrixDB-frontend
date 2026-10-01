@@ -381,7 +381,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <span class="ah-kind">Benchmark report · 32 pages</span>
     <h1 class="ah-title">The 1B-Key Benchmark <span class="em">— methodology &amp; raw data</span>.</h1>
-    <p class="ah-sub">The setup and percentiles from our internal 3-node, one-billion-key run, which is <b>unverified</b> and not reproducible from published tooling, followed by the benchmark that is reproducible: 100M keys on YCSB, with every condition stated.</p>
+    <p class="ah-sub">The setup and percentiles from our internal 3-node, one-billion-key run, which is <b>unverified</b> and not reproducible from published tooling, followed by the benchmark we measured and can stand behind: 100M keys on YCSB, with every condition stated, and the newer laptop measurements you can re-run from the repo.</p>
     <div class="ah-meta">
       <div class="ah-author">
         <div class="av">AG</div>
@@ -393,7 +393,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="ah-meta-r">
         <span><b>Published</b> · May 21, 2026</span>
         <span><b>Read time</b> · 18 minutes</span>
-        <span><b>Reproducible</b> · YCSB run only (§05)</span>
+        <span><b>Measured</b> · YCSB run (§05) · re-runnable commands (§06)</span>
       </div>
     </div>
   </div>
@@ -409,7 +409,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-body">
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>Update (Sept 2026):</b> we hold ourselves to this post's own title and apply it to the post. The 1B-key GKE run described in §02–§04 was never reproduced, and its harness was never published. Treat every figure from it as <b>internal and unverified</b>. That covers the 4.9 ms P99, 6.2M ops/s, 94.2% hit rate, 1.0× write amplification and the fill rate. The description of how cache misses were served was also wrong: disk reads are a Go <code>pread</code>, not io_uring SQPOLL across 1024 queues. The only reproducible headline numbers are in the <b>YCSB run in §05</b>. The reproduce steps in §06 now use tooling that exists in the repo.</p>
+          <p><b>Update (Sept 2026):</b> we hold ourselves to this post's own title and apply it to the post. The 1B-key GKE run described in §02–§04 was never reproduced, and its harness was never published. Treat every figure from it as <b>internal and unverified</b>. That covers the 4.9 ms P99, 6.2M ops/s, 94.2% hit rate, 1.0× write amplification and the fill rate. The description of how cache misses were served was also wrong: disk reads are a Go <code>pread</code>, not io_uring SQPOLL across 1024 queues. The measured headline numbers are in the <b>YCSB run in §05</b>. (Its YCSB 0.17.0 binding is not in the repo, so that exact run cannot be re-run from it; the repo&rsquo;s go-ycsb harness, <code>bench/compare</code>, is the re-runnable YCSB path.) The reproduce steps in §06 use tooling that exists in the repo.</p>
         </div>
         <div class="a-kicker">Why we benchmark</div>
         <h2 class="a-h">If you can't reproduce it, <span class="em">it didn't happen</span>.</h2>
@@ -542,7 +542,7 @@ sample_hz     = <span class="n">1</span></pre>
         <p>The interesting number is what happens when the LIRS cache misses and we have to go to disk. The internal run reported a cache-miss P99 of <b>4.9 ms</b>, which is <b>unverified</b>. The original text credited io_uring SQPOLL and 1024 NVMe submission queues for it. That was wrong. A miss is served by one 4 KB-aligned Go <code>pread</code> from the VLog, checked with CRC32C (<code>O_DIRECT</code> on Linux), and the index has 8192 shards.</p>
 
         <h3>Writes — the durability path</h3>
-        <p>Group commit amortizes the cost of durability across concurrent writers: one WAL <code>write(2)</code> and one <code>fdatasync</code> per window. The internal run reported a P99 write latency of <code>0.21 ms</code> (unverified). The window setting for that run was not recorded. The current default window is 15 ms, and a writer waits up to one window for its sync. The reproducible write numbers in §05 were taken with 5 ms windows.</p>
+        <p>Group commit amortizes the cost of durability across concurrent writers: one WAL <code>write(2)</code> and one <code>fdatasync</code> per window. The internal run reported a P99 write latency of <code>0.21 ms</code> (unverified). The window setting for that run was not recorded. The reproducible write numbers in §05 were taken with 5 ms windows and fixed group commit, where a writer waits up to one window for its sync. Since v1.12 the default is adaptive group commit: the 15 ms default window is only an upper bound, and a lone writer is synced at once (with an emulated 300 µs sync on macOS, one writer&rsquo;s P50 went from 16.0 ms to 0.45 ms).</p>
       </div>
     </section>
 
@@ -552,7 +552,7 @@ sample_hz     = <span class="n">1</span></pre>
       <div class="a-body">
         <div class="a-kicker">Measured</div>
         <h2 class="a-h">The run we can <span class="em">stand behind</span>.</h2>
-        <p class="a-lede">These are the only reproducible headline numbers we have: a single-node YCSB run on June 9, 2026. It is smaller than the 1B-key run, and every condition is stated.</p>
+        <p class="a-lede">These are the headline numbers we can back with a recorded run: a single-node YCSB run on June 9, 2026. It is smaller than the 1B-key run, and every condition is stated. The YCSB 0.17.0 binding it used is not in the repo, so it cannot be re-run from there; §06 lists what can.</p>
         <p>This run is <b>historical</b>. It used a pure-Go build, before the off-heap native index, the binary WAL, the one-<code>write(2)</code> WAL flusher and the opt-in C++ network front-end. Those changes shipped later, in v1.5–v1.7.</p>
 
         <div class="spec">
@@ -585,6 +585,11 @@ sample_hz     = <span class="n">1</span></pre>
 
         <h3>What this run does not show</h3>
         <p>Because the whole dataset was in cache, this run says nothing about cache-miss latency from NVMe. It also doesn't cover 1 billion keys or a multi-node cluster. Later measurements, each under its own conditions, are listed on the <a class="inline" href="performance.html#performance">performance page</a>. On v1.7, server batch writes on macOS (8 clients × 1024-key MPUT, 1M-key space) reached 3.54M keys/s at P99 4.2 ms. On a 4-CPU CI runner with tmpfs and the client on the same host, the Go front-end measured 1.77M keys/s batch writes and 177–182K reads/s.</p>
+
+        <div class="callout">
+          <div class="ico">i</div>
+          <p><b>Update (Oct 2026, v1.11–v1.12).</b> Newer measurements, all on one macOS laptop with the client on the same host, so they do not predict a Linux NVMe server and are not comparable with the June run. go-ycsb (<code>bench/compare</code>, 20K records, 16 threads, zipfian): workload C 55,287 ops/s at P99 0.39 ms, B 52,255 ops/s at P99 0.65 ms, A 34,640 ops/s at P99 1.30 ms; macOS <code>fsync</code> does not reach the platter, so the write latencies are a lower bound. Adaptive group commit with an emulated 300 µs sync: 64 durable writers 4,053 → 37,504 writes/s. Vector search on GloVe-100 (100K words, in-process): recall@10 0.953 at ef = 256, p50 0.77 ms. No other database has been run on the same hardware. Full tables, conditions and commands are on the <a class="inline" href="performance.html#oct-2026">performance page</a>.</p>
+        </div>
       </div>
     </section>
 
@@ -595,7 +600,7 @@ sample_hz     = <span class="n">1</span></pre>
         <div class="a-kicker">How to reproduce</div>
         <h2 class="a-h">Run it yourself <span class="em">with the tools in the repo</span>.</h2>
         <p class="a-lede">The internal 1B-key harness was never published, so that run can't be reproduced. What you can run today is the server plus the repo's own load generator, <code>cmd/loadtest</code>, against your own hardware.</p>
-        <p>You'll need a Linux host with local NVMe (network-attached disks change the latency picture completely), Go, and a checkout of the VeltrixDB repo. <code>cmd/loadtest</code> is not YCSB, so its numbers are not directly comparable with §05. The YCSB client binding used for §05 is not in the repo.</p>
+        <p>You'll need a Linux host with local NVMe (network-attached disks change the latency picture completely), Go, and a checkout of the VeltrixDB repo. <code>cmd/loadtest</code> is not YCSB, so its numbers are not directly comparable with §05. The YCSB client binding used for §05 is not in the repo; for YCSB workloads A–F use go-ycsb in <code>bench/compare</code> (Step 5).</p>
 
         <h3>Step 1 — start a single node</h3>
         <p>One data directory per NVMe disk, and a cache large enough for your dataset. The example uses the 5 ms windows from §05; the default for both is 15 ms.</p>
@@ -644,6 +649,26 @@ sample_hz     = <span class="n">1</span></pre>
 <pre><span class="c">$</span> go run ./cmd/loadtest --addr=127.0.0.1:9000 --mode=read \
     --num-keys=100000000 --value-size=100 \
     --concurrency=200 --duration=60</pre>
+        </div>
+
+        <h3>Step 5 — YCSB A–F and the October tables</h3>
+        <p>These are the commands behind the October 2026 numbers on the performance page. <code>bench/compare</code> is a separate Go module (Go ≥ 1.25); with <code>START=0</code> it uses a server already running at <code>127.0.0.1:9000</code>.</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">~/VeltrixDB · zsh</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="c"># go-ycsb A–F against a running server</span>
+<span class="c">$</span> cd bench/compare &amp;&amp; START=0 DBS=veltrixdb RECORDS=20000 OPS=20000 \
+    THREADS=16 WORKLOADS="a b c d e f" ./compare.sh
+
+<span class="c"># durable single-key writes, adaptive vs fixed group commit (emulated sync)</span>
+<span class="c">$</span> VELTRIX_GC_TABLE=1 go test ./storage -run TestGroupCommit_LatencyTable -v
+
+<span class="c"># vector recall on GloVe-100 (needs h5py + numpy)</span>
+<span class="c">$</span> scripts/ann-dataset.py glove-100-angular /tmp/ann --train 100000 --test 500
+<span class="c">$</span> VELTRIX_ANN_DIR=/tmp/ann go test ./storage -run TestRealEmbeddings -v -timeout 30m</pre>
         </div>
 
         <div class="callout">
@@ -743,7 +768,7 @@ Internal run (unverified): harness <b>veltrixdb/bench-harness</b> (private) · <
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

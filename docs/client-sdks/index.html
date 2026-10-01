@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -90,7 +91,7 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Client SDKs<span class="sep">/</span>SDK Overview</div>
     <h1>Client SDK Overview</h1>
-<p class="page-lede">VeltrixDB ships official client libraries for six languages. Every SDK speaks the same auto-detected binary wire protocol, so behavior, performance characteristics, and error semantics are consistent no matter which one you pick.</p>
+<p class="page-lede">VeltrixDB ships official client libraries for six languages, maintained in the separate Veltrixdb-client repository. Every SDK speaks the same auto-detected binary wire protocol, so behavior, performance characteristics, and error semantics are consistent no matter which one you pick. Search (v1.11) is not in those SDKs yet: use the Go <code>client</code> package in the server repository, or send the text commands over a socket.</p>
 
 <h2 id="available-sdks">Available SDKs</h2>
 <p>All clients connect to the plaintext TCP port (<code>9000</code> by default, server flag <code>-addr</code>) or, when the server has TLS configured, to the separate TLS port (<code>9443</code> by default, <code>-tls-addr</code>). The default Go server auto-detects the protocol per connection and also accepts a human-readable text protocol on the same port for quick <code>nc</code>/<code>telnet</code> testing, but the SDKs use the binary protocol.</p>
@@ -132,9 +133,37 @@
 <span><span class="callout-title">Disk density bonus</span> Server-side, batched writes pack multiple small records into each 4&nbsp;KB VLog block. For 128&nbsp;B values that's roughly a 25&times; disk-density gain over single-key <code>Put</code> calls, which each consume one full block. See the <a class="inline-link" href="../operations/performance-tuning.html">Performance Tuning</a> guide for the block-packing details.</span>
 </div>
 
+<h2 id="search">Vector, text and hybrid search</h2>
+<p><span class="badge good">New in v1.11</span> The search commands &mdash; <code>VCREATE</code> (with <code>QUANT</code>, <code>PQM</code>, <code>PQTRAIN</code>, and <code>GRAPH disk</code> since v1.12), <code>VSET … NS</code>, <code>VSEARCH</code> with <code>NS</code>/<code>EF</code>/<code>FILTER</code>, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code> and <code>IDXCREATE</code>/<code>IDXQUERY</code> &mdash; are server features on the text and binary protocols. Client support:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Client</th><th>Search API</th></tr></thead>
+<tbody>
+<tr><td>Go, in-repo <code>github.com/VeltrixDB/veltrixdb/client</code> &mdash; <code>BinaryConn</code>, <code>TCPConn</code></td><td>Full: <code>VCreate</code>, <code>VCreateWithOptions</code>, <code>VSetNS</code>, <code>VSet</code>, <code>VDel</code>, <code>VSearch</code>, <code>VSearchWithOptions</code>, <code>TSet</code>, <code>TDel</code>, <code>TSearch</code>, <code>HSearch</code>, <code>IdxCreate</code>/<code>IdxDrop</code>/<code>IdxQuery</code>. See <a class="inline-link" href="go.html#search">Go &rarr; Search</a>.</td></tr>
+<tr><td>Go, in-repo cluster-aware <code>client.Client</code></td><td>None (only <code>Put</code>/<code>Get</code>/<code>Delete</code>).</td></tr>
+<tr><td>The six SDKs in Veltrixdb-client</td><td>Not updated with the search release. From any language, open a TCP socket to <code>-addr</code> and send the text commands, one per line; each search answers <code>id score</code> lines then <code>END</code>, or one <code>ERR …</code> line. The text protocol is line-based, so <code>TSET</code> text cannot contain newlines and filter values cannot contain spaces.</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><div class="code-label">text protocol</div><code>VCREATE docs 4 QUANT int8
+OK
+PUT doc-42 {"lang":"en"}
+OK
+VSET doc-42 NS docs 0.12 -0.03 0.88 0.41
+OK
+VSEARCH 10 NS docs EF 128 FILTER lang = en 0.1 0 0.9 0.4
+doc-42 0.9991367
+END
+TSET doc-42 NS docs TEXT how to rotate keys
+OK
+TSEARCH 5 NS docs QUERY rotate
+doc-42 0.2876821
+END</code></pre>
+<p>Command syntax, filters, memory layouts and measured recall are on <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+
 <h2 id="languages">Browse by language</h2>
 <div class="card-grid">
-<a class="card" href="go.html"><div class="card-title">Go →</div><div class="card-desc">Connection-pooled client with the full API surface: KV, batch, namespaces, hash fields, range scans, transactions, and vector search.</div></a>
+<a class="card" href="go.html"><div class="card-title">Go →</div><div class="card-desc">Connection-pooled SDK for KV, batch, namespaces, hash fields, scans and transactions &mdash; plus the in-repo client package with the full search API.</div></a>
 <a class="card" href="python.html"><div class="card-title">Python →</div><div class="card-desc">Pure stdlib client (socket + struct), single-connection and thread-safe pool variants.</div></a>
 <a class="card" href="nodejs.html"><div class="card-title">Node.js →</div><div class="card-desc">Promise-based async client built on the built-in net/tls modules, with an async connection pool.</div></a>
 <a class="card" href="java.html"><div class="card-title">Java →</div><div class="card-desc">Blocking Socket-based client plus a thread-safe VeltrixDBPool for concurrent servers.</div></a>
@@ -143,7 +172,7 @@
 </div>
 
 <h2 id="cluster-aware-client">Cluster-aware client (Go, bundled with the server)</h2>
-<p>The SDKs above each talk to a single node. VeltrixDB's server repository also ships a separate, cluster-aware Go client (<code>client.NewClient</code>, package <code>github.com/VeltrixDB/veltrixdb/client</code>) for use against <code>raft</code> or <code>replicated</code> deployments. It fetches cluster topology, builds the same consistent-hash ring the server uses to route keys, and transparently follows <code>MOVED</code> redirects to the current Raft leader. This is a different package from <code>veltrixdb-client-go</code> covered on the <a class="inline-link" href="go.html">Go page</a> — reach for it specifically when you're running a multi-node cluster and want client-side routing. See <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a> for when each mode applies.</p>
+<p>The SDKs above each talk to a single node. VeltrixDB's server repository also ships a separate, cluster-aware Go client (<code>client.NewClient</code>, package <code>github.com/VeltrixDB/veltrixdb/client</code>) for use against <code>raft</code> or <code>replicated</code> deployments. It fetches cluster topology with the <code>TOPOLOGY</code> command, builds the same consistent-hash ring the server uses to route keys, and transparently follows <code>MOVED</code> redirects to the current Raft leader. It uses the text protocol, offers only <code>Put</code>/<code>Get</code>/<code>Delete</code>, and has no search methods. This is a different package from <code>veltrixdb-client-go</code> covered on the <a class="inline-link" href="go.html">Go page</a> — reach for it specifically when you're running a multi-node cluster and want client-side routing. See <a class="inline-link" href="../concepts/deployment-modes.html">Deployment Modes</a> for when each mode applies.</p>
 
     <div class="page-nav">
 <a class="prev" href="../concepts/deployment-modes.html"><span class="dir">&larr; Previous</span><span>Deployment Modes</span></a>

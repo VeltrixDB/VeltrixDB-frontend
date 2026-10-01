@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -183,6 +184,9 @@ pub enum SetNxOutcome { Created, Existed }</code></pre>
 <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
 <span><span class="callout-title">Not yet in this crate</span> The Rust client intentionally stays blocking-only and single-connection to avoid pulling in 50+ transitive dependencies. Not yet implemented: an async client (would add <code>tokio</code> + <code>bytes</code>), <code>MultiPut</code>/<code>MultiGet</code> batch framing (the wire format matches the Go client's — see the <a class="inline-link" href="go.html">Go batch operations</a> section), TLS (planned via <code>rustls</code>), and connection pooling (wrap <code>Client</code> in your own pool, e.g. <code>r2d2</code>, for concurrent callers).</span>
 </div>
+
+<h2 id="search">Vector, text and hybrid search</h2>
+<p>This SDK has no search methods: the Veltrixdb-client SDKs were not updated with the v1.11 search release. The search commands (<code>VCREATE</code>, <code>VSET … NS</code>, <code>VSEARCH</code>, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code>, <code>IDXCREATE</code>/<code>IDXQUERY</code>) are available over the text and binary protocols, and as typed methods only in the Go <code>client</code> package in the server repository (<a class="inline-link" href="go.html#search">Go &rarr; Search</a>; its cluster-aware <code>client.Client</code> has none). From Rust, open a plain TCP socket to the server's <code>-addr</code> and send one text command per line; each search answers <code>id score</code> lines then <code>END</code>, or one <code>ERR …</code> line. Text cannot contain newlines and filter values cannot contain spaces on this protocol. Syntax: <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
 
     <div class="page-nav">
 <a class="prev" href="../client-sdks/java.html"><span class="dir">&larr; Previous</span><span>Java</span></a>

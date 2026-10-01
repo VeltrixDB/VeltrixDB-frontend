@@ -8,7 +8,7 @@
 <link rel="canonical" href="https://veltrixdb.com/redis-comparison.html" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 <meta name="author" content="Shubham Sharma" />
-<meta name="keywords" content="VeltrixDB vs Redis, Redis alternative, Redis P99 latency spikes, Redis memory cost, migrate from Redis to VeltrixDB, key-value database comparison, Redis GC death spiral, NVMe database, Redis replacement" />
+<meta name="keywords" content="VeltrixDB vs Redis, Redis alternative, Redis P99 latency spikes, Redis memory cost, migrate from Redis to VeltrixDB, key-value database comparison, VeltrixDB vs Redis Stack vector search, NVMe database, Redis replacement" />
 <meta property="og:type" content="article" />
 <meta property="og:url" content="https://veltrixdb.com/redis-comparison.html" />
 <meta property="og:site_name" content="VeltrixDB" />
@@ -18,7 +18,7 @@
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="article:published_time" content="2026-05-01T00:00:00+00:00" />
-<meta property="article:modified_time" content="2026-09-25T00:00:00+00:00" />
+<meta property="article:modified_time" content="2026-10-01T00:00:00+00:00" />
 <meta property="article:author" content="Shubham Sharma" />
 <meta property="article:section" content="Database Engineering" />
 <meta property="article:tag" content="Redis" />
@@ -424,7 +424,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="ah-meta-r">
         <span><b>Published</b> · May 2026</span>
         <span><b>Read time</b> · 12 minutes</span>
-        <span><b>Updated</b> · Sep 2026 · v1.8</span>
+        <span><b>Updated</b> · Oct 2026 · v1.12</span>
       </div>
     </div>
   </div>
@@ -499,7 +499,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
                 <td>Durable single write · P99</td>
                 <td class="warn">varies with AOF</td>
                 <td class="vdb">47.3 ms</td>
-                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB: measured, YCSB load, WAL + fdatasync before every ACK, 5 ms flush windows, 18,064 ops/s</td>
+                <td style="font-family:var(--sans);font-size:12.5px;color:var(--ink-3);text-align:left">VeltrixDB: measured, YCSB load, WAL + fdatasync before every ACK, 5 ms fixed flush windows (before adaptive group commit, v1.12), 18,064 ops/s</td>
               </tr>
               <tr>
                 <td>Batch writes (1024-key MPUT)</td>
@@ -521,7 +521,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>The GC death spiral — and why VeltrixDB can't get stuck in it.</b> VeltrixDB's own value-log GC backs off when read latency rises, to protect reads. Done naively, that is a spiral: GC pauses, garbage accumulates, reads stay slow, GC stays paused. The GC escalates in three tiers, and at 65% garbage it bypasses the read-pressure pause unconditionally, so it cannot stay paused forever. <code>veltrixdb_vlog_gc_emergency_runs_total</code> counts every time that happens.</p>
+          <p><b>The GC death spiral — and why VeltrixDB can't get stuck in it.</b> VeltrixDB's own value-log GC backs off when read latency rises, to protect reads. Done naively, that is a spiral: GC pauses, garbage accumulates, reads stay slow, GC stays paused. The GC escalates in three tiers, and at 65% garbage it bypasses the read-pressure pause unconditionally, so it cannot stay paused forever (a stale pause also clears after 4 minutes without reads). Redis has no value-log GC — its tail risk is the fork. <code>veltrixdb_vlog_gc_emergency_runs_total</code> counts every time that happens.</p>
         </div>
       </div>
     </section>
@@ -531,37 +531,26 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-num">03</div>
       <div class="a-body">
         <div class="a-kicker">Storage cost</div>
-        <h2 class="a-h">RAM is 15× more expensive <span class="em">per gigabyte than NVMe</span>.</h2>
-        <p class="a-lede">This math doesn't change. At small scale it doesn't matter. At 100M+ keys, it can be the difference between a few hundred and a few thousand dollars a month. The table below is <b>calculated from list prices and record sizes, not measured</b>.</p>
+        <h2 class="a-h">VeltrixDB's RAM scales with <span class="em">keys, not value bytes</span>.</h2>
+        <p class="a-lede">VeltrixDB moves values to NVMe, but the whole index stays in RAM. So the RAM saving depends on value size: with small values it is small; with 1 KB values it is roughly 4–7×. The table below is <b>per-key arithmetic, not a measurement</b>.</p>
 
-        <div class="spec">
+        <div class="lat-table">
           <table>
-            <tr>
-              <td>10M keys · 128B values</td>
-              <td>
-                Redis: <b>~2.5 GB RAM</b> → r6g.xlarge ~$150/mo<br>
-                VeltrixDB: <b>~1.5 GB NVMe</b> → fits on any local-SSD instance
-              </td>
-            </tr>
-            <tr>
-              <td>100M keys · 128B values</td>
-              <td>
-                Redis: <b>~25 GB RAM</b> → r6g.4xlarge ~$1,100/mo<br>
-                VeltrixDB: <b>~15 GB NVMe</b> → n2-standard-8-lssd ~$280/mo
-              </td>
-            </tr>
-            <tr>
-              <td>1B keys · 128B values</td>
-              <td>
-                Redis: <b>~250 GB RAM</b> → r6g.metal cluster ~$6,000–8,000/mo<br>
-                VeltrixDB: <b>~160 GB NVMe</b> across 3 nodes → ~<b>$900/mo</b> (estimate; 1B keys has not been measured reproducibly)
-              </td>
-            </tr>
+            <thead>
+              <tr><th>Keys · value</th><th>Redis RAM (estimate)</th><th>VeltrixDB RAM (index)</th><th>VeltrixDB NVMe (packed values)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>100M · 128 B</td><td class="redis">~25 GB</td><td class="vdb">~14–23 GB</td><td>~15 GB</td></tr>
+              <tr><td>1B · 128 B</td><td class="redis">~250 GB</td><td class="vdb">~142–232 GB</td><td>~160 GB</td></tr>
+              <tr class="highlight"><td>100M · 1 KB</td><td class="redis">&gt; 100 GB</td><td class="vdb">~14–23 GB</td><td>~137 GB</td></tr>
+              <tr class="highlight"><td>1B · 1 KB</td><td class="redis">&gt; 1 TB</td><td class="vdb">~142–232 GB</td><td>~1.4 TB</td></tr>
+            </tbody>
           </table>
         </div>
 
-        <p>For batched writes (MultiPut), VeltrixDB's block packing puts <b>up to ~26 records into a single 4 KB VLog block</b> — about 152 B per 128-byte value. A single <code>Put</code> stays on the unpacked path. Storing one record per 4 KB block would waste ~96% of every block; at 1 billion keys that is the difference between roughly 160 GB and 4,096 GB. The DRAM side is separate: the index costs ~64 B per key plus the key itself, and the ordered index for RANGE adds ~90 B per key unless you turn it off with <code>--disable-ordered-index</code>.</p>
-        <p>If your dataset fits comfortably in RAM and you're not cost-constrained — Redis is the simpler choice. If your keyspace is growing and the RAM bill is growing with it, that's the signal to benchmark VeltrixDB against your workload.</p>
+        <p>The VeltrixDB RAM column is the index: <b>~142 B per key</b> with the native index (measured at 5M keys), plus <b>~90 B per key</b> for the ordered index that serves <code>RANGE</code> / <code>SCANCUR</code> unless you start with <code>--disable-ordered-index</code> — plus whatever LIRS cache you configure. The Redis column is an estimate of values plus per-key overhead; we have not measured it. Nothing at 1 billion keys has been measured reproducibly.</p>
+        <p>With 128-byte values the index is about as large as the values, so VeltrixDB <b>saves little RAM</b> there; its advantage at that size is NVMe durability without fork-based persistence. The disk side relies on block packing: batched writes (<code>MultiPut</code>, and GC relocation) put up to ~26 records into one 4 KB VLog block, ~152 B per 128-byte value. A single <code>Put</code> stays on the unpacked path and takes a whole 4 KB block. Price RAM and NVMe for your own instance types rather than relying on a fixed ratio.</p>
+        <p>If your dataset fits comfortably in RAM and you're not cost-constrained — Redis is the simpler choice. If your keyspace is growing, your values are large, and the RAM bill is growing with them, that's the signal to benchmark VeltrixDB against your workload.</p>
       </div>
     </section>
 
@@ -570,7 +559,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-num">04</div>
       <div class="a-body">
         <div class="a-kicker">Write amplification &amp; SSD wear</div>
-        <h2 class="a-h">Every byte should land on NVMe <span class="em">exactly once</span>.</h2>
+        <h2 class="a-h">Every value should land on NVMe <span class="em">once</span> — until GC moves it.</h2>
         <p class="a-lede">Write amplification is how many times a byte gets written to storage for every one byte of user data. At 1× you're paying for your data once. At 30× you're paying thirty times — in SSD wear, in NVMe IOPS, and in latency tail.</p>
 
         <div class="spec">
@@ -585,16 +574,16 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             </tr>
             <tr>
               <td>VeltrixDB</td>
-              <td><span class="good">~1× by design</span> — values are appended once to the Value Log and never sorted. GC copies still-live values forward when it reclaims a region, so the real figure rises with how much live data GC relocates. Not measured.</td>
+              <td><span class="good">~1× by design for batched writes</span> — values are appended once to the Value Log and never sorted; the WAL carries only a header and the key. GC copies still-live values forward when it reclaims a region, and a single small <code>Put</code> pads to a whole 4 KB block, so the real figure is higher. Not measured.</td>
             </tr>
           </table>
         </div>
 
-        <p>VeltrixDB uses <b>WiscKey key-value separation</b>: the per-shard in-memory index (8192 shards) holds only key metadata — offset, disk index, value size, flags, TTL, version. Values go to an append-only Value Log on NVMe. There is no LSM compaction; the value-log GC relocates live values out of mostly-dead regions and skips keys read recently. With a low overwrite rate, write amplification stays close to 1×; heavy overwrites make GC do more copying.</p>
+        <p>VeltrixDB uses <b>WiscKey key-value separation</b>: the per-shard in-memory index (8192 shards) holds a 64-byte entry per key — offset, disk index, on-disk and plaintext sizes, CRC32C, write time, TTL, flags. Values go to an append-only Value Log on NVMe. There is no LSM compaction; the value-log GC relocates live values out of mostly-dead regions and skips keys written in the last 30 s. With a low overwrite rate, write amplification stays close to 1×; heavy overwrites make GC do more copying.</p>
 
         <div class="callout good">
           <div class="ico">✓</div>
-          <p><b>What this means for SSDs (arithmetic, not a benchmark).</b> At 100K writes/sec of 128 B values, 1× write amp writes 12.8 MB/s to NVMe. At 10× (a typical LSM figure) that's 128 MB/s — proportionally more SSD wear and more IOPS to provision.</p>
+          <p><b>What this means for SSDs (arithmetic, not a benchmark).</b> At 100K batched writes/sec of 128 B values, 1× write amp writes 12.8 MB/s to NVMe (unbatched single <code>Put</code>s would pad each to 4 KB). At 10× (a typical LSM figure) that's 128 MB/s — proportionally more SSD wear and more IOPS to provision.</p>
         </div>
       </div>
     </section>
@@ -608,7 +597,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <p class="a-lede">This is not a takedown of Redis. It is the right tool for a large number of workloads. Knowing when not to migrate is as important as knowing when to.</p>
         <ul>
           <li><b>Your full dataset fits comfortably in RAM</b> — if you have 5M keys at 256 bytes, Redis's DRAM-only path has zero NVMe latency on any read. The advantage of VeltrixDB's cache tier disappears.</li>
-          <li><b>You need pub/sub, streams, sorted sets, or Lua scripting</b> — Redis has a rich data structure model built over decades. VeltrixDB is a key-value store. If your application relies on <code>ZRANGEBYSCORE</code>, <code>XREAD</code>, or Lua, stay on Redis.</li>
+          <li><b>You need pub/sub, streams, sorted sets, or Lua scripting</b> — Redis has a rich data structure model built over decades. VeltrixDB is a key-value store. VeltrixDB has hashes (with per-field TTL), lists, sets, counters, CAS, TTLs, ordered key range scans, secondary indexes and one-shot transactions — but none of those four. If your application relies on <code>ZRANGEBYSCORE</code>, <code>XREAD</code>, <code>PUBLISH</code> or Lua, stay on Redis.</li>
           <li><b>Your team already runs Redis and has no latency complaints</b> — operational familiarity is real value. Don't fix what isn't broken.</li>
           <li><b>You need a fully-managed hosted service today</b> — Redis Cloud, ElastiCache, Upstash, and Momento all exist and are production-hardened. VeltrixDB is self-hosted only today; a managed service is planned, not available.</li>
           <li><b>Your workload is write-once, read-many and fits in RAM</b> — with no overwrites there is little background rewriting on either side, so VeltrixDB's tail-latency design has little to fix.</li>
@@ -622,13 +611,13 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="a-body">
         <div class="a-kicker">When VeltrixDB wins</div>
         <h2 class="a-h">The specific problems <span class="em">VeltrixDB was built to solve</span>.</h2>
-        <p class="a-lede">VeltrixDB earns its place when your dataset is outgrowing your RAM budget, when your production dashboards show Redis P99 spikes you can't explain, or when you're running on Kubernetes with local NVMe and want first-class tooling.</p>
+        <p class="a-lede">VeltrixDB earns its place when your dataset is outgrowing your RAM budget, when your production dashboards show Redis P99 spikes you can't explain, or when you're running on Kubernetes with local NVMe.</p>
         <ul>
           <li><b>Your dataset doesn't fit in RAM — or fitting it costs too much</b> — VeltrixDB's LIRS cache keeps hot keys in DRAM (default <code>-cache</code> 256 MB; size it to your hot set) and a miss costs one <code>pread</code> of a 4 KB VLog block. Your hit rate depends on your access skew — measure it with <code>veltrixdb_cache_hit_rate</code>.</li>
           <li><b>Unpredictable P99 under sustained write pressure</b> — if your Redis P99 spikes during AOF rewrite or background save: VeltrixDB never forks, and its admission-controlled three-tier GC is designed to keep background work out of the read tail. That is a design goal; benchmark it on your workload rather than taking a ceiling on faith.</li>
           <li><b>High-concurrency bulk writes</b> — MultiPut with 1024-key batches measured 3.54M keys/s (8 clients, 1M-key space, macOS, v1.7) and 1.77M keys/s on a 4-CPU CI runner (tmpfs, same-host client). VLog appends reserve offsets with an atomic add, and a batch is one <code>pwrite</code> plus one <code>fdatasync</code>.</li>
-          <li><b>Kubernetes with local NVMe SSDs</b> — first-class Kubernetes Operator, Helm chart, and GKE local SSD auto-detection. The nvme-prep DaemonSet formats the local SSDs (XFS) and handles kubelet mount-namespace isolation on GKE/EKS/AKS.</li>
-          <li><b>Write amplification and SSD cost matter</b> — values are written once and never re-sorted, so there is no LSM-style 10–30× rewrite; GC relocation is the only extra copying.</li>
+          <li><b>Kubernetes with local NVMe SSDs</b> — a Kubernetes Operator and a Helm chart (with an nvme-prep DaemonSet that formats local SSDs as XFS) live in separate repositories; the main repository ships the <code>kubectl-veltrix</code> plugin and Prometheus rules.</li>
+          <li><b>Write amplification and SSD cost matter</b> — values are written once and never re-sorted, so there is no LSM-style 10–30× rewrite; GC relocation and 4 KB padding of single <code>Put</code>s are the extra bytes.</li>
           <li><b>You need predictable latency at scale — not just at P50</b> — an internal 3-node GKE run (<b>unverified</b>, not reproduced with a published harness) recorded zero GC emergency runs over 30 minutes of sustained 80R/20W load. The reproducible numbers are on the <a class="inline" href="performance.html">performance page</a>.</li>
         </ul>
       </div>
@@ -656,22 +645,26 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
               <tr><td>No fork for persistence</td><td class="warn">⚠ AOF rewrite / RDB fork</td><td class="yes">✓ group-commit WAL</td></tr>
               <tr><td>NVMe storage tier</td><td class="no">—</td><td class="yes">✓</td></tr>
               <tr><td>Values never re-sorted (WiscKey)</td><td class="no">—</td><td class="yes">✓</td></tr>
-              <tr><td>GC cannot be permanently paused</td><td class="no">—</td><td class="yes">✓ three-tier</td></tr>
+              <tr><td>Value-log GC that cannot be permanently paused</td><td class="no">n/a · no value-log GC</td><td class="yes">✓ three-tier</td></tr>
+              <tr><td>Hashes / lists / sets</td><td class="yes">✓</td><td class="yes">✓ HSET (per-field TTL), LPUSH, SADD …</td></tr>
               <tr><td>Pub/Sub</td><td class="yes">✓</td><td class="no">—</td></tr>
               <tr><td>Sorted sets / ZRANGEBYSCORE</td><td class="yes">✓</td><td class="no">—</td></tr>
-              <tr><td>Ordered range scans</td><td class="yes">✓ sorted sets / SCAN</td><td class="yes">✓ RANGE / SCANCUR</td></tr>
+              <tr><td>Ordered range scans</td><td class="yes">✓ sorted sets / SCAN</td><td class="yes">✓ RANGE / SCANCUR (local node in clusters)</td></tr>
               <tr><td>Streams (XREAD/XADD)</td><td class="yes">✓</td><td class="no">—</td></tr>
               <tr><td>Lua scripting</td><td class="yes">✓</td><td class="no">—</td></tr>
-              <tr><td>Atomic CAS / INCR / DECR</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-              <tr><td>TTL / key expiry</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>Atomic CAS / INCR / DECR / SETNX</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+              <tr><td>Multi-key transactions</td><td class="yes">✓ MULTI / EXEC, WATCH</td><td class="yes">✓ one-shot TXN, version check, read-committed</td></tr>
+              <tr><td>Secondary indexes</td><td class="warn">⚠ Redis Query Engine / RediSearch</td><td class="yes">✓ IDXCREATE / IDXQUERY (equality)</td></tr>
+              <tr><td>Vector · full-text · hybrid search</td><td class="warn">⚠ Redis Query Engine / RediSearch</td><td class="yes">✓ built in — see §08</td></tr>
+              <tr><td>TTL / key expiry</td><td class="yes">✓</td><td class="yes">✓ PUTEX / binary PUT TTL</td></tr>
               <tr><td>Encryption at rest (AES-256-GCM)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
               <tr><td>TLS in transit</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-              <tr><td>Multi-node replication</td><td class="yes">✓</td><td class="yes">✓ async/quorum/strong</td></tr>
-              <tr><td>Kubernetes Operator</td><td class="warn">⚠ third-party</td><td class="yes">✓ first-class</td></tr>
+              <tr><td>Multi-node replication</td><td class="yes">✓</td><td class="yes">✓ Raft, or replicated (eventual default / quorum / strong)</td></tr>
+              <tr><td>Kubernetes Operator</td><td class="warn">⚠ third-party</td><td class="yes">✓ separate repository</td></tr>
               <tr><td>Prometheus metrics</td><td class="yes">✓</td><td class="yes">✓</td></tr>
               <tr><td>Change data capture (CDC)</td><td class="no">—</td><td class="yes">✓ built-in</td></tr>
-              <tr><td>Go / Python / Node / Rust / C++ SDKs</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-              <tr><td>RESP protocol compatibility</td><td class="yes">✓</td><td class="roadmap">roadmap</td></tr>
+              <tr><td>Go / Python / Node / Rust / C++ SDKs</td><td class="yes">✓</td><td class="yes">✓ Go in the main repo; others in Veltrixdb-client</td></tr>
+              <tr><td>RESP protocol compatibility</td><td class="yes">✓</td><td class="roadmap">roadmap · not implemented</td></tr>
               <tr><td>Managed cloud service</td><td class="yes">✓</td><td class="roadmap">planned · self-hosted today</td></tr>
             </tbody>
           </table>
@@ -679,13 +672,43 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       </div>
     </section>
 
-    <!-- 08: Migration -->
-    <section class="a-section a-grid reveal">
+    <!-- 08: Vector search -->
+    <section class="a-section a-grid reveal" id="vector-search">
       <div class="a-num">08</div>
       <div class="a-body">
+        <div class="a-kicker">Vector &amp; hybrid search</div>
+        <h2 class="a-h">Against Redis Stack-style search, <span class="em">feature by feature</span>.</h2>
+        <p class="a-lede">Redis does vector, full-text and hybrid queries through the Redis Query Engine (the RediSearch module, shipped in Redis Stack and bundled with Redis 8). VeltrixDB has its own built in since v1.11. This is a feature comparison only: <b>no performance comparison has been run</b> on shared hardware, so none is shown.</p>
+
+        <div class="matrix">
+          <table>
+            <thead><tr><th>Capability</th><th>Redis Query Engine</th><th>VeltrixDB</th></tr></thead>
+            <tbody>
+              <tr><td>Vector index</td><td class="yes">✓ HNSW and flat</td><td class="yes">✓ HNSW; <code>k = 0</code> is an exact scan</td></tr>
+              <tr><td>Distance</td><td class="yes">✓ cosine / L2 / inner product</td><td class="warn">cosine only</td></tr>
+              <tr><td>Where vectors live</td><td class="warn">RAM, with the data</td><td class="yes">float32 on NVMe; RAM holds float32, int8 or PQ codes + graph</td></tr>
+              <tr><td>Compressed vectors</td><td class="warn">depends on version — check its docs</td><td class="yes">✓ int8, PQ, layer-0 graph in a mapped file; re-rank against float32</td></tr>
+              <tr><td>Full-text</td><td class="yes">✓ stemming, phrases, field weights</td><td class="warn">BM25, Unicode tokenizer; no stemming, phrases or field weights</td></tr>
+              <tr><td>Hybrid vector + text</td><td class="yes">✓ KNN with a filter query</td><td class="yes">✓ weighted reciprocal-rank fusion (<code>HSEARCH</code>)</td></tr>
+              <tr><td>Metadata filters</td><td class="yes">✓ tag / numeric / text fields</td><td class="yes">✓ <code>= != &lt; &gt; contains</code> on the record with the same id; <code>=</code> served by a secondary index</td></tr>
+              <tr><td>Index after restart</td><td class="warn">see Redis docs for your persistence setup</td><td class="warn">rebuilt from durable keys; searches refused until done</td></tr>
+              <tr><td>Clustered search</td><td class="warn">depends on deployment</td><td class="yes">fans out to every node, fails closed if a peer misses its timeout</td></tr>
+              <tr><td>Client access</td><td class="yes">✓ every Redis client</td><td class="warn">Go client, or text / binary protocol</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>VeltrixDB&rsquo;s own numbers, each from its docs with conditions: 768-dim heap per vector 3,383 B float32, 1,078 B int8, 493 B PQ (10K synthetic, macOS); GloVe-100 (100K real vectors) recall@10 0.953 at ef = 256, p50 0.77 ms, one query at a time on macOS. It has been tested to 100K real vectors; nothing at 10M+. Commands, layouts and limits: <a class="inline" href="docs/concepts/vector-search.html">vector &amp; hybrid search docs</a>.</p>
+      </div>
+    </section>
+
+    <!-- 09: Migration -->
+    <section class="a-section a-grid reveal" id="migration">
+      <div class="a-num">09</div>
+      <div class="a-body">
         <div class="a-kicker">Migration from Redis</div>
-        <h2 class="a-h">One connection string swap <span class="em">for most workloads</span>.</h2>
-        <p class="a-lede">VeltrixDB's text protocol maps directly to Redis's most common commands (served by the default <code>--net=go</code> front-end). For GET/SET/DEL workloads, switching is a client library change, not an application rewrite.</p>
+        <h2 class="a-h">A client change, <span class="em">not a connection-string swap</span>.</h2>
+        <p class="a-lede">VeltrixDB does not speak RESP, so <code>redis-cli</code> and Redis client libraries cannot connect to it. Every call site moves to a VeltrixDB client or to its own text / binary protocol. Many Redis commands have a close equivalent; some have none.</p>
 
         <h3>Try it in 30 seconds</h3>
 
@@ -694,21 +717,60 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             <span class="ttl">shell — Docker quickstart</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
-<pre><span class="c"># Linux / Windows</span>
+<pre><span class="c"># Linux / Windows (the image is linux/amd64)</span>
 docker run -p <span class="n">9000</span>:<span class="n">9000</span> ghcr.io/veltrixdb/veltrixdb:latest
 
-<span class="c"># Mac (Apple Silicon)</span>
+<span class="c"># Mac (Apple Silicon) — runs under emulation</span>
 docker run --platform linux/amd64 -p <span class="n">9000</span>:<span class="n">9000</span> ghcr.io/veltrixdb/veltrixdb:latest
 
-<span class="c"># Test — same semantics as Redis SET/GET</span>
-echo -e <span class="s">"PUT hello world\nGET hello\nPING"</span> | nc localhost <span class="n">9000</span></pre>
+<span class="c"># Text protocol over nc — SET is accepted as an alias of PUT</span>
+echo -e <span class="s">"SET hello world\nGET hello\nPING"</span> | nc localhost <span class="n">9000</span></pre>
         </div>
+
+        <h3>Command mapping</h3>
+        <div class="spec">
+          <table>
+            <tr><td>SET / GET / DEL</td><td><code>PUT</code> (alias <code>SET</code>) / <code>GET</code> / <code>DEL</code> — text-protocol <code>PUT</code> takes the rest of the line as the value</td></tr>
+            <tr><td>SET … EX / SETEX</td><td><code>PUTEX key ttl-seconds value</code>, or the TTL field of a binary PUT. There is no standalone <code>EXPIRE</code> / <code>TTL</code> on plain keys</td></tr>
+            <tr><td>SETNX / INCR / DECR</td><td><code>SETNX</code>, <code>INCR key [delta]</code>, <code>DECR key [delta]</code>; compare-and-swap is <code>CAS key expected new</code></td></tr>
+            <tr><td>MGET / pipelines</td><td><code>MGET</code>; binary <code>MPUT</code> / <code>MGET</code> batches (one WAL write, one VLog <code>pwrite</code>, one <code>fdatasync</code> per disk)</td></tr>
+            <tr><td>Hashes</td><td><code>HSET key field value [ttl]</code>, <code>HGET</code>, <code>HDEL</code>, <code>HGETALL</code>, <code>HKEYS</code>, <code>HLEN</code>, <code>HEXPIRE</code>, <code>HTTL</code></td></tr>
+            <tr><td>Lists / sets</td><td><code>LPUSH</code> <code>RPUSH</code> <code>LPOP</code> <code>RPOP</code> <code>LRANGE</code> <code>LLEN</code>; <code>SADD</code> <code>SREM</code> <code>SMEMBERS</code> <code>SISMEMBER</code> <code>SCARD</code></td></tr>
+            <tr><td>SCAN / KEYS</td><td><code>SCANCUR cursor limit</code>, <code>RANGE start end [LIMIT n] [REV]</code> — ordered, local node only in a cluster</td></tr>
+            <tr><td>MULTI / EXEC / WATCH</td><td><code>TXN n</code> + <code>n</code> lines of <code>SET</code> / <code>SETIF key version value</code> / <code>DEL</code>: one-shot, optimistic, read-committed, not MVCC; a version conflict returns <code>CONFLICT</code> — retry</td></tr>
+            <tr><td>ZADD, PUBLISH, XADD, EVAL</td><td><b>No equivalent.</b> Keep those workloads on Redis</td></tr>
+          </table>
+        </div>
+
+        <h3>Copy the data</h3>
+        <p>There is no Redis importer. <code>veltrix-migrate import</code> (in the main repo) reads JSONL from stdin, one <code>{"k": key, "v": base64 value}</code> per line, and PUTs each entry. For string keys, a short <code>redis-py</code> script produces that format. It does not carry TTLs, and other Redis types need their own mapping (e.g. hash fields to <code>HSET</code>):</p>
+
+        <div class="a-code">
+          <div class="a-code-head">
+            <span class="ttl">shell + python — strings only</span>
+            <span class="lights"><i></i><i></i><i></i></span>
+          </div>
+<pre><span class="k">cat</span> &gt; dump_strings.py &lt;&lt;<span class="s">'EOF'</span>
+<span class="k">import</span> base64, json, sys, redis
+r = redis.Redis(host=<span class="s">'localhost'</span>, port=<span class="n">6379</span>)
+<span class="k">for</span> k <span class="k">in</span> r.scan_iter(count=<span class="n">1000</span>):
+    <span class="k">if</span> r.type(k) != <span class="s">b'string'</span>:
+        <span class="k">continue</span>
+    v = r.get(k)
+    <span class="k">if</span> v <span class="k">is not</span> None:
+        sys.stdout.write(json.dumps({<span class="s">"k"</span>: k.decode(), <span class="s">"v"</span>: base64.b64encode(v).decode()}) + <span class="s">"\n"</span>)
+<span class="s">EOF</span>
+
+go build -o veltrix-migrate ./cmd/veltrix-migrate      <span class="c"># in the VeltrixDB repo</span>
+python3 dump_strings.py | ./veltrix-migrate import --dst localhost:<span class="n">9000</span></pre>
+        </div>
+        <p><code>veltrix-migrate</code> sends one PUT at a time, so each value takes a whole 4 KB VLog block; for many small values, load with batched <code>MPUT</code>s instead (the Go client&rsquo;s <code>BinaryConn.MPut</code>) to get block packing. In <code>--mode=raft</code>, point <code>--dst</code> at the leader.</p>
 
         <h3>SDK migration</h3>
 
         <div class="a-code">
           <div class="a-code-head">
-            <span class="ttl">Python — before and after</span>
+            <span class="ttl">Python — before and after (SDK in the separate Veltrixdb-client repo; not verified here)</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
 <pre><span class="c"># Before (redis-py)</span>
@@ -726,7 +788,7 @@ val = r.get(<span class="s">'key'</span>)</pre>
 
         <div class="a-code">
           <div class="a-code-head">
-            <span class="ttl">Node.js — before and after</span>
+            <span class="ttl">Node.js — before and after (from the SDK's example.js; not verified here)</span>
             <span class="lights"><i></i><i></i><i></i></span>
           </div>
 <pre><span class="c">// Before (ioredis)</span>
@@ -735,16 +797,17 @@ val = r.get(<span class="s">'key'</span>)</pre>
 <span class="k">await</span> r.set(<span class="s">'key'</span>, <span class="s">'value'</span>)
 
 <span class="c">// After (veltrixdb-client)</span>
-<span class="k">const</span> VeltrixDB = require(<span class="s">'veltrixdb-client'</span>)
-<span class="k">const</span> r = new VeltrixDB({ host: <span class="s">'localhost'</span>, port: <span class="n">9000</span> })
-<span class="k">await</span> r.put(<span class="s">'key'</span>, <span class="s">'value'</span>)</pre>
+<span class="k">const</span> { VeltrixDBClient } = require(<span class="s">'veltrixdb-client'</span>)
+<span class="k">const</span> c = new VeltrixDBClient({ host: <span class="s">'localhost'</span>, port: <span class="n">9000</span> })
+<span class="k">await</span> c.connect()
+<span class="k">await</span> c.put(<span class="s">'key'</span>, Buffer.from(<span class="s">'value'</span>))</pre>
         </div>
 
-        <p>VeltrixDB does not speak RESP today, so <code>redis-cli</code> and Redis client libraries will not connect to it. RESP compatibility is on the roadmap, with no date.</p>
+        <p>The search API (vectors, text, hybrid) is only in the Go client in the main repo; from other languages use the text-protocol search commands over a TCP socket. RESP compatibility is on the roadmap, with no date.</p>
 
         <div class="callout good">
           <div class="ico">✓</div>
-          <p><b>Recommended migration strategy.</b> Run VeltrixDB in shadow mode — dual-write to both Redis and VeltrixDB for two weeks, compare read results, validate latency numbers against your actual key distribution. Cutover when the shadow reads match. This is zero-risk and gives you real-world latency data before you commit.</p>
+          <p><b>Recommended migration strategy.</b> Copy the data, then run VeltrixDB in shadow mode — dual-write to both Redis and VeltrixDB for two weeks, compare read results, validate latency against your actual key distribution. Cut over when the shadow reads match. It gives you real-world latency data before you commit; the <a class="inline" href="blog-migration.html">migration playbook</a> walks through the stages.</p>
         </div>
       </div>
     </section>
@@ -839,7 +902,7 @@ val = r.get(<span class="s">'key'</span>)</pre>
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>
@@ -866,7 +929,7 @@ val = r.get(<span class="s">'key'</span>)</pre>
       "url": "https://veltrixdb.com/redis-comparison.html",
       "mainEntityOfPage": {"@type": "WebPage", "@id": "https://veltrixdb.com/redis-comparison.html"},
       "datePublished": "2026-05-01",
-      "dateModified": "2026-09-25",
+      "dateModified": "2026-10-01",
       "author": {"@type": "Person", "name": "Shubham Sharma", "jobTitle": "Founder, VeltrixDB"},
       "publisher": {
         "@type": "Organization",
@@ -905,13 +968,13 @@ val = r.get(<span class="s">'key'</span>)</pre>
         },
         {
           "@type": "Question",
-          "name": "How much cheaper is VeltrixDB than Redis at scale?",
-          "acceptedAnswer": {"@type": "Answer", "text": "It depends on your data; these are estimates from list prices, not measurements. For 1 billion keys with 128-byte values, Redis needs roughly 250 GB of RAM (estimated $6,000–8,000/month), while VeltrixDB needs roughly 160 GB of NVMe across 3 nodes (estimated ~$900/month), because RAM costs ~15× more per GB and batched writes pack up to ~26 records into a 4 KB block. 1 billion keys has not been measured reproducibly."}
+          "name": "How much RAM does VeltrixDB save compared with Redis?",
+          "acceptedAnswer": {"@type": "Answer", "text": "It depends on value size; this is per-key arithmetic, not a measurement. VeltrixDB keeps values on NVMe but its index in RAM: ~142 B per key (measured at 5M keys) plus ~90 B per key for the ordered index unless disabled. With 128-byte values the index is about as large as the values, so it saves little RAM. With 1 KB values, 1 billion keys need over 1 TB of RAM in an in-memory store against 142–232 GB of index RAM plus ~1.4 TB of NVMe for VeltrixDB — roughly 4–7× less RAM. 1 billion keys has not been measured reproducibly."}
         },
         {
           "@type": "Question",
           "name": "How do I migrate from Redis to VeltrixDB?",
-          "acceptedAnswer": {"@type": "Answer", "text": "For GET/SET/DEL workloads, migration is a client library change — not an application rewrite. Recommended strategy: run VeltrixDB in shadow mode — dual-write to both Redis and VeltrixDB for two weeks, compare read results, validate latency against your actual key distribution, then cutover. VeltrixDB provides SDKs for Go, Python, Node.js, Rust, C++, and Java."}
+          "acceptedAnswer": {"@type": "Answer", "text": "VeltrixDB does not speak RESP, so every call site has to move to a VeltrixDB client or protocol; many commands (SET/GET/DEL, SETEX via PUTEX, INCR, SETNX, hashes, lists, sets) have close equivalents, while sorted sets, pub/sub, streams and Lua have none. Copy string data with veltrix-migrate import (JSONL). Recommended strategy: run VeltrixDB in shadow mode — dual-write to both Redis and VeltrixDB for two weeks, compare read results, validate latency against your actual key distribution, then cutover. The Go client is in the main repository; Python, Node.js, Rust, C++ and Java SDKs are in the separate Veltrixdb-client repository."}
         },
         {
           "@type": "Question",

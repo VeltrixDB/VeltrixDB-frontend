@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Moving from DynamoDB to VeltrixDB in two sprints · VeltrixDB</title>
-<meta name="description" content="A field-tested migration playbook — shadow reads, dual-writes, cutover checklist, and rollback plan, with copy-pasteable Terraform." />
+<meta name="description" content="A staged migration playbook from DynamoDB to VeltrixDB — shadow reads, dual-writes, cutover checklist, and rollback plan, with a Terraform starting point." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -349,7 +349,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <span class="ah-kind">Migration playbook · 12 min read</span>
     <h1 class="ah-title">Moving from DynamoDB to VeltrixDB <span class="em">in two sprints</span>.</h1>
-    <p class="ah-sub">A field-tested playbook used by four production migrations. Shadow reads, dual-writes, cutover checklist, and the rollback plan you'll hopefully never need — with copy-pasteable Terraform.</p>
+    <p class="ah-sub">A staged playbook: shadow reads, dual-writes, cutover checklist, and the rollback plan you'll hopefully never need — with a Terraform starting point. Coming from Redis instead? See the <a href="redis-comparison.html#migration" style="color:var(--red);border-bottom:1px solid var(--red)">Redis migration section</a>.</p>
     <div class="ah-meta">
       <div class="ah-author">
         <div class="av">AG</div>
@@ -378,22 +378,22 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <h2 class="a-h">Two reasons, <span class="em">always the same</span>.</h2>
         <div class="callout">
           <div class="ico">!</div>
-          <p><b>Update (Sept 2026):</b> parts of this playbook referred to tooling that does not exist, and those steps have been corrected. There is no <code>ddb-importer</code> image and no DynamoDB Streams sidecar. The bulk-load step now converts the DynamoDB export to JSONL and loads it with the repo's <code>veltrix-migrate import</code>. The cost (3–5×) and latency (12 ms → 4.9 ms) comparisons have no measured source and have been removed. The 4.9 ms figure comes from an internal, <b>unverified</b> run. VeltrixDB is self-hosted only; there is no managed service today. It speaks its own binary and text protocols, not RESP or the DynamoDB API, so your application has to use a VeltrixDB client.</p>
+          <p><b>Update (Sept 2026):</b> parts of this playbook referred to tooling that does not exist, and those steps have been corrected. There is no <code>ddb-importer</code> image and no DynamoDB Streams sidecar. The bulk-load step now converts the DynamoDB export to JSONL and loads it with the repo's <code>veltrix-migrate import</code>. The cost (3–5×) and latency (12 ms → 4.9 ms) comparisons have no measured source and have been removed. The 4.9 ms figure comes from an internal, <b>unverified</b> run. VeltrixDB is self-hosted only; there is no managed service today. It speaks its own binary and text protocols, not RESP or the DynamoDB API, so your application has to use a VeltrixDB client. Claims about earlier customer migrations (counts, durations, zero rollbacks) could not be sourced and have been removed (Oct 2026).</p>
         </div>
         <p class="a-lede">Every team that walked us through a DynamoDB-to-VeltrixDB migration showed up with the same two concerns. The bill, and the tail.</p>
         <p>If you're reading this guide, you probably already know your <i>why</i>. For the engineering manager you'll be selling this migration to, make the case with your own numbers:</p>
         <ul>
-          <li><b>Cost</b> · take your current DynamoDB invoice and compare it with the cost of self-hosted nodes with local NVMe sized for your RAM and disk needs. VeltrixDB keeps every key in RAM. The <a class="inline" href="pricing.html#calc">cost calculator</a> gives an estimate, not a measurement.</li>
+          <li><b>Cost</b> · take your current DynamoDB invoice and compare it with the cost of self-hosted nodes with local NVMe sized for your RAM and disk needs. VeltrixDB keeps every key in RAM. With small values the index (~142 B/key, plus ~90 B/key for the ordered index unless disabled) is about as large as the data, so size RAM from your key count. The <a class="inline" href="pricing.html#calc">node-sizing rules</a> give an estimate, not a measurement.</li>
           <li><b>Tail latency</b> · measure DynamoDB's P99 for your access pattern, then measure VeltrixDB's during the shadow-read phase (§06). The only reproducible VeltrixDB read figure we publish is a cache-resident YCSB run (P99 2.77 ms). Its conditions are in the <a class="inline" href="blog-benchmark.html">benchmark post</a>.</li>
         </ul>
 
         <div class="a-pull">
-          <div class="pull"><div class="pl">Median migration time</div><div class="pv"><span class="red">2 sprints</span></div><div class="pd">across 4 prod migrations</div></div>
+          <div class="pull"><div class="pl">Planned duration</div><div class="pv"><span class="red">2 sprints</span></div><div class="pd">a plan, not a measured median</div></div>
           <div class="pull"><div class="pl">P99 latency drop</div><div class="pv">—</div><div class="pd">measure it in shadow reads</div></div>
           <div class="pull"><div class="pl">Cost reduction</div><div class="pv">—</div><div class="pd">no measured figure · use your invoice</div></div>
         </div>
 
-        <p>The rest of this guide is the actual playbook — the same one our solutions architects walk Enterprise customers through. Two sprints. No big-bang cutover. Rollback at every stage.</p>
+        <p>The rest of this guide is the playbook. Two sprints. No big-bang cutover. Rollback at every stage.</p>
       </div>
     </section>
 
@@ -409,11 +409,11 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="ck">
           <div class="ck-h">Workload fit</div>
           <ul>
-            <li>Your hot path is <b>point lookups</b> — GET / PUT / DEL / HGET-style. Ordered range scans exist (<code>RANGE</code>, <code>SCANCUR</code>), but in cluster modes they read only the local node. So a critical path built on <code>Query</code> with sort-key ranges, or on <code>Scan</code>, needs a careful look.</li>
-            <li>No global secondary indexes (GSIs) on the critical path. <b>Or</b> you can model the GSI access patterns as separate keys.</li>
+            <li>Your hot path is <b>point lookups</b> — GET / PUT / DEL / HGET-style. Ordered range scans exist (<code>RANGE</code>, <code>SCANCUR</code>), but in cluster modes they read only the local node (and skip the Raft read barrier). So a critical path built on <code>Query</code> with sort-key ranges, or on <code>Scan</code>, needs a careful look.</li>
+            <li>GSI access patterns either become separate keys, or a secondary index on a record field (<code>IDXCREATE name field</code> / <code>IDXQUERY name value</code>). The field is read from a JSON or <code>k=v</code> value, so store items as flat JSON (unmarshal DynamoDB JSON first). <code>IDXQUERY</code> fans out to every node in a cluster; an index is equality-only.</li>
             <li>You have a <b>partition key</b> in DynamoDB that can map 1:1 to a VeltrixDB key. Composite (PK + SK) keys map to <code>pk:sk</code> string concatenations.</li>
             <li>Values are <b>≤ 400 KB</b> (DynamoDB's own limit). VeltrixDB supports up to 64 MB, but smaller values keep your RAM budget honest.</li>
-            <li>You can run on <b>bare-metal NVMe or local SSD</b>. EBS, Azure managed disks, and any network-attached storage are not supported.</li>
+            <li>You can run on <b>bare-metal NVMe or local SSD</b>. That is what the engine is designed and benchmarked for. Network-attached block storage (EBS, Azure managed disks) will run, but every <code>fdatasync</code> is then a network round trip, and nothing has been measured there.</li>
           </ul>
         </div>
 
@@ -447,7 +447,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
             <div class="tl-day">Days 3–5 <span class="sub">Sprint 1 · Stage 2</span></div>
             <div class="tl-d">
               <div class="ti">Bulk-load the snapshot</div>
-              <div class="td">Use DynamoDB's <code>ExportTableToPointInTime</code> to S3, convert the export to JSONL, and pipe it into <code>veltrix-migrate import</code>. We have no measured import rate, so time a sample before you plan the window. Validate row count and a sample of values match.</div>
+              <div class="td">Use DynamoDB's <code>ExportTableToPointInTime</code> to S3, convert the export to JSONL, and pipe it into <code>veltrix-migrate import</code>. We have no measured import rate, so time a sample before you plan the window. Validate row count and a sample of values match (<code>veltrix-migrate export</code> dumps the same JSONL back).</div>
             </div>
           </div>
 
@@ -525,11 +525,11 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
   volume_binding_mode = <span class="s">"WaitForFirstConsumer"</span>
   parameters = {
     type = <span class="s">"local-ssd"</span>
-    fsType = <span class="s">"ext4"</span>
+    fsType = <span class="s">"xfs"</span>  <span class="c"># nvme-prep formats local SSDs as XFS</span>
   }
 }
 
-<span class="c"># Node group: i3en.6xlarge — 24 vCPU, 192 GB RAM, 7.5 TB local NVMe</span>
+<span class="c"># Node group: i3en.6xlarge — 24 vCPU, 192 GiB RAM, 2 × 7.5 TB local NVMe</span>
 <span class="k">module</span> <span class="s">"veltrix_nodes"</span> {
   source           = <span class="s">"terraform-aws-modules/eks/aws//modules/eks-managed-node-group"</span>
   cluster_name     = <span class="k">var</span>.eks_cluster_name
@@ -544,7 +544,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         </div>
 
         <h3>Bulk-import from DynamoDB</h3>
-        <p>There is no dedicated DynamoDB importer. The repo's <code>veltrix-migrate import</code> reads JSONL from stdin, one <code>{"k": "&lt;key&gt;", "v": "&lt;base64 value&gt;"}</code> per line, and PUTs each entry over the binary protocol. It's idempotent: re-runs overwrite, so it's safe to restart if it fails partway. The <code>jq</code> step below maps each DynamoDB item to a key (here, a partition key <code>pk</code> of string type) and stores the item's JSON as the value. Adapt it to your key schema, for example <code>pk:sk</code> for composite keys. In <code>--mode=raft</code>, point <code>--dst</code> at the current leader, because followers reject writes with a <code>MOVED</code> redirect.</p>
+        <p>There is no dedicated DynamoDB importer. The repo's <code>veltrix-migrate import</code> reads JSONL from stdin, one <code>{"k": "&lt;key&gt;", "v": "&lt;base64 value&gt;"}</code> per line, and PUTs each entry over the binary protocol. It's idempotent: re-runs overwrite, so it's safe to restart if it fails partway. The <code>jq</code> step below maps each DynamoDB item to a key (here, a partition key <code>pk</code> of string type) and stores the item's JSON as the value. Adapt it to your key schema, for example <code>pk:sk</code> for composite keys. It sends one PUT at a time and does not carry TTLs. Each single PUT takes a whole 4 KB VLog block, so for many small items a loader that batches with <code>MPUT</code> (e.g. the Go client's <code>BinaryConn.MPut</code>) packs ~26 × 128 B records per block instead. In <code>--mode=raft</code>, point <code>--dst</code> at the current leader, because followers reject writes with a <code>MOVED</code> redirect and <code>veltrix-migrate</code> does not follow it. In <code>--mode=replicated</code> any node accepts the write and replicates it to its peers (eventual by default).</p>
 
         <div class="a-code">
           <div class="a-code-head">
@@ -639,7 +639,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="a-kicker">Cutover</div>
         <h2 class="a-h">5 → 25 → 50 → 100. <span class="em">No big-bang flips</span>.</h2>
         <p class="a-lede">Move the read traffic in four feature-flag controlled steps. Each step must be stable for four hours before the next. Rollback at any step is a single config change.</p>
-        <p>We've never seen a migration fail at this stage if shadow-reads were clean — but we still walk through the cohorts. Discipline here is what makes the postmortem boring.</p>
+        <p>If shadow reads were clean this stage should be uneventful — walk through the cohorts anyway. Discipline here is what makes the postmortem boring.</p>
 
         <div class="timeline">
           <div class="timeline-h">Cutover cohorts · 16-hour walk</div>
@@ -666,7 +666,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
         <div class="callout">
           <div class="ico">✓</div>
-          <p><b>In four migrations to date</b>, zero have needed a rollback at the cutover stage. The two times shadow-reads surfaced a problem (a serialization quirk and a Unicode normalization edge case), the team caught it during the 48-hour shadow window, fixed it, and proceeded clean. That's the entire point of running shadow-reads.</p>
+          <p><b>Clean shadow reads are what make this step boring.</b> Typical problems — a serialization quirk, a Unicode normalization edge case — surface during the 48-hour shadow window, where they cost nothing to fix. That's the entire point of running shadow-reads.</p>
         </div>
       </div>
     </section>
@@ -685,10 +685,10 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
 
     <div class="a-foot reveal">
       <div class="cite">
-        Playbook based on four production migrations between Q4 2025 and Q1 2026 · median duration 11 working days · zero rollbacks.
+        Commands checked against the VeltrixDB repo (<code>cmd/veltrix-migrate</code>, <code>client/</code>) · Oct 2026 · durations are a plan, not measurements.
       </div>
       <div class="links">
-        <a href="pricing.html#calc">Cost calculator</a>
+        <a href="pricing.html#calc">Node sizing</a>
         <a href="blog-architecture.html">Architecture deep-dive</a>
         <a href="mailto:veltrixdb@gmail.com?subject=Migration%20support&body=Hi%20—%20we'd%20like%20to%20schedule%20a%20migration%20planning%20call.%0A%0ATable%20size%3A%0AOps%2Fmo%3A">Talk to a solutions architect</a>
       </div>
@@ -714,7 +714,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="cta-mini">
         <div>
           <h3>Want a <span class="em">solutions architect</span> on the migration?</h3>
-          <p>Enterprise tier includes a named solutions architect end-to-end — Terraform, schema mapping, cutover plan, and the on-call escalation during cutover weekend. No additional cost.</p>
+          <p>Engineering support (terms agreed per engagement) covers migration planning from DynamoDB or Redis, a sizing review on your workload, and incident help during cutover.</p>
         </div>
         <div class="actions">
           <a class="btn primary" href="mailto:veltrixdb@gmail.com?subject=Migration%20support">Talk to sales <span class="arrow">↗</span></a>
@@ -770,7 +770,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>

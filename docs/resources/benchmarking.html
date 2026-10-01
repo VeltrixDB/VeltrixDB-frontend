@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -93,7 +94,8 @@
 <p class="page-lede">How VeltrixDB's benchmark numbers are produced: the harness, the hardware, the pass/fail gates, and the raw results with the conditions they were measured under &mdash; so you can reproduce them or run the same harness against your own workload shape.</p>
 
 <h2 id="the-harness">The harness</h2>
-<p><code>scripts/bench.sh</code> runs a 6-phase sequenced workload and reports go/no-go on two hard gates: <strong>packing density</strong> and <strong>GC emergency runs</strong>. The project re-runs it after any storage engine change.</p>
+<p><code>scripts/bench.sh</code> runs a 6-phase sequenced workload (build + start, <code>MPUT</code> bulk load, cool-down, read-only, mixed 70R/30W, sustained <code>MPUT</code> write stress) and reports go/no-go on two hard gates: <strong>packing density</strong> and <strong>GC emergency runs</strong>. The project re-runs it after any storage engine change.</p>
+<p>It builds the server and <code>loadtest</code> with <code>CGO_ENABLED=0</code> (Go map index) unless you export <code>CGO_ENABLED=1</code>. The Docker image is a cgo build (native index), so set <code>CGO_ENABLED=1</code> on Linux to measure what the image runs.</p>
 <pre class="code-block"><code># macOS / Linux dev (uses /tmp, 1M keys)
 ./scripts/bench.sh
 
@@ -114,10 +116,15 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 <tr><td><code>BATCH_SIZE</code></td><td>1024</td><td>Higher = better packing density</td></tr>
 <tr><td><code>CONCURRENCY</code></td><td>64</td><td>Use 512 on multi-core hosts</td></tr>
 <tr><td><code>BULK_DUR</code></td><td>30 s</td><td>120&ndash;300 s for production verification</td></tr>
+<tr><td><code>READ_DUR</code> / <code>MIXED_DUR</code></td><td>30 s</td><td>Read-only and mixed phases</td></tr>
 <tr><td><code>STRESS_DUR</code></td><td>60 s</td><td>600 s to detect GC pressure</td></tr>
-<tr><td><code>WAL_WINDOW_MS</code></td><td>5</td><td>10 for default, 2 for low latency</td></tr>
+<tr><td><code>WAL_WINDOW_MS</code></td><td>5</td><td>Sets both <code>--wal-flush-window-ms</code> and <code>--vlog-flush-window-ms</code> (the server default is 15)</td></tr>
 <tr><td><code>CACHE_MB</code></td><td>1024</td><td>409600 on n2-highmem-64</td></tr>
-<tr><td><code>RAW_VLOGS</code></td><td>&mdash;</td><td>Raw block-device VLog (Linux + <code>CAP_SYS_RAWIO</code>)</td></tr>
+<tr><td><code>DATA_DIRS</code></td><td><code>/tmp/veltrixbench</code></td><td>Comma-separated list &rarr; <code>--data-dirs</code>; only paths under <code>/tmp</code> are wiped first</td></tr>
+<tr><td><code>RAW_VLOGS</code></td><td>&mdash;</td><td>Raw block-device VLog (Linux, root + <code>CAP_SYS_RAWIO</code>)</td></tr>
+<tr><td><code>OUT_DIR</code></td><td><code>/tmp/veltrixbench-out</code></td><td>Binaries, <code>server.log</code>, <code>run.log</code></td></tr>
+<tr><td><code>EXTRA_SERVER_FLAGS</code></td><td>&mdash;</td><td>Extra server flags, e.g. <code>--disable-ordered-index</code></td></tr>
+<tr><td><code>CGO_ENABLED</code></td><td>0</td><td>Build mode of the server and <code>loadtest</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -128,14 +135,15 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 <table>
 <thead><tr><th>Gate</th><th>Condition</th><th>What failure means</th></tr></thead>
 <tbody>
-<tr><td>Density</td><td><code>bytes/record &le; 1.2 &times; (24 + value_size)</code></td><td>Packing not engaged &mdash; use <code>--batch-size &gt; 1</code></td></tr>
-<tr><td>GC emergency</td><td><code>vlog_gc_emergency_runs</code> delta <code>== 0</code></td><td>Write rate exceeds GC throughput</td></tr>
+<tr><td>Density</td><td><code>bytes/record &le; 1.2 &times; (24 + value_size)</code> (<code>veltrixdb_vlog_file_bytes</code> / &Delta;<code>veltrixdb_storage_writes_total</code> after the bulk load)</td><td>Packing not engaged &mdash; keep <code>BATCH_SIZE &gt; 1</code> (loadtest <code>--batch-size</code>)</td></tr>
+<tr><td>GC emergency</td><td><code>veltrixdb_vlog_gc_emergency_runs_total</code> delta <code>== 0</code> during the write stress</td><td>Write rate exceeds GC throughput</td></tr>
 </tbody>
 </table>
 </div>
+<p>The script exits non-zero if either gate fails. It also prints the read P99, but that is not a gate.</p>
 
 <h2 id="reference-numbers">Reference numbers (BENCHMARKING.md)</h2>
-<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Provenance</span> Added at v1.1.0; the Linux table is a projection, not a measurement. Both tables predate the one-<code>write(2)</code> WAL flusher, one <code>pwrite</code> per VLog batch, the binary WAL, the <code>MultiPut</code> cache write-around, the ordered-index overwrite skip and the native index, all of which change write-path numbers. The macOS figures also sit on an <code>fsync</code> that does not flush the drive cache. Re-run before quoting them.</span></div>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Provenance</span> Added at v1.1.0; the Linux table is a projection, not a measurement. Both tables predate the one-<code>write(2)</code> WAL flusher, one <code>pwrite</code> per VLog batch, the binary WAL, the <code>MultiPut</code> cache write-around, the ordered-index overwrite skip and the native index, all of which change write-path numbers. The macOS figures also sit on an <code>fsync</code> that does not flush the drive cache. Re-run before quoting them. The single-Put rows are fixed-window group commit; the default is now adaptive (see <a class="inline-link" href="#group-commit">durable single-key writes</a>).</span></div>
 <h3>macOS M-series (dev)</h3>
 <div class="table-wrap">
 <table>
@@ -163,7 +171,7 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 </div>
 
 <h2 id="ycsb-results">YCSB benchmark results (100M keys)</h2>
-<p>These are the only reproducible headline numbers. Published in <code>BENCHMARK_RESULTS.md</code>, dated June 9, 2026, on a <strong>historical pure-Go build</strong> (v1.0; it predates the native index, the binary WAL, the one-<code>write(2)</code> WAL flusher, the ordered-index fix and <code>--net</code>). Test environment: AWS EC2 high-memory instance, 495 GB total RAM (488 GB available), 4&times; NVMe SSD at 873 GB each (3.5 TB total), raw block-device VLog (<code>/dev/nvmeXn1p2</code>), 400 GB LIRS cache, 200 client threads, 100,000,000 keys, ~100-byte values, benchmark tool <strong>YCSB 0.17.0</strong>.</p>
+<p>These are the only reproducible headline numbers. Published in <code>BENCHMARK_RESULTS.md</code>, dated June 9, 2026, on a <strong>historical pure-Go build</strong> (v1.0; it predates the native index, the binary WAL, the one-<code>write(2)</code> WAL flusher, the ordered-index fix and <code>--net</code>). Test environment: AWS EC2 high-memory instance, 495 GB total RAM (488 GB available), 4&times; NVMe SSD at 873 GB each (3.5 TB total), raw block-device VLog (<code>/dev/nvmeXn1p2</code>), 400 GB LIRS cache, 200 client threads, 100,000,000 keys, ~100-byte values, benchmark tool <strong>YCSB 0.17.0</strong>. The YCSB binding used for this run is not in the repository, so it cannot be re-run from it; <code>bench/compare</code> (go-ycsb, <a class="inline-link" href="#ycsb-af">below</a>) is the reproducible YCSB path.</p>
 
 <h3>Write benchmark (100M key load)</h3>
 <p>Configuration: 5 ms WAL flush window, 5 ms VLog flush window (the server default is now 15 ms), 200 threads, 4&times; NVMe striped, every write <code>fdatasync</code>-durable.</p>
@@ -227,12 +235,12 @@ CONCURRENCY=512 BULK_DUR=120 STRESS_DUR=300 \
 <tr><td>Mixed-workload write P99, 1 ms flush window</td><td><strong>2.57 ms</strong></td><td>same</td></tr>
 <tr><td>Batch writes, C++ storage layer all on (io_uring bridge + SQPOLL, batch engine, native index)</td><td>1.12M keys/s</td><td>same; per-part attribution pending</td></tr>
 <tr><td>C++ network front-end (<code>--net=cpp</code>, opt-in) vs Go</td><td>read P50 154 vs 286 &micro;s, poll read throughput 194K vs 177K ops/s; read P99 ~3.0 vs 1.8 ms, batch writes ~12% lower</td><td>same, measured before disk reads moved off the loop; not faster overall</td></tr>
-<tr><td>Native index vs Go map, 5M keys</td><td>full GC 21 &rarr; 0.27 ms, settled RSS 168 &rarr; 142 B/key, ~19 ns more per cache-miss lookup</td><td>engine benchmark</td></tr>
+<tr><td>Native index vs Go map, 5M keys</td><td>full GC 21 &rarr; 0.27 ms, settled RSS 168 &rarr; 142 B/key, ~19 ns more per cache-miss lookup</td><td>engine benchmark; <code>go test ./storage -run '^$' -bench 'Index_Footprint|Index_Get' -benchtime 1x</code> compares the two (footprint uses 2M keys by default)</td></tr>
 <tr><td>In-process cache hit</td><td>~92 ns (sharded LIRS; was 711 ns)</td><td>engine benchmark</td></tr>
 </tbody>
 </table>
 </div>
-<p>Because the CI rows use tmpfs and a client on the same host, compare them with each other, not with other hardware.</p>
+<p>Because the CI rows use tmpfs and a client on the same host, compare them with each other, not with other hardware. Reproduce them with <code>scripts/net-bench.sh</code> or the &ldquo;Net front-end&rdquo; workflow: <code>ENGINES=nocgo NETS=go WINDOWS="5 1"</code> for the &ldquo;C++ storage off&rdquo; rows, <code>ENGINES=sqpoll</code> for the &ldquo;all on&rdquo; row, <code>NETS="go uring poll"</code> for the front-end row. The macOS 3.54M row is the same batch phase (<code>loadtest --mode write --concurrency 8 --batch-size 1024 --num-keys 1000000</code>) against a local server.</p>
 
 <h2 id="net-bench">Network front-ends and storage configurations (<code>net-bench.sh</code>) <span class="badge good">New in v1.7</span></h2>
 <p><code>scripts/net-bench.sh</code> starts a fresh server per combination and runs batch write (8 &times; 1024-key <code>MPUT</code>, <code>BATCH_DURATION</code>, default 10 s), read (64 binary <code>GET</code> clients) and mixed (70/30) workloads, then prints one markdown table (also to <code>$GITHUB_STEP_SUMMARY</code>). The &ldquo;Net front-end&rdquo; GitHub workflow runs it on Linux, where the io_uring code exists.</p>
@@ -261,6 +269,161 @@ ENGINES="native bridge sqpoll map nocgo" NETS=go WINDOWS="5 1" ./scripts/net-ben
 <li>On macOS only poll with one loop runs, and loopback caps round trips at ~60K/s for both front-ends &mdash; measure on Linux.</li>
 </ul>
 
+<h2 id="oct-2026">October 2026 measurements <span class="badge good">New in v1.11&ndash;v1.12</span></h2>
+<p>Taken while building adaptive group commit, vector / text / hybrid search, PQ and the disk graph. <strong>All on one macOS laptop (Apple silicon) unless stated</strong>, so absolute numbers do not predict a Linux NVMe server, and none of them is a comparison with another database. Each table names the test or tool that reproduces it. Source: <code>BENCHMARK_RESULTS.md</code>, &ldquo;October 2026 measurements&rdquo;.</p>
+
+<h3 id="group-commit">Durable single-key writes: adaptive vs fixed group commit</h3>
+<p><code>--group-commit=adaptive</code> (the default since v1.12) vs <code>fixed</code>. The device&rsquo;s <code>fdatasync</code> cost is <strong>emulated</strong> (a sleep before the real sync), because macOS <code>fsync</code> returns at the drive cache; that is what makes the result mean the same on a laptop as on Linux. 15 ms window, 128 B values, each writer doing sequential durable <code>Put</code>s for 1.5 s.</p>
+<pre class="code-block"><code>VELTRIX_GC_TABLE=1 go test ./storage -run TestGroupCommit_LatencyTable -v</code></pre>
+<p>Emulated sync = 300 &micro;s (NVMe-like):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Writers</th><th>Mode</th><th>P50</th><th>P99</th><th>Writes/s</th><th>Writes per fdatasync</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>fixed</td><td>16.01 ms</td><td>17.76 ms</td><td>63</td><td>1.0</td></tr>
+<tr><td>1</td><td><strong>adaptive</strong></td><td><strong>0.45 ms</strong></td><td>0.52 ms</td><td><strong>2,186</strong></td><td>1.0</td></tr>
+<tr><td>8</td><td>fixed</td><td>16.02 ms</td><td>16.39 ms</td><td>501</td><td>8.0</td></tr>
+<tr><td>8</td><td><strong>adaptive</strong></td><td><strong>0.96 ms</strong></td><td>1.22 ms</td><td><strong>8,283</strong></td><td>8.0</td></tr>
+<tr><td>64</td><td>fixed</td><td>15.94 ms</td><td>16.81 ms</td><td>4,053</td><td>64.0</td></tr>
+<tr><td>64</td><td><strong>adaptive</strong></td><td><strong>1.67 ms</strong></td><td>2.64 ms</td><td><strong>37,504</strong></td><td>63.9</td></tr>
+<tr><td>256</td><td>fixed</td><td>16.40 ms</td><td>33.15 ms</td><td>15,291</td><td>249.3</td></tr>
+<tr><td>256</td><td><strong>adaptive</strong></td><td><strong>3.18 ms</strong></td><td>11.54 ms</td><td><strong>73,999</strong></td><td>255.2</td></tr>
+</tbody>
+</table>
+</div>
+<p>Emulated sync = 2 ms (slow / network disk):</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Writers</th><th>Mode</th><th>P50</th><th>P99</th><th>Writes/s</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>fixed</td><td>18.10 ms</td><td>23.68 ms</td><td>55</td></tr>
+<tr><td>1</td><td><strong>adaptive</strong></td><td><strong>2.41 ms</strong></td><td>2.52 ms</td><td><strong>417</strong></td></tr>
+<tr><td>64</td><td>fixed</td><td>18.18 ms</td><td>19.12 ms</td><td>3,541</td></tr>
+<tr><td>64</td><td><strong>adaptive</strong></td><td><strong>5.40 ms</strong></td><td>7.07 ms</td><td><strong>11,691</strong></td></tr>
+<tr><td>256</td><td>fixed</td><td>18.32 ms</td><td>35.17 ms</td><td>13,705</td></tr>
+<tr><td>256</td><td><strong>adaptive</strong></td><td><strong>6.96 ms</strong></td><td>18.56 ms</td><td><strong>32,277</strong></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>TestGroupCommit_AdaptiveGates</code> (every PR) fails if a lone writer waits for the window or concurrent writers stop sharing syncs. The nightly workflow prints the table in its job summary.</p>
+
+<h3 id="ycsb-af">YCSB A&ndash;F through the server (go-ycsb, VeltrixDB only)</h3>
+<p><code>bench/compare/cmd/ycsb</code> (go-ycsb core workloads) against a local server: 20,000 records &times; 10 fields &times; 100 B, 20,000 operations, 16 threads, zipfian, whole-record writes. Client and server on the same laptop; macOS <code>fsync</code> does not reach the platter, so write latency here is a lower bound. Not comparable with the June YCSB 0.17.0 run.</p>
+<pre class="code-block"><code>cd bench/compare &amp;&amp; START=0 DBS=veltrixdb RECORDS=20000 OPS=20000 THREADS=16 WORKLOADS="a b c d e f" ./compare.sh</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Workload</th><th>Op</th><th>Ops/s</th><th>Avg</th><th>P99</th><th>P99.9</th></tr></thead>
+<tbody>
+<tr><td>load</td><td>INSERT</td><td>37,495</td><td>419 &micro;s</td><td>1.29 ms</td><td>2.04 ms</td></tr>
+<tr><td>A (50/50 read/update)</td><td>total</td><td>34,640</td><td>453 &micro;s</td><td>1.30 ms</td><td>2.98 ms</td></tr>
+<tr><td></td><td>READ</td><td>17,230</td><td>262 &micro;s</td><td>0.77 ms</td><td>1.55 ms</td></tr>
+<tr><td></td><td>UPDATE</td><td>17,434</td><td>642 &micro;s</td><td>1.63 ms</td><td>3.14 ms</td></tr>
+<tr><td>B (95/5)</td><td>total</td><td>52,255</td><td>303 &micro;s</td><td>0.65 ms</td><td>0.74 ms</td></tr>
+<tr><td>C (read only)</td><td>READ</td><td>55,287</td><td>287 &micro;s</td><td>0.39 ms</td><td>0.53 ms</td></tr>
+<tr><td>D (read latest)</td><td>total</td><td>55,163</td><td>288 &micro;s</td><td>0.39 ms</td><td>0.59 ms</td></tr>
+<tr><td>E (short scans)</td><td>SCAN</td><td>23,651</td><td>638 &micro;s</td><td>1.43 ms</td><td>1.97 ms</td></tr>
+<tr><td>F (read-modify-write)</td><td>total</td><td>40,067</td><td>392 &micro;s</td><td>0.81 ms</td><td>0.98 ms</td></tr>
+<tr><td></td><td>READ_MODIFY_WRITE</td><td>13,397</td><td>915 &micro;s</td><td>1.22 ms</td><td>1.49 ms</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>compare.sh</code> defaults: <code>DBS="veltrixdb aerospike scylla"</code>, <code>WORKLOADS="a b c f"</code>, <code>RECORDS=1000000</code>, <code>OPS=1000000</code>, <code>THREADS=64</code>, <code>START=1</code> (docker compose up / stop each database in turn). With <code>START=0</code> it uses databases already running at <code>VELTRIX_ADDR</code> (default <code>127.0.0.1:9000</code>), <code>AEROSPIKE_HOST</code> and <code>SCYLLA_HOSTS</code>. <code>bench/compare</code> is a separate Go module (Go &ge; 1.25).</p>
+
+<h3 id="vector-search">Vector search</h3>
+<p><strong>Real embeddings.</strong> First 100,000 words of GloVe-100 (angular), 100 dimensions, 500 queries, exact cosine ground truth. In-process, one query at a time, macOS (Apple silicon, GOMAXPROCS = 18). Build = 18 parallel durable <code>PutVector</code> writers.</p>
+<pre class="code-block"><code>scripts/ann-dataset.py glove-100-angular /tmp/ann --train 100000 --test 500
+VELTRIX_ANN_DIR=/tmp/ann go test ./storage -run TestRealEmbeddings -v -timeout 30m</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layout</th><th>Build</th><th>ef</th><th>recall@10</th><th>p50</th><th>p99</th><th>QPS (1 thread)</th></tr></thead>
+<tbody>
+<tr><td>float32</td><td>57 s</td><td>64</td><td>0.842</td><td>0.25 ms</td><td>0.41 ms</td><td>3,933</td></tr>
+<tr><td></td><td></td><td>128</td><td>0.906</td><td>0.42 ms</td><td>0.63 ms</td><td>2,351</td></tr>
+<tr><td></td><td></td><td>256</td><td>0.953</td><td>0.77 ms</td><td>1.12 ms</td><td>1,307</td></tr>
+<tr><td></td><td></td><td>512</td><td>0.983</td><td>1.43 ms</td><td>1.95 ms</td><td>712</td></tr>
+<tr><td>int8</td><td>50 s</td><td>64</td><td>0.839</td><td>0.61 ms</td><td>0.81 ms</td><td>1,655</td></tr>
+<tr><td></td><td></td><td>128</td><td>0.905</td><td>0.55 ms</td><td>0.80 ms</td><td>1,905</td></tr>
+<tr><td></td><td></td><td>256</td><td>0.952</td><td>0.72 ms</td><td>1.08 ms</td><td>1,356</td></tr>
+<tr><td></td><td></td><td>512</td><td>0.983</td><td>1.18 ms</td><td>1.84 ms</td><td>834</td></tr>
+<tr><td>pq (m = 25)</td><td>42 s</td><td>64</td><td>0.797</td><td>0.56 ms</td><td>0.90 ms</td><td>1,771</td></tr>
+<tr><td></td><td></td><td>128</td><td>0.870</td><td>0.72 ms</td><td>1.06 ms</td><td>1,367</td></tr>
+<tr><td></td><td></td><td>256</td><td>0.927</td><td>1.17 ms</td><td>2.91 ms</td><td>780</td></tr>
+<tr><td></td><td></td><td>512</td><td>0.969</td><td>1.56 ms</td><td>3.44 ms</td><td>604</td></tr>
+<tr><td>pq + disk graph</td><td>45 s</td><td>64</td><td>0.788</td><td>0.55 ms</td><td>0.79 ms</td><td>1,811</td></tr>
+<tr><td></td><td></td><td>128</td><td>0.875</td><td>0.66 ms</td><td>0.99 ms</td><td>1,506</td></tr>
+<tr><td></td><td></td><td>256</td><td>0.931</td><td>1.06 ms</td><td>2.18 ms</td><td>907</td></tr>
+<tr><td></td><td></td><td>512</td><td>0.966</td><td>1.60 ms</td><td>2.97 ms</td><td>613</td></tr>
+</tbody>
+</table>
+</div>
+<p>The quantized layouts are slower per query than float32 at this size because they re-rank from the VLog (one parallel <code>MultiGet</code>; before that change int8 at ef = 64 was p50 1.9 ms / p99 13.8 ms). Their point is RAM: at 100 dimensions the vectors are small and graph edges dominate. <code>scripts/ann-dataset.py</code> needs <code>h5py</code> and <code>numpy</code>.</p>
+
+<p><strong>Over the network (<code>vecbench</code>).</strong> GloVe-100, first 20,000 words, 300 queries, int8, 8 concurrent clients, server and client on one macOS machine. Load: 6.4 s (3,146 durable vector writes/s).</p>
+<pre class="code-block"><code>cd bench/compare &amp;&amp; go run ./cmd/vecbench -data /tmp/ann -train 20000 -quant int8 -threads 8
+# flags: -addr (default 127.0.0.1:9000) -efs (default 64,128,256,512) -queries -pqm -graph memory|disk -out results/</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>ef</th><th>recall@10</th><th>QPS</th><th>p50</th><th>p99</th></tr></thead>
+<tbody>
+<tr><td>64</td><td>0.894</td><td><strong>24,637</strong></td><td>0.28 ms</td><td>0.68 ms</td></tr>
+<tr><td>256</td><td>0.985</td><td><strong>15,629</strong></td><td>0.48 ms</td><td>0.91 ms</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><strong>RAM per vector, 768 dimensions.</strong> 10,000 synthetic clustered vectors, Go heap per vector, macOS.</p>
+<pre class="code-block"><code>VELTRIX_VECTOR_MEMORY=1 go test ./storage -run TestVectorMemoryTable -v</code></pre>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layout</th><th>Heap / vector</th><th>Mapped file / vector</th><th>vs float32</th></tr></thead>
+<tbody>
+<tr><td>float32</td><td>3,383 B</td><td>&mdash;</td><td>1&times;</td></tr>
+<tr><td>int8</td><td>1,078 B</td><td>&mdash;</td><td>3.1&times; less</td></tr>
+<tr><td>pq, m = 96</td><td>493 B</td><td>&mdash;</td><td>6.9&times; less</td></tr>
+<tr><td>pq, m = 96 + disk graph</td><td>378 B</td><td>216 B</td><td>8.9&times; less heap</td></tr>
+</tbody>
+</table>
+</div>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Other vector measurement</th><th>Result</th><th>Reproduce</th></tr></thead>
+<tbody>
+<tr><td>CI quality gate, 5K &times; 64-dim clustered, recall@10</td><td>f32 0.927, ef 256 0.998, int8 0.923, pq 0.882, pq + disk 0.881, filtered 0.994, after 40% deletes ~0.96</td><td>every PR (<code>node-7-search</code>): <code>go test ./storage -run TestSearchQualityGate -v</code></td></tr>
+<tr><td>HNSW rework, 20K &times; 128 random, index only</td><td>search 240 &rarr; 99 &micro;s (853 &rarr; 6 allocs); with 50% deleted 6.56 ms &rarr; 190 &micro;s; insert 349 &rarr; 209 &micro;s</td><td><code>go test ./storage -run '^$' -bench 'HNSW_(Search|Search_Deleted50pct|Insert)$'</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Tested up to 100K real vectors and 10K at 768 dimensions; nothing at 10M+ yet.</p>
+
+<h3 id="soak-chaos">Search soak and crash chaos</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Test</th><th>Result (macOS)</th><th>Reproduce</th></tr></thead>
+<tbody>
+<tr><td>Soak, 60 s: 4 writers + 4 searchers, 5K-id space, upserts / deletes / searches against an oracle of acknowledged writes</td><td>201,573 writes, 292,079 searches, 0 results outside the oracle, 288,025 self-queries with 0 misses, RSS flat at ~1.0 GB, exact oracle match before and after restart</td><td><code>VELTRIX_SOAK_DURATION=60s go test ./tests/integration -run TestSearchSoak -v</code></td></tr>
+<tr><td>Crash chaos: SIGKILL mid-write, restart, rebuild</td><td>3 cycles, 8,524 / 8,380 / 11,851 acknowledged writes, all visible after restart + rebuild, no deleted id returned</td><td><code>VELTRIX_CHAOS_CYCLES=3 go test ./tests/integration -run TestSearchCrashRecovery -v</code></td></tr>
+<tr><td>Raft failover read barrier</td><td>without it a new leader missed the acknowledged write in 20 / 20 test rounds; with it 0 / 20</td><td><code>go test ./consensus -run TestWaitLeaderApplied_FailoverVisibility -v</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The nightly workflow runs a 20-minute soak and 10 crash cycles on Linux:</p>
+<pre class="code-block"><code>VELTRIX_SOAK_DURATION=20m go test ./tests/integration/ -run TestSearchSoak -v -timeout 40m
+VELTRIX_CHAOS_CYCLES=10 go test ./tests/integration/ -run TestSearchCrashRecovery -v -timeout 25m</code></pre>
+<p>Writes in flight at the kill are not checked. After each crash cycle the test rewrites every id whose write had an unknown outcome to a fresh, fully acknowledged version, so later cycles check those ids too.</p>
+
+<h2 id="same-hardware">Against Aerospike and ScyllaDB (same hardware)</h2>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No shared run yet</span> The harness exists; no same-hardware comparison has been run or published. The Aerospike and ScyllaDB drivers (upstream go-ycsb code), <code>docker-compose.yml</code> and <code>aerospike.conf</code> are compile-checked only. There is no vector driver for Aerospike Vector Search or ScyllaDB vector search.</span></div>
+<p><code>bench/compare/compare.sh</code> runs go-ycsb workloads through a VeltrixDB driver and go-ycsb&rsquo;s Aerospike and Cassandra (ScyllaDB) drivers, one database at a time on the same machine, and writes <code>results/&lt;ts&gt;/summary.md</code>.</p>
+<pre class="code-block"><code># On the machine under test (Linux, NVMe), with Docker and Go &ge; 1.25:
+export BENCH_DATA=/mnt/nvme0/bench BENCH_CPUS=8 BENCH_MEM=16g
+./compare.sh                                   # all three, workloads a b c f
+RECORDS=10000000 OPS=10000000 THREADS=128 WORKLOADS="a b c d f" ./compare.sh
+
+# Vectors (VeltrixDB only):
+../../scripts/ann-dataset.py glove-100-angular /mnt/nvme0/ann --train 1000000 --test 1000
+VECTORS=1 ANN_DIR=/mnt/nvme0/ann VEC_ARGS="-quant pq -graph disk" ./compare.sh</code></pre>
+<p>Publish a result only with all of these stated next to it: the same machine and disk with one database running at a time (a client on a second machine is better still); the durability setting of each (VeltrixDB ACKs after <code>fdatasync</code> of WAL and VLog; ScyllaDB&rsquo;s default <code>commitlog_sync: periodic</code> ACKs before the write is on disk, so use <code>batch</code> or report both; Aerospike ACKs from its write buffer); warm-up and a dataset larger than the caches if the point is disk performance; replication factor 1; and the versions of all three.</p>
+
 <h2 id="cluster-benchmark">Internal GKE run (unverified)</h2>
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Not a reproducible result</span> These figures come from an internal run with no published harness or raw output. They have not been reproduced, and &ldquo;1 billion keys&rdquo; has not been measured reproducibly. Do not use them for capacity planning; the YCSB results above are the only reproducible headline numbers.</span></div>
 <p>Reported conditions: <strong>3-node GKE cluster &middot; <code>n2-highmem-64</code> &middot; 8&times;375 GB NVMe per node &middot; 1 billion keys &middot; 80R/20W &middot; 30 minutes sustained</strong>.</p>
@@ -274,22 +437,22 @@ ENGINES="native bridge sqpoll map nocgo" NETS=go WINDOWS="5 1" ./scripts/net-ben
 <tr><td>P99 (80R/20W blended)</td><td><strong>~510 &micro;s</strong></td></tr>
 <tr><td>GC emergency events</td><td><strong>0</strong></td></tr>
 <tr><td>Errors</td><td><strong>0</strong></td></tr>
-<tr><td>Storage density</td><td><strong>~160 GB</strong> for 1B &times; 128 B values</td></tr>
+<tr><td>Storage density</td><td><strong>~160 GB</strong> for 1B &times; 128 B values (by arithmetic from the <code>bench.sh</code> density of ~160 B per 128 B record, not a billion-key measurement)</td></tr>
 </tbody>
 </table>
 <p class="note" style="font-size:12.5px;color:#8A8C95;margin-top:8px"><b>Verified vs unverified:</b> the measured, reproducible numbers are the YCSB single-node results (427,697 reads/s &middot; 18,064 durable writes/s &middot; AWS EC2, 4&times;NVMe, 100M keys). The 3-node GKE figures (7.2M reads/s / 1.8M writes/s) come from an internal run without a published harness — treat them as unverified until reproduced.</p>
 </div>
 
-<h3>Single node (Linux NVMe) &mdash; projected</h3>
-<p>Illustrative figures derived from the flush-window model in the performance guide, not from a recorded benchmark run.</p>
+<h3>Single node, historical &mdash; mixed provenance</h3>
+<p>Pure-Go path with the fixed group-commit window (before adaptive group commit became the default in v1.12). Each row says whether it was measured, computed or projected; none is a current benchmark run.</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Operation</th><th>P50</th><th>P99</th></tr></thead>
 <tbody>
-<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s)</td></tr>
-<tr><td>PUT &mdash; 15 ms flush window (default)</td><td>&mdash;</td><td>~15.2 ms</td></tr>
-<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s)</td></tr>
-<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s)</td></tr>
+<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s, measured on macOS)</td></tr>
+<tr><td>PUT &mdash; 15 ms fixed flush window</td><td>5 ms</td><td>15.2 ms (Linux NVMe)</td></tr>
+<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s is the computed ceiling, not a measurement)</td></tr>
+<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s is a Linux projection from macOS ~108K/s)</td></tr>
 </tbody>
 </table>
 </div>
@@ -311,7 +474,7 @@ ENGINES="native bridge sqpoll map nocgo" NETS=go WINDOWS="5 1" ./scripts/net-ben
 <table>
 <thead><tr><th>Resource</th><th>VeltrixDB (100M keys)</th><th>Redis (100M keys)</th></tr></thead>
 <tbody>
-<tr><td>RAM required</td><td><strong>15 GB</strong> (400 GB provisioned as cache)</td><td><strong>30&ndash;45 GB</strong> (data lives in RAM)</td></tr>
+<tr><td>RAM required</td><td><strong>15 GB</strong> as recorded (index; 400 GB provisioned as cache). Today&rsquo;s per-key figures give ~14&ndash;23 GB (~142 B/key native index + ~90 B/key ordered index)</td><td><strong>30&ndash;45 GB</strong> (data lives in RAM; estimate, not measured)</td></tr>
 <tr><td>Disk required</td><td>~25 GB per NVMe</td><td>Swap/RDB snapshots only</td></tr>
 <tr><td>Max dataset size</td><td><strong>3.5 TB (NVMe)</strong></td><td>Limited by RAM</td></tr>
 <tr><td>Dataset &gt; RAM</td><td><span class="badge good">Works (reads from NVMe)</span></td><td><span class="badge red">Evicts or crashes</span></td></tr>
@@ -328,7 +491,7 @@ ENGINES="native bridge sqpoll map nocgo" NETS=go WINDOWS="5 1" ./scripts/net-ben
 <li><strong>Read hit rate:</strong> 100% with proper dataset sizing (<code>recordcount</code> matching <code>operationcount</code>), zero <code>NOT_FOUND</code> across 10 million reads.</li>
 </ul>
 
-<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Reproduce it yourself</span> The YCSB numbers come from YCSB 0.17.0 against VeltrixDB v1.0 (June 2026); the later measurements from <code>scripts/net-bench.sh</code> and engine benchmarks (September 2026, v1.7 code); the reference tables from <code>scripts/bench.sh</code> and projections. Re-run the harness against your own key/value shape rather than assuming these numbers transfer directly &mdash; see <a class="inline-link" href="redis-comparison.html">VeltrixDB vs. Redis</a> for how to interpret the results relative to your workload.</span></div>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Reproduce it yourself</span> The YCSB numbers come from YCSB 0.17.0 against VeltrixDB v1.0 (June 2026); the later measurements from <code>scripts/net-bench.sh</code> and engine benchmarks (September 2026, v1.7 code); the October 2026 tables from the Go tests and <code>bench/compare</code> commands printed above each (v1.11&ndash;v1.12 code, macOS laptop); the reference tables from <code>scripts/bench.sh</code> and projections. Re-run the harness against your own key/value shape rather than assuming these numbers transfer directly &mdash; see <a class="inline-link" href="redis-comparison.html">VeltrixDB vs. Redis</a> for how to interpret the results relative to your workload.</span></div>
 
 <div class="card-grid">
 <a class="card" href="redis-comparison.html"><div class="card-title">VeltrixDB vs. Redis &rarr;</div><div class="card-desc">Feature comparison, cost economics, and migration guidance.</div></a>

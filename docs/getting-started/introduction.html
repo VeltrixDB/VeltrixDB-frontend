@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -93,8 +94,9 @@
 <p class="page-lede">VeltrixDB is an NVMe-native distributed key-value database that keeps values on flash and only a small pointer index in DRAM, trading Redis-style RAM costs and LSM-style write amplification for predictable, disk-backed performance.</p>
 
 <h2 id="what-is-veltrixdb">What is VeltrixDB</h2>
-<p>VeltrixDB is a key-value store written in Go, with optional C++ components on cgo builds, designed around one idea: <strong>values belong on NVMe, not in RAM</strong>. Instead of an in-memory hash table (Redis) or a log-structured merge tree that rewrites data repeatedly (RocksDB, LevelDB), VeltrixDB separates keys from values using a <strong>WiscKey</strong>-style design, hashes every key across <strong>8192 shards</strong>, and drives up to 8 NVMe disks in parallel with no single hot lock.</p>
-<p>It speaks a simple text protocol (usable directly with <code>nc</code> or <code>telnet</code>) and a binary protocol used by its client SDKs, and it is built to run first-class on Kubernetes via a Helm chart and a CRD-based Operator.</p>
+<p>VeltrixDB is a key-value store written in Go, with optional C++ components on cgo builds, designed around one idea: <strong>values belong on NVMe, not in RAM</strong>. Instead of an in-memory hash table (Redis) or a log-structured merge tree that rewrites data repeatedly (RocksDB, LevelDB), VeltrixDB separates keys from values using a <strong>WiscKey</strong>-style design, hashes every key across <strong>8192 shards</strong>, and drives every NVMe disk you give it in parallel (one WAL and one VLog per disk) with no single hot lock.</p>
+<p>The same database serves <strong>vector, full-text and hybrid search</strong> over the records it stores: HNSW vector indexes, a BM25 inverted index, and reciprocal-rank fusion of the two, filtered by the KV record with the same id <span class="badge good">v1.11–v1.12</span>.</p>
+<p>It speaks a simple text protocol (usable directly with <code>nc</code> or <code>telnet</code>) and a binary protocol used by its client SDKs, and it is built to run first-class on Kubernetes via a Helm chart and a CRD-based Operator (both maintained in separate repositories).</p>
 
 <h2 id="why-veltrixdb">Why VeltrixDB</h2>
 
@@ -107,13 +109,14 @@
 <p>VeltrixDB uses <strong>WiscKey KV-separation</strong>: values are written once to an append-only Value Log (VLog) on NVMe, and there is no LSM compaction. GC only copies still-live values out of mostly-dead VLog regions, so write amplification is about <strong>1&times;</strong> by design (not a measured figure).</p>
 
 <h3>Predictable P99</h3>
-<p>Redis P99 latency spikes when AOF rewrite runs; RocksDB P99 spikes during compaction. VeltrixDB's three-tier admission-controlled garbage collector enforces a ceiling: GC bandwidth is rate-limited proportional to read latency, and an emergency mode bypasses pauses before garbage can accumulate. In the reproducible YCSB run (100M operations) there were <strong>zero errors and zero GC emergency events</strong>.</p>
+<p>Redis P99 latency spikes when AOF rewrite runs; RocksDB P99 spikes during compaction. VeltrixDB's three-tier admission-controlled garbage collector enforces a ceiling: GC bandwidth is rate-limited proportional to read latency, and an emergency mode bypasses pauses before garbage can accumulate. In the YCSB run below there were <strong>zero failed writes across the 100M-key load and zero NOT_FOUND across 10M reads</strong>; <code>veltrixdb_vlog_gc_emergency_runs_total</code> is the counter to watch for GC falling behind.</p>
 
 <h2 id="how-it-works">How it works</h2>
 <p><strong>8192 shards, FNV-1a routing.</strong> Each key hashes (FNV-1a &amp; 0x1FFF) into 1 of 8192 shards. With 8 NVMe disks, shard <code>N</code> routes to disk <code>N % 8</code>, and all 8 disks write in parallel.</p>
-<p><strong>Values on NVMe, index in DRAM.</strong> The in-memory index holds a 64-byte record per key (disk offset, shard, size, TTL, version) &mdash; about 142&nbsp;B/key of RAM with the native index (measured at 5M keys), plus ~90&nbsp;B/key for the ordered index unless it is disabled. Value bytes go directly to the per-disk append-only VLog. A cache hit is a DRAM lookup (~92 ns in-process, with the sharded LIRS cache); a cache miss is one NVMe random read (a Go <code>pread</code>, CRC32C-verified). On cgo builds the index tables live off the Go heap in C++, so a large index does not slow Go garbage collection.</p>
-<p><strong>Group-commit WAL.</strong> A background flusher amortizes <code>fdatasync</code> across all writers within a configurable window (default 15 ms) — one <code>write(2)</code> and one <code>fdatasync</code> per batch instead of per write. Records are binary with a CRC32C over the whole record <span class="badge good">New in v1.6</span>; replay still reads legacy text WALs.</p>
-<p><strong>LIRS cache.</strong> Scan-resistant eviction means large sequential reads don't evict hot keys; small values (&le;256 B) get higher eviction priority.</p>
+<p><strong>Values on NVMe, index in DRAM.</strong> The in-memory index holds a 64-byte record per key (key hash, disk offset, VLog/segment id, sizes, write timestamp, TTL, CRC32C, shard, flags, schema version &mdash; no value bytes) &mdash; about 142&nbsp;B/key of RAM with the native index (measured at 5M keys), plus ~90&nbsp;B/key for the ordered index unless it is disabled. Value bytes go directly to the per-disk append-only VLog. A cache hit is a DRAM lookup (~92 ns in-process, with the sharded LIRS cache); a cache miss is one NVMe random read (a Go <code>pread</code>, CRC32C-verified). On cgo builds the index tables live off the Go heap in C++, so a large index does not slow Go garbage collection.</p>
+<p><strong>Adaptive group-commit WAL.</strong> <span class="badge good">New in v1.12</span> A background flusher amortizes <code>fdatasync</code> across writers — one <code>write(2)</code> and one <code>fdatasync</code> per batch instead of per write. The window (default 15 ms) is only an upper bound: a lone writer is synced immediately, and concurrent writers are synced together after an idle gap of about one fdatasync; <code>--group-commit=fixed</code> restores the full-window wait. Every write is acknowledged only after the sync that covers it. Records are binary with a CRC32C over the whole record <span class="badge good">New in v1.6</span>; replay still reads legacy text WALs.</p>
+<p><strong>LIRS cache.</strong> Scan-resistant eviction means large sequential reads don't evict hot keys; small values (&le;256 B) get a higher retention priority, so large cold values are evicted first. The cache is split into up to 256 independently locked shards.</p>
+<p><strong>Vector, full-text and hybrid search.</strong> <span class="badge good">New in v1.11</span> HNSW vector indexes per namespace (float32, int8 or product-quantized; graph on the heap or, from v1.12, layer-0 edges in a mapped file), a BM25 inverted index, and hybrid search fused by reciprocal rank. Vectors and documents persist as ordinary keys; the indexes are rebuilt from them at startup, and in a cluster every search fans out to all nodes. See <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
 <p><strong>C++ components (cgo builds).</strong> <span class="badge good">New in v1.6</span> With <code>CGO_ENABLED=1</code> (the default for the Docker image) the index moves off the Go heap into C++ shard tables — with 5M keys a full GC went from 21 ms to 0.27 ms and RSS from 168 to 142 B/key. An opt-in <code>io_uring</code> bridge (<code>VELTRIXDB_URING_BRIDGE=on|sqpoll</code>, Linux, default off) can submit VLog batch writes. <code>--net=cpp|uring|poll</code> swaps the Go listener for an experimental C++ event-loop front-end (binary PUT GET DEL PING MPUT MGET, standalone mode only) that is not faster overall. The VLog read path and the LIRS cache stay in Go; the ART index and priority io_uring scheduler under <code>cpp/</code> have no Go call site and do not run. The Go layer is fully functional and cross-platform without any of it (<code>CGO_ENABLED=0</code>).</p>
 
 <h2 id="benchmark-numbers">Benchmark numbers</h2>
@@ -129,18 +132,19 @@
 </table>
 </div>
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Read these numbers carefully</span> This run used the pure-Go build and predates the native index, the binary WAL and <code>--net</code>. The read figure measures cache hits, not NVMe reads. An earlier internal 3-node GKE run (7.2M reads/s, 1B keys) was never reproduced with a published harness and is <strong>unverified</strong>; &ldquo;1 billion keys&rdquo; has not been measured reproducibly.</span></div>
-<p>Historical single-node figures on Linux NVMe (pure-Go path):</p>
+<p>Historical single-node figures (pure-Go path, fixed group-commit window, mixed provenance):</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Operation</th><th>P50</th><th>P99</th></tr></thead>
 <tbody>
-<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s)</td></tr>
-<tr><td>PUT &mdash; 15 ms flush window (default)</td><td>5 ms</td><td>15.2 ms</td></tr>
-<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s)</td></tr>
-<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s)</td></tr>
+<tr><td>GET &mdash; cache hit</td><td>0.05 ms</td><td>0.28 ms (~1.4M reads/s, measured on macOS)</td></tr>
+<tr><td>PUT &mdash; 15 ms fixed flush window</td><td>5 ms</td><td>15.2 ms (Linux NVMe)</td></tr>
+<tr><td>PUT &mdash; 5 ms window, 512 workers</td><td>2.6 ms</td><td>5.2 ms (~102K writes/s is a computed ceiling, not a measurement)</td></tr>
+<tr><td>MultiPut 1024 entries</td><td>&mdash;</td><td>~9.5 ms (~426K entries/s is a Linux projection from ~108K/s on macOS)</td></tr>
 </tbody>
 </table>
 </div>
+<p><span class="badge good">New in v1.12</span> Adaptive group commit, measured on a macOS laptop with an emulated 300&nbsp;&micro;s fdatasync: one writer's PUT P50 went from 16 ms (fixed window) to <strong>0.45 ms</strong>; 64 writers from 4.0K to <strong>37.5K writes/s</strong> (P99 2.6 ms). Vector search on GloVe-100 (100K real word vectors, in-process, one query at a time, macOS) reached recall@10 0.906 at ef&nbsp;=&nbsp;128 with p50 0.42 ms; the full tables are on the <a class="inline-link" href="../concepts/vector-search.html">search page</a>.</p>
 <p>Later server batch writes (8 clients &times; 1024-key <code>MPUT</code>): 3.54M keys/s, P99 4.2 ms on macOS with a 1M-key space, and 1.77M keys/s, P99 12.2&ndash;12.7 ms on a 4-CPU CI runner (tmpfs, same-host client). Write amplification is approximately <strong>1.0&times;</strong> by design (values are written once), versus the 10&ndash;30&times; typical of LSM-tree engines. Full methodology lives in the project's <code>BENCHMARKING.md</code>.</p>
 
 <h2 id="features">Features</h2>
@@ -151,14 +155,16 @@
 <tr><td><strong>Storage</strong></td><td>WiscKey KV-separation, 8192-shard index (off-heap C++ tables on cgo builds), LIRS cache, append-only VLog, ordered index for range scans</td></tr>
 <tr><td><strong>Durability</strong></td><td>Group-commit WAL (binary, CRC32C-checked records), fdatasync amortization, crash recovery via WAL replay, compacted checkpoint on clean shutdown</td></tr>
 <tr><td><strong>Atomic ops</strong></td><td><code>CAS</code>, <code>INCR</code>, <code>DECR</code>, <code>SETNX</code> &mdash; shard-locked read-modify-write, safe under concurrency</td></tr>
-<tr><td><strong>Data types</strong></td><td>Keys with TTL, hash fields with per-field TTL, namespaces, lists, sets, vector search (HNSW), <code>RANGE</code> / <code>SCANCUR</code> range scans</td></tr>
-<tr><td><strong>Replication</strong></td><td>Raft consensus (with snapshots and optional linearizable reads), async / quorum / strong replication, anti-entropy</td></tr>
-<tr><td><strong>Transactions</strong></td><td>Optimistic multi-key transactions with per-key version guards (conflict detection)</td></tr>
+<tr><td><strong>Data types</strong></td><td>Keys with TTL, hash fields with per-field TTL, namespaces, lists, sets, secondary indexes (<code>IDXCREATE</code> / <code>IDXQUERY</code>), <code>RANGE</code> / <code>SCANCUR</code> range scans</td></tr>
+<tr><td><strong>Vector search</strong></td><td>HNSW (cosine), multiple namespaces, optional int8 or product quantization with exact re-rank from disk, optional on-disk layer-0 graph, metadata filters, background tombstone compaction</td></tr>
+<tr><td><strong>Full-text / hybrid</strong></td><td>BM25 inverted index (Unicode tokenizer), hybrid vector + text search fused by Reciprocal Rank Fusion; searches fan out across cluster nodes</td></tr>
+<tr><td><strong>Replication</strong></td><td>Raft consensus (with log snapshots and optional linearizable reads), replicated mode with eventual / quorum / strong consistency, anti-entropy</td></tr>
+<tr><td><strong>Transactions</strong></td><td>One-shot optimistic transactions (<code>TXN</code>): per-key version check at commit, committed through <code>MultiPut</code>; read-committed, not MVCC</td></tr>
 <tr><td><strong>Security</strong></td><td>AES-256-GCM at-rest encryption, RBAC, mTLS, append-only audit log</td></tr>
 <tr><td><strong>Quotas</strong></td><td>Per-namespace rate limiting (token bucket) + key-count caps</td></tr>
 <tr><td><strong>CDC</strong></td><td>In-process change data capture, durable <code>/admin/changes</code> catch-up feed, <code>repl-ship</code> for cross-region forwarding</td></tr>
-<tr><td><strong>Backup</strong></td><td>Full + incremental chains, S3 + GCS upload/restore</td></tr>
-<tr><td><strong>Observability</strong></td><td>60+ Prometheus metrics, web dashboard, liveness/readiness probes</td></tr>
+<tr><td><strong>Backup</strong></td><td>Full + incremental chains, WAL archiving + point-in-time restore, S3 / GCS / Azure upload and download</td></tr>
+<tr><td><strong>Observability</strong></td><td>70+ Prometheus metric families, web dashboard, liveness/readiness probes</td></tr>
 <tr><td><strong>Compression</strong></td><td>Per-record zstd, 256 B threshold, transparent on read</td></tr>
 <tr><td><strong>Scrubber</strong></td><td>Background CRC32C integrity validation at configurable MB/s</td></tr>
 </tbody>
@@ -172,6 +178,7 @@
 <li>Need predictable P99 latency under sustained write load and can't tolerate LSM-style compaction stalls.</li>
 <li>Are comfortable operating a self-hosted database on Kubernetes with local NVMe, using the provided Helm chart or Operator.</li>
 <li>Primarily need plain key-value, atomic (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>), and transactional operations, optionally replicated via Raft or primary-copy replication.</li>
+<li>Want vector, text or hybrid search over the same records without running a separate search system, at the scale it has been tested to (100K real vectors; 10M+ is untested).</li>
 </ul>
 
 <h2 id="who-should-not-use-veltrixdb-yet">Who should not use VeltrixDB yet</h2>
@@ -179,9 +186,10 @@
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No Redis protocol (RESP)</span> You cannot point an existing Redis client at VeltrixDB today. RESP compatibility is on the roadmap; once shipped, migration should require only a connection-string change.</span></div>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No managed cloud offering</span> VeltrixDB is self-hosted only. A managed service is planned but not available.</span></div>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title"><code>repl-ship</code> has no back-pressure</span> The cross-region shipper can catch up after a restart through the durable <code>/admin/changes</code> feed (<code>--checkpoint</code>), but it has no back-pressure to the source and resolves conflicts last-write-wins only.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Raft reads are local by default</span> <code>raft</code> mode gives linearizable <strong>writes</strong> via quorum commit, but by default reads are served from local applied state and can be stale. <code>--linearizable-reads</code> runs the ReadIndex fence at one heartbeat round-trip per <code>GET</code>.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Raft reads are local by default</span> <code>raft</code> mode gives linearizable <strong>writes</strong> via quorum commit, but by default reads are served from local applied state and can be stale. A newly elected leader first applies everything its predecessor committed, so reads on the leader include every acknowledged write; <code>--linearizable-reads</code> runs the ReadIndex fence (followers redirect to the leader). Both barriers cover <code>GET</code> and <code>MGET</code> only; namespace, hash and <code>RANGE</code> / <code>SCANCUR</code> reads stay local.</span></div>
 <div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Replicated mode is not linearizable</span> <code>replicated</code> mode is primary-copy replication for durability across copies; it has no single-writer ordering, so concurrent writers to the same key are not linearizable. Use <code>raft</code> mode when write linearizability matters.</span></div>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Some operations stay node-local in cluster modes</span> Namespace, hash-field, vector, secondary-index and list/set <em>writes</em> route through the coordinator in every mode, but <code>QUERY</code> / <code>RANGE</code> / <code>SCANCUR</code> reads are always local, and replicated-mode secondary-index metadata (<code>IDXCREATE</code>/<code>IDXDROP</code>) is node-local.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Range scans stay node-local in cluster modes</span> Namespace, hash-field, vector, text, secondary-index and list/set <em>writes</em> route through the coordinator in every mode, and <code>IDXCREATE</code> / <code>IDXDROP</code> replicate in both raft and replicated mode. Searches, <code>QUERY</code> and <code>IDXQUERY</code> fan out to every node, but <code>RANGE</code> / <code>SCANCUR</code> read only the receiving node.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Search indexes live in RAM and are rebuilt at every start</span> Vector codes, graph nodes and the BM25 index are in memory and are not persisted; searches are refused until the rebuild finishes. Each search asks every non-failed node, so its cost grows with the cluster, and a peer that does not answer fails the request unless <code>--search-allow-partial</code> is set. There is no same-hardware comparison with other vector databases yet.</span></div>
 
 <div class="card-grid">
 <a class="card" href="quickstart.html"><div class="card-title">Quickstart &rarr;</div><div class="card-desc">Run VeltrixDB in Docker and issue your first commands in under a minute.</div></a>

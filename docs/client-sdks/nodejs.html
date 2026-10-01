@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.8</span>
+    <span class="version-pill">v1.12</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -50,6 +50,7 @@
 </div>
 <div class="nav-group"><div class="nav-group-title">Core Concepts</div>
 <a href="../concepts/data-model.html" class="">Data Model</a>
+<a href="../concepts/vector-search.html" class="">Vector &amp; Hybrid Search</a>
 <a href="../concepts/wire-protocol.html" class="">Wire Protocol</a>
 <a href="../concepts/deployment-modes.html" class="">Deployment Modes</a>
 </div>
@@ -320,6 +321,27 @@ try {
   }
 }</code></pre>
 <p><code>VeltrixDBError</code> wraps server-side <code>STATUS_ERR</code> responses and protocol-level failures (e.g. a batch-level error on <code>multiPut</code>/<code>multiGet</code>). Socket-level failures surface as regular Node.js <code>Error</code> objects with a <code>code</code> such as <code>ETIMEDOUT</code> or <code>ECONNREFUSED</code>.</p>
+
+<h2 id="search">Vector, text and hybrid search</h2>
+<p>This SDK has no search methods: the Veltrixdb-client SDKs were not updated with the v1.11 search release. The search commands (<code>VCREATE</code>, <code>VSET … NS</code>, <code>VSEARCH</code>, <code>VDEL</code>, <code>TSET</code>/<code>TDEL</code>/<code>TSEARCH</code>, <code>HSEARCH</code>, <code>IDXCREATE</code>/<code>IDXQUERY</code>) are available over the text and binary protocols, and as typed methods only in the Go <code>client</code> package in the server repository (<a class="inline-link" href="go.html#search">Go &rarr; Search</a>; its cluster-aware <code>client.Client</code> has none). From Node.js, open a plain TCP socket to the server's <code>-addr</code> and send one text command per line; each search answers <code>id score</code> lines then <code>END</code>, or one <code>ERR …</code> line. Text cannot contain newlines and filter values cannot contain spaces on this protocol. Syntax: <a class="inline-link" href="../concepts/vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+<pre class="code-block"><div class="code-label">javascript &mdash; built-in net module</div><code>const net = require('net');
+const readline = require('readline');
+
+const sock = net.connect(9000, '127.0.0.1');
+const lines = readline.createInterface({ input: sock });
+const hits = [];
+lines.on('line', (line) =&gt; {
+  if (line === 'OK') return;                 // reply to VSET
+  if (line === 'END' || line.startsWith('ERR')) {
+    console.log(hits, line);
+    sock.end();
+    return;
+  }
+  const [id, score] = line.split(' ');
+  hits.push({ id, score: Number(score) });
+});
+sock.write('VSET doc-42 NS docs 0.12 -0.03 0.88 0.41\n');
+sock.write('VSEARCH 10 NS docs EF 128 0.1 0 0.9 0.4\n');</code></pre>
 
     <div class="page-nav">
 <a class="prev" href="../client-sdks/python.html"><span class="dir">&larr; Previous</span><span>Python</span></a>

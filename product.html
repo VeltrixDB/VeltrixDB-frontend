@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Product - VeltrixDB</title>
-<meta name="description" content="What VeltrixDB replaces and how it works: the storage engine, read/write path, use cases, deployment targets - and what it deliberately will not do." />
+<meta name="description" content="What VeltrixDB replaces and how it works: the storage engine, read/write path, vector / full-text / hybrid search, use cases, deployment targets - and what it deliberately will not do." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%232E8BFF'/><stop offset='60%25' stop-color='%230B5CFF'/><stop offset='100%25' stop-color='%230A3FD1'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><path d='M19 6 L9 18 H15 L13 26 L23 12 H17 Z' fill='white'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,6 +48,7 @@
     <a href="#compare">Compared</a>
     <a href="#how">Read/write path</a>
     <a href="#whitepaper">Engine internals</a>
+    <a href="#search">Vector search</a>
     <a href="#usecases">Use cases</a>
     <a href="#deploy">Deploy targets</a>
     <a href="#requirements">Requirements</a>
@@ -59,7 +60,7 @@
   <div class="wrap">
     <div class="eyebrow">PRODUCT</div>
     <h2 class="sh" style="margin-top:10px;border-top:none">What it is, <span class="em">how it works</span>, and what it will not do.</h2>
-    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">The engine, the read/write path, where it fits - and the honest list of requirements before you commit.</p>
+    <p style="max-width:640px;color:var(--ink-3);font-size:15px;line-height:1.65;margin-top:14px">The engine, the read/write path, the built-in vector and hybrid search, where it fits - and the honest list of requirements before you commit.</p>
   </div>
 </section>
 
@@ -140,7 +141,21 @@
             <td class="cell" data-h="Redis"><span class="v-warn">Roll your own</span></td>
             <td class="cell" data-h="DynamoDB"><span class="v-warn">CloudWatch only</span></td>
             <td class="cell" data-h="Cassandra"><span class="v-warn">Roll your own</span></td>
-            <td class="us" data-h="VeltrixDB"><span class="v-yes">60+ metrics + Grafana</span></td>
+            <td class="us" data-h="VeltrixDB"><span class="v-yes">70+ metric families + Grafana</span></td>
+          </tr>
+          <tr>
+            <td class="criteria">Vector / hybrid search</td>
+            <td class="cell" data-h="Redis"><span class="v-warn">Redis Query Engine (Redis Stack / Redis 8)</span></td>
+            <td class="cell" data-h="DynamoDB"><span class="v-warn">Via a separate service (e.g. OpenSearch)</span></td>
+            <td class="cell" data-h="Cassandra"><span class="v-warn">Vector search in 5.0 (SAI)</span></td>
+            <td class="us" data-h="VeltrixDB"><span class="v-yes">HNSW + BM25 + RRF, in the server</span></td>
+          </tr>
+          <tr>
+            <td class="criteria">Redis protocol (RESP)</td>
+            <td class="cell" data-h="Redis"><span class="v-yes">Native</span></td>
+            <td class="cell" data-h="DynamoDB"><span class="v-no">No</span></td>
+            <td class="cell" data-h="Cassandra"><span class="v-no">No (CQL)</span></td>
+            <td class="us" data-h="VeltrixDB"><span class="v-no">No · own text / binary protocol</span></td>
           </tr>
           <tr>
             <td class="criteria">Time to production</td>
@@ -152,6 +167,7 @@
         </tbody>
       </table>
     </div>
+    <p class="sh-sub" style="margin-top:18px;font-size:13.5px">Competitor cells describe what their vendors publish; we have not tested them, and no same-hardware benchmark against Redis, DynamoDB, Cassandra or any vector database has been run. The comparison harness is <code>bench/compare</code> in the main repo.</p>
   </div>
 </section>
 
@@ -197,7 +213,7 @@
         <div class="path-content" id="pc-write">
           <div class="path-eyebrow">PATH 01 / 03 — DURABLE WRITE</div>
           <h3 class="path-h">Value lands on NVMe <em class="em">before ack</em>.</h3>
-          <p class="path-sub">The value is appended to the VLog and its pointer to the WAL at the same time; the two fdatasyncs race, so you wait for the slower one, not the sum. The group-commit WAL shares one write(2) and one fdatasync across every writer in the window. Records are binary with a CRC32C over the whole record.</p>
+          <p class="path-sub">The value is appended to the VLog and its pointer to the WAL at the same time; the two fdatasyncs race, so you wait for the slower one, not the sum. The group-commit WAL shares one write(2) and one fdatasync across every writer in the batch. Group commit is adaptive by default (since v1.12): a lone writer is synced at once, and the 15 ms window is only an upper bound. Records are binary with a CRC32C over the whole record.</p>
           <div class="path-steps">
             <div class="pstep"><span class="psn">01</span><span class="psl">Hash key → 1 of 8192 shards</span><span class="pst">FNV-1a</span></div>
             <div class="pstep active"><span class="psn">02</span><span class="psl">VLog append (O_DIRECT)</span><span class="pst">atomic offset</span></div>
@@ -206,8 +222,8 @@
             <div class="pstep"><span class="psn">05</span><span class="psl">Cache insert → ack</span><span class="pst">durable</span></div>
           </div>
           <div class="path-foot">
-            <span class="pf-label">Default group-commit window</span>
-            <span class="pf-val">15 ms</span>
+            <span class="pf-label">Group commit · adaptive, window upper bound</span>
+            <span class="pf-val">≤ 15 ms</span>
           </div>
         </div>
 
@@ -241,8 +257,8 @@
             <div class="pstep"><span class="psn">05</span><span class="psl">Old value reclaimed by VLog GC</span><span class="pst">later, background</span></div>
           </div>
           <div class="path-foot">
-            <span class="pf-label">Default group-commit window</span>
-            <span class="pf-val">15 ms</span>
+            <span class="pf-label">Group commit · adaptive, window upper bound</span>
+            <span class="pf-val">≤ 15 ms</span>
           </div>
         </div>
       </div>
@@ -329,14 +345,15 @@
       <article class="article">
         <div class="article-num">03</div>
         <div class="article-body">
-          <div class="article-kicker">Engine work · v1.6–v1.7</div>
+          <div class="article-kicker">Engine work · v1.6–v1.12</div>
           <h3 class="article-h">What shipped, <span class="em">and what didn't pay off</span>.</h3>
-          <p class="article-lede">v1.6 and v1.7 carry engine changes we measured — including one that did not pay off overall. v1.8 is the latest release.</p>
+          <p class="article-lede">v1.6 through v1.12 carry engine changes we measured — including one that did not pay off overall. v1.12 (2026-09-30) is the latest release.</p>
           <p><b>Binary WAL (default since v1.6).</b> 48-byte header, CRC32C over the whole record. Keys containing <code>|</code> or a newline no longer cut replay short — with the old text format, an acknowledged write after such a key could be lost on a crash restart. Encoding is 4× faster per record, replay 2.5× faster; old text WALs still replay. <b>Ordered index:</b> overwrites of a live key no longer re-insert into the skiplist — server batch writes went from 1.45M to 3.54M keys/s (8 clients × 1024-key MPUT, 1M keys, macOS).</p>
-          <p><b>C++ network front-end (experimental, opt-in).</b> <code>--net=cpp|uring|poll</code> runs one event loop per core for the binary PUT GET DEL PING MPUT MGET commands, standalone mode only; reads that need disk are handed to goroutines. On a 4-CPU CI runner it lowered read P50 (154 vs 286 µs) but had a worse read P99 and ~12% lower batch-write throughput than the default Go listener. <b>It is not faster overall</b>, so <code>--net=go</code> stays the default.</p>
+          <p><b>Adaptive group commit (default since v1.12).</b> The WAL and VLog flush windows became upper bounds: a lone writer is synced at once, concurrent writers after an idle gap of about one fdatasync; <code>--group-commit=fixed</code> restores the full-window wait. With an emulated 300 µs fdatasync on a macOS laptop (15 ms window, 128 B values): one writer&rsquo;s P50 went from 16 ms to <b>0.45 ms</b>, and 64 writers from 4.0K to 37.5K durable writes/s at P99 2.6 ms. It has not yet been measured on Linux NVMe. <b>Raft read barrier (v1.12):</b> a newly elected leader now waits for its no-op before serving local reads, and MGET passes the same barrier as GET.</p>
+          <p><b>C++ network front-end (experimental, opt-in).</b> <code>--net=cpp|uring|poll</code> runs one event loop per core for the binary PUT GET DEL PING MPUT MGET commands, standalone mode only; reads that need disk are handed to goroutines. On a 4-CPU CI runner (measured before disk reads moved off the loop) it lowered read P50 (154 vs 286 µs) but had a worse read P99 and ~12% lower batch-write throughput than the default Go listener. It does not serve the search commands. <b>It is not faster overall</b>, so <code>--net=go</code> stays the default.</p>
 
           <div class="article-pull">
-            <div class="pull"><div class="pl">WAL replay</div><div class="pv"><span class="red">2.5×</span></div><div class="pd">faster · binary format</div></div>
+            <div class="pull"><div class="pl">Lone-writer PUT P50</div><div class="pv"><span class="red">0.45 ms</span></div><div class="pd">was 16 ms · emulated 300 µs sync</div></div>
             <div class="pull"><div class="pl">Batch writes</div><div class="pv">3.54M/s</div><div class="pd">macOS, 1M keys · was 1.45M</div></div>
             <div class="pull"><div class="pl">--net=cpp</div><div class="pv">opt-in</div><div class="pd">experimental, not faster overall</div></div>
           </div>
@@ -344,6 +361,70 @@
           <div class="article-foot">
             <div class="article-cite">Every figure above has its conditions in the main repo's BENCHMARK_RESULTS.md and CHANGELOG.md.</div>
             <div class="article-links">
+              <a href="performance.html">Measured numbers</a>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VECTOR / HYBRID SEARCH ============ -->
+<section id="search">
+  <div class="wrap">
+    <span class="eyebrow">Vector, full-text &amp; hybrid search · v1.11–v1.12</span>
+    <h2 class="sh">Semantic search <span class="em">next to the record it describes</span>.</h2>
+    <p class="sh-sub">One id names one record: <code>PUT doc-42 {"lang":"en"}</code>, <code>VSET doc-42 NS docs ...</code> and <code>TSET doc-42 NS docs TEXT ...</code> are the same thing. Vectors and documents persist as ordinary keys, acknowledged after the same WAL + VLog fdatasync as any write; the search indexes in RAM are derived from them. v1.11 shipped int8 quantization, BM25, hybrid search, cluster fan-out, <code>VDEL</code> and vector namespaces; v1.12 added product quantization and the on-disk graph.</p>
+
+    <div class="cases">
+      <div class="case">
+        <div class="cap">01 — RAG retrieval</div>
+        <h3>Chunks, metadata and embeddings <span class="em">under one key</span>.</h3>
+        <p>Store each chunk&rsquo;s text and metadata as a KV record and its embedding under the same id with <code>VSET</code>. At question time: <code>VSEARCH</code> top-k, <code>MGET</code> the texts, build the prompt. One write path, one WAL, one backup. The repo ships a runnable example (<code>examples/rag_semantic_search.py</code>).</p>
+        <div class="chips"><span class="chip">RAG</span><span class="chip">Chunk store</span><span class="chip">Semantic lookup</span><span class="chip">Bring your own embedder</span></div>
+      </div>
+      <div class="case">
+        <div class="cap">02 — Semantic + keyword</div>
+        <h3>Hybrid ranking <span class="em">without a second system</span>.</h3>
+        <p><code>TSET</code> indexes a document for BM25; <code>HSEARCH</code> runs the vector and text searches and fuses them by weighted reciprocal rank (<code>ALPHA</code> = vector weight, default 0.5). Ranks, not raw scores, are fused, so cosine and BM25 never need a common scale.</p>
+        <div class="chips"><span class="chip">Docs search</span><span class="chip">Product search</span><span class="chip">Support tickets</span><span class="chip">Exact-term recall</span></div>
+      </div>
+      <div class="case">
+        <div class="cap">03 — Filtered search</div>
+        <h3>Filter on the record, <span class="em">not a copy of it</span>.</h3>
+        <p><code>FILTER field op value</code> (<code>= != &gt; &lt; &gt;= &lt;= contains</code>) is evaluated on the KV record whose key is the vector id. An <code>=</code> filter on a field with an <code>IDXCREATE</code> index is served from the index; other filters are checked during the graph walk.</p>
+        <div class="chips"><span class="chip">Per-tenant</span><span class="chip">Language</span><span class="chip">Tier / ACL</span><span class="chip">Freshness</span></div>
+      </div>
+      <div class="case">
+        <div class="cap">04 — Lookups + similarity</div>
+        <h3>Profiles and <span class="em">nearest neighbours</span> in one call path.</h3>
+        <p>When the same service already does point lookups on user or item records, the similar-items query can hit the same cluster: vectors are routed to the node that owns their record, and in raft or replicated mode a search runs on every live node and is merged.</p>
+        <div class="chips"><span class="chip">Similar items</span><span class="chip">Recommendations</span><span class="chip">Dedup</span><span class="chip">Feature lookups</span></div>
+      </div>
+    </div>
+
+    <div class="deep">
+      <article class="article">
+        <div class="article-num">04</div>
+        <div class="article-body">
+          <div class="article-kicker">How search works</div>
+          <h3 class="article-h">HNSW in RAM, <span class="em">exact re-rank from NVMe</span>.</h3>
+          <p class="article-lede">Each namespace has one HNSW graph (cosine similarity; M = 16, efConstruction = 200, ef 64 by default, tunable per query with <code>EF</code>). The full float32 vectors always live in the value log; how much of them RAM holds is a per-namespace choice.</p>
+          <p><b>Memory layouts</b> (<code>VCREATE ns dim QUANT none|int8|pq GRAPH memory|disk</code>), measured as Go heap per 768-dim vector over 10K vectors on macOS: float32 <b>3,383 B</b>; int8 <b>1,078 B</b>, top 4 × k candidates re-ranked from disk; PQ (m = 96) <b>493 B</b>, the whole beam re-ranked; PQ + <code>GRAPH disk</code> <b>378 B</b> of heap plus 216 B in a memory-mapped file the kernel can page to NVMe. The re-rank reads the candidates&rsquo; float32 vectors with one parallel MultiGet.</p>
+          <p><b>Text and hybrid:</b> Okapi BM25 (k1 = 1.2, b = 0.75) over lowercase runs of Unicode letters and digits — Indic scripts stay whole; no stemming, stop words or phrase queries. <code>HSEARCH</code> fuses with RRF, <code>score = α/(60 + rank_vec) + (1 − α)/(60 + rank_text)</code>. <b>Clusters:</b> searches fan out to every non-failed node and merge; BM25 sums every node&rsquo;s statistics first. A peer that misses <code>--search-timeout-ms</code> (2000) fails the request and is named, unless <code>--search-allow-partial</code>. The node-to-node listener is signed with HMAC-SHA256 via <code>--cluster-secret-file</code>, or use mTLS; without either the server warns it is unauthenticated.</p>
+          <p><b>What it won&rsquo;t do yet:</b> the graph and inverted index are rebuilt at every start and searches are refused until that ends; tested to 100K real vectors and 10K at 768-dim, nothing at 10M+; one graph per namespace, cosine only, no GPU; <code>DEL</code> removes the record but not its vector or text — use <code>VDEL</code> / <code>TDEL</code> too; the search API is in the bundled Go client only (other languages use the text protocol), and the <code>--net=cpp</code> front-ends do not serve it.</p>
+
+          <div class="article-pull">
+            <div class="pull"><div class="pl">Recall@10 · GloVe-100</div><div class="pv"><span class="red">0.953</span></div><div class="pd">float32, ef 256 · 100K vectors</div></div>
+            <div class="pull"><div class="pl">Query p50</div><div class="pv">0.77 ms</div><div class="pd">same run · one query at a time</div></div>
+            <div class="pull"><div class="pl">Over the network</div><div class="pv"><span class="red">24.6K</span> QPS</div><div class="pd">20K vectors, int8, 8 clients · recall 0.894</div></div>
+          </div>
+
+          <div class="article-foot">
+            <div class="article-cite">Measured on one macOS laptop (Apple silicon), 2026-09-30: first 100K GloVe-100 word vectors, 500 queries, exact cosine ground truth, in-process (<code>TestRealEmbeddings</code>); network figures from <code>vecbench</code> with the client on the same machine. <b>Not a comparison</b> — no same-hardware run against Milvus, Qdrant, pgvector or any other vector database exists.</div>
+            <div class="article-links">
+              <a class="primary" href="docs/concepts/vector-search.html">Vector search docs</a>
               <a href="performance.html">Measured numbers</a>
             </div>
           </div>
@@ -400,7 +481,7 @@
       <div class="globe-info">
         <span class="gx">Run it where your data lives</span>
         <h3>Your regions, <span class="em">your VPC</span>, your NVMe.</h3>
-        <p>Inside a cluster: Raft consensus with async, quorum, or strong replication, and rack-aware placement that keeps copies of a partition in different zones (<code>--rack-id</code>). Across regions: <code>repl-ship</code> forwards the change-data-capture stream to another cluster. Self-hosted only — there is no managed service today.</p>
+        <p>Inside a cluster: Raft consensus (quorum-committed writes), or replicated mode with eventual, quorum, or strong consistency, and rack-aware placement that keeps copies of a partition in different zones (<code>--rack-id</code>). Across regions: <code>repl-ship</code> forwards the change-data-capture stream to another cluster. Self-hosted only — there is no managed service today.</p>
         <div class="globe-stats">
           <div class="gs"><div class="v"><span class="red">3</span></div><div class="l">Replication modes</div></div>
           <div class="gs"><div class="v">4</div><div class="l">Deploy targets</div></div>
@@ -426,11 +507,10 @@
           <div class="term-out">"veltrixdb" has been added to your repositories</div>
           <div class="term-line" style="margin-top:14px"><span class="pr">$ </span><span class="cmd">helm install <b>veltrixdb</b> veltrixdb/veltrixdb \<br/>&nbsp;&nbsp;&nbsp;&nbsp;--namespace veltrixdb --create-namespace</span></div>
           <div class="term-out" style="margin-top:10px">
-            <span class="ok">✓</span> StorageClass · veltrixdb-nvme<br/>
-            <span class="ok">✓</span> StatefulSet · 3 replicas, anti-affinity<br/>
-            <span class="ok">✓</span> ServiceMonitor · 60+ metrics<br/>
-            <span class="ok">✓</span> PodDisruptionBudget · minAvailable 2<br/>
-            <span class="ok">✓</span> nvme-prep DaemonSet · local NVMe formatted XFS
+            # the chart (separate repo) deploys:<br/>
+            # StatefulSet · nvme-prep DaemonSet (formats XFS)<br/>
+            # NVMe StorageClass · ServiceMonitor · PrometheusRule<br/>
+            # PodDisruptionBudget (minAvailable: 2)
           </div>
           <div class="term-line" style="margin-top:14px"><span class="pr">$ </span><span class="term-cursor"></span></div>
         </div>
@@ -439,8 +519,8 @@
     <div class="deploy-pills">
       <div class="dp"><div class="nm">⎈ Kubernetes-native</div><div class="sub">StatefulSet · anti-affinity · PDB</div></div>
       <div class="dp"><div class="nm">⚓ Helm chart</div><div class="sub">one command · full values.yaml</div></div>
-      <div class="dp"><div class="nm">🤖 K8s operator</div><div class="sub">rolling upgrades · reshard · self-heal</div></div>
-      <div class="dp"><div class="nm">📊 Prometheus + Grafana</div><div class="sub">60+ metrics · 22 alert rules · dashboards</div></div>
+      <div class="dp"><div class="nm">🤖 K8s operator</div><div class="sub">rolling upgrades · reshard · self-heal · separate repo</div></div>
+      <div class="dp"><div class="nm">📊 Prometheus + Grafana</div><div class="sub">70+ metric families · alert rules · dashboards</div></div>
     </div>
   </div>
 </section>
@@ -455,7 +535,7 @@
     <div class="honest">
       <div class="honest-head">
         <h3>Hard requirements <span class="em">we won't bend on</span>.</h3>
-        <span class="tag">Last updated · September 2026</span>
+        <span class="tag">Last updated · October 2026</span>
       </div>
       <div class="honest-grid">
         <div class="honest-cell">
@@ -466,12 +546,29 @@
         <div class="honest-cell">
           <div class="sym">⚠</div>
           <div class="h">Point lookups first</div>
-          <div class="d">Purpose-built for <b>high-throughput GET / PUT / DEL</b> at scale. Ordered scans exist (<code>RANGE</code>, <code>SCANCUR</code>, backed by a skiplist at ~90 B/key), but joins, SQL and full-text search do not. No Redis (RESP) protocol — clients use our text or binary protocol and SDKs.</div>
+          <div class="d">Purpose-built for <b>high-throughput GET / PUT / DEL</b> at scale. Ordered scans exist (<code>RANGE</code>, <code>SCANCUR</code>, backed by a skiplist at ~90 B/key), and so do vector, BM25 and hybrid search — but no joins, no SQL, and no facets or aggregations. No Redis (RESP) protocol — clients use our text or binary protocol and SDKs.</div>
         </div>
         <div class="honest-cell">
           <div class="sym">⚠</div>
           <div class="h">RAM budget for the index</div>
           <div class="d">Every key's index record lives in DRAM. The native index measured <b>~142 B/key</b> settled RSS at 5M keys (168 B/key with the Go map), plus ~90 B/key for the ordered index unless you pass <code>--disable-ordered-index</code>, plus your cache. Size with your own key lengths — you will not run a large keyspace on a t3.medium.</div>
+        </div>
+      </div>
+      <div class="honest-grid" style="border-top:1px solid var(--line)">
+        <div class="honest-cell">
+          <div class="sym">⚠</div>
+          <div class="h">Search indexes live in RAM</div>
+          <div class="d">HNSW graphs and the BM25 index are in memory (~0.4–3.4 KB per 768-dim vector, by layout) and are <b>rebuilt at every start</b>; searches are refused until the rebuild ends. Tested to 100K real vectors — nothing at 10M+ yet.</div>
+        </div>
+        <div class="honest-cell">
+          <div class="sym">⚠</div>
+          <div class="h">Kubernetes pieces are separate repos</div>
+          <div class="d">The Helm chart (<code>VeltrixDB-Helm-Chart</code>) and the operator (<code>VeltrixDB-Kubernetes-Operator</code>) are published from their own repositories, not the server&rsquo;s; check their own docs for what each version deploys. Adding a node means every node must list it in <code>--peers</code> — gossip does not add members.</div>
+        </div>
+        <div class="honest-cell">
+          <div class="sym">⚠</div>
+          <div class="h">Encryption has known gaps</div>
+          <div class="d"><code>--encrypt-at-rest</code> encrypts values (AES-256-GCM), not keys. There is <b>no key rotation</b>: one key per data directory, loaded from an env var or file. Point-in-time-recovery archives hold values decrypted, so protect that location.</div>
         </div>
       </div>
       <div class="honest-foot">
@@ -498,7 +595,8 @@
         <div class="fit-opts">
           <input type="radio" name="q1" id="q1a" value="point"><label for="q1a">Point lookups by key</label>
           <input type="radio" name="q1" id="q1b" value="range"><label for="q1b">Range scans / analytical queries</label>
-          <input type="radio" name="q1" id="q1c" value="fts"><label for="q1c">Full-text / faceted search</label>
+          <input type="radio" name="q1" id="q1d" value="vector"><label for="q1d">Vector / semantic search (RAG)</label>
+          <input type="radio" name="q1" id="q1c" value="fts"><label for="q1c">Search engine (facets, phrases, stemming)</label>
         </div>
       </fieldset>
 
@@ -597,7 +695,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.8</div>
+      <div>Latest release v1.12</div>
     </div>
   </div>
 </footer>
