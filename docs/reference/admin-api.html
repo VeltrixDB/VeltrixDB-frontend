@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -119,7 +119,7 @@ curl http://localhost:2112/metrics | head -30
 curl "http://localhost:2112/traces?limit=50&amp;error=true"</code></pre>
 
 <h2 id="admin-stats">GET /admin/stats</h2>
-<p>Returns a full JSON snapshot of engine state: index size, cumulative op counters, cache stats, WAL totals, CDC counters, per-disk VLog stats, and namespace list. This is the endpoint the <code>veltrix status</code>, <code>compaction</code>, <code>cache</code>, <code>wal</code>, <code>replication</code>, <code>cdc</code> and <code>top</code> subcommands poll. Methods other than <code>GET</code> get <code>405</code>.</p>
+<p>Returns a full JSON snapshot of engine state: index size, cumulative op counters, cache stats, WAL totals, CDC counters, per-disk VLog stats, and namespace list. This is the endpoint the <code>veltrix status</code>, <code>compaction</code>, <code>cache</code>, <code>wal</code>, <code>replication</code>, <code>cdc</code> and <code>top</code> subcommands poll (after v1.13, <code>replication</code> reads <a class="inline-link" href="#admin-cluster"><code>/admin/cluster</code></a> instead). Methods other than <code>GET</code> get <code>405</code>.</p>
 
 <pre class="code-block"><code>curl http://localhost:2112/admin/stats</code></pre>
 
@@ -229,7 +229,7 @@ curl "http://localhost:2112/traces?limit=50&amp;error=true"</code></pre>
 
 <pre class="code-block"><code>curl "http://localhost:2112/admin/cdc?prefix=orders/&duration_seconds=60"</code></pre>
 
-<p>Each streamed line is one JSON-encoded <code>storage.CDCEvent</code>: <code>Op</code>, <code>Key</code>, <code>Value</code> (base64, as Go encodes <code>[]byte</code>; <code>null</code> for deletes) and <code>Timestamp</code> (&micro;s). It is consumed by the <code>repl-ship</code> cross-region shipper; <code>veltrix cdc-tail</code> reads it too, but its formatter looks for lowercase field names, so its op/key columns print <code>&mdash;</code> (see <a class="inline-link" href="cli-reference.html#veltrix">CLI Reference</a>).</p>
+<p>Each streamed line is one JSON-encoded <code>storage.CDCEvent</code>: <code>Op</code>, <code>Key</code>, <code>Value</code> (base64, as Go encodes <code>[]byte</code>; <code>null</code> for deletes) and <code>Timestamp</code> (&micro;s). It is consumed by the <code>repl-ship</code> cross-region shipper; <code>veltrix cdc-tail</code> reads it too; in v1.12 its formatter looks for lowercase field names, so its op/key columns print <code>&mdash;</code> (<span class="badge good">Fixed on main after v1.13 — ships in the next release</span> it decodes these fields; see <a class="inline-link" href="cli-reference.html#veltrix">CLI Reference</a>).</p>
 
 <div class="callout limitation">
 <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
@@ -317,7 +317,7 @@ curl "http://localhost:2112/traces?limit=50&amp;error=true"</code></pre>
 <tr><td><code>partition_count</code></td><td>uint32</td><td>Number of partitions in the consistent-hash ring.</td></tr>
 <tr><td><code>consistency</code></td><td>string</td><td>Present only in <code>replicated</code> mode &mdash; <code>eventual</code>/<code>quorum</code>/<code>strong</code>.</td></tr>
 <tr><td><code>raft</code></td><td>object</td><td>Present only in <code>raft</code> mode: <code>role</code>, <code>term</code>, <code>leader_id</code>, <code>is_leader</code>.</td></tr>
-<tr><td><code>replication</code></td><td>array</td><td>Present only in <code>replicated</code> mode: per-replica <code>node_id</code>, <code>state</code>, <code>last_ack_seq</code>, <code>lag_bytes</code>, <code>lag_ns</code>.</td></tr>
+<tr><td><code>replication</code></td><td>array</td><td>Present only in <code>replicated</code> mode: per-replica <code>node_id</code>, <code>state</code>, <code>last_ack_seq</code>, <code>lag_bytes</code>, <code>lag_ns</code>. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>lag_ns</code> is the age of the oldest write the replica has not acked (0 when caught up), and two fields are added: <code>last_ack_unix_nano</code> and, while the replica is <code>FAILED</code>, <code>next_probe_unix_nano</code>.</td></tr>
 <tr><td><code>nodes</code></td><td>array</td><td>Every known node: <code>node_id</code>, <code>address</code>, <code>port</code>, <code>rack</code> (omitted when unset; see <code>-rack-id</code>), <code>state</code>.</td></tr>
 </tbody>
 </table>

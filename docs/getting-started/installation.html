@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -96,7 +96,7 @@
 <h2 id="docker">Docker</h2>
 <p>The fastest way to try VeltrixDB. The published image requires no build step:</p>
 <pre class="code-block"><code>docker run -p 9000:9000 ghcr.io/veltrixdb/veltrixdb:latest</code></pre>
-<p>This starts a single standalone node listening on <code>9000</code> (add <code>-p 2112:2112</code> for metrics and health checks). Release images are tagged per release, e.g. <code>ghcr.io/veltrixdb/veltrixdb:v1.12</code>, plus <code>latest</code>. It's suitable for local development and protocol testing, not for production NVMe throughput — for that, run on bare metal or Kubernetes with real local NVMe disks attached.</p>
+<p>This starts a single standalone node listening on <code>9000</code> (add <code>-p 2112:2112</code> for metrics and health checks). Release images are tagged per release, e.g. <code>ghcr.io/veltrixdb/veltrixdb:v1.13</code>, plus <code>latest</code>. It's suitable for local development and protocol testing, not for production NVMe throughput — for that, run on bare metal or Kubernetes with real local NVMe disks attached.</p>
 <p><span class="badge good">New in v1.6</span> The image is built with <code>CGO_ENABLED=1</code> on <code>gcr.io/distroless/cc-debian12</code> (glibc, no shell), so it carries the off-heap native index. The io_uring VLog write bridge is compiled in but stays off unless you set <code>VELTRIXDB_URING_BRIDGE=on</code> or <code>sqpoll</code>; under Kubernetes' RuntimeDefault seccomp profile <code>io_uring_setup</code> is blocked and an opted-in bridge falls back to <code>pwrite</code>. Build with <code>--build-arg CGO_ENABLED=0</code> for the old fully static, pure-Go image (Go map index).</p>
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Set vm.max_map_count on the host</span> The native index mmaps its large arrays individually, so at large key counts the host (or Kubernetes node) needs <code>vm.max_map_count ≥ 262144</code>; below that an insert can fail with ENOMEM. A container cannot set it — apply <code>scripts/sysctl.conf</code> on the host, e.g. <code>sudo sysctl -w vm.max_map_count=262144</code>.</span></div>
 
@@ -148,7 +148,7 @@ metadata:
   namespace: veltrixdb
 spec:
   replicas: 3
-  image: ghcr.io/veltrixdb/veltrixdb:v1.12
+  image: ghcr.io/veltrixdb/veltrixdb:v1.13
   disksPerNode: 8
   cacheSizeMB: 262144
   walFlushWindowMs: 15

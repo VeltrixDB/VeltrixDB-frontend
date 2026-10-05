@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -96,6 +96,7 @@
 <h2 id="what-gets-backed-up">What gets backed up</h2>
 <p>VeltrixDB stores two files per disk: <code>wal.log</code> (a compacted write-ahead log — one entry per live key, holding the key and its VLog offset) and <code>vlog_active.dat</code> (the append-only value bytes). Backup captures both. The in-memory index is <strong>not</strong> backed up — it is rebuilt from the WAL on startup, so backing up the WAL and VLog is sufficient to reconstruct full key-value state.</p>
 <p><strong>WAL encoding.</strong> <span class="badge good">New in v1.6</span> The backed-up <code>wal.log</code> and PITR archive segments use the binary WAL format (48-byte header, magic <code>0xB1</code>, CRC32C over the whole record): the <code>veltrixdb-backup</code> CLI, which opens the engine itself, always writes binary, and <code>restore-pitr</code> always appends binary records. Any build that reads binary also reads legacy text records, so restoring into the same or a newer build always works. A pre-binary build (v1.5 and earlier) cannot read binary records: to restore into one, restore with the current build, start the server once with <code>--wal-format=text</code> and stop it cleanly (the shutdown checkpoint rewrites <code>wal.log</code> as text), then start the older build. Keys containing <code>|</code> or a newline are not crash-safe in the text format.</p>
+<p><span class="badge good">Fixed on main after v1.13 — ships in the next release</span> backups, checkpoints and PITR archive records carry each key&rsquo;s absolute TTL expiry (v1.12 drops TTLs, so restored keys never expire), so a restored key expires when the original would have. A build older than that change cannot read the record of a TTL&rsquo;d key: to roll back to one, start the new build once with <code>--wal-format=text-legacy</code> (not <code>text</code>) and stop it cleanly; TTL&rsquo;d keys become immortal on the older build.</p>
 
 <h2 id="full-backup">Full backup</h2>
 <p>A full backup captures a consistent snapshot of the entire dataset as of the moment it runs, while the engine keeps serving traffic. It checkpoints the WAL, then copies each disk's VLog up to its snapshotted end offset (through its own read-only descriptor, so it never reads the region concurrent appends are writing) plus the compacted WAL, and writes <code>manifest.json</code> last.</p>
@@ -103,12 +104,12 @@
 <pre class="code-block"><code># Full backup of a RUNNING server
 curl -s -X POST localhost:2112/admin/backup \
   -d '{"type":"full","dest_dir":"/backups/full-20260523"}'
-# same thing via the CLI (sends no admin token)
+# same thing via the CLI (v1.12 sends no admin token; the next release adds --admin-token / VELTRIX_ADMIN_TOKEN)
 veltrix --addr 127.0.0.1:2112 backup /backups/full-20260523</code></pre>
 <p>The response is JSON with <code>status</code>, <code>type</code>, <code>backup_id</code>, <code>dest_dir</code>, <code>num_disks</code>, <code>duration_ms</code> and the full <code>manifest</code>.</p>
 <div class="callout danger">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">Never run <code>veltrixdb-backup</code> against a live server's data dirs.</span> The offline tool (<code>cmd/backup</code>) opens the data directories with <strong>its own engine</strong>. Pointed at a running server's directories it runs a second engine on the same files (no lock prevents it); in testing this produced an empty backup and <strong>truncated the live <code>wal.log</code> and <code>vlog_active.dat</code></strong>. Use it only on the data dirs of a stopped server. It is not included in the server image.</span>
+  <span><span class="callout-title">v1.12: never run <code>veltrixdb-backup</code> against a live server's data dirs.</span> The offline tool (<code>cmd/backup</code>) opens the data directories with <strong>its own engine</strong>. On v1.13 and earlier, pointed at a running server's directories it runs a second engine on the same files (no lock prevents it); in testing this produced an empty backup and <strong>truncated the live <code>wal.log</code> and <code>vlog_active.dat</code></strong>. Use it only on the data dirs of a stopped server. It is not included in the server image.<br/><span class="badge good">Fixed on main after v1.13 — ships in the next release</span> every engine holds an exclusive lock on <code>&lt;data-dir&gt;/LOCK</code>, so against a live server&rsquo;s dirs the tool refuses to start (<code>data directory is locked by another VeltrixDB engine: &lt;dir&gt; (&hellip; held by pid N since &hellip;)</code>), tells you to stop the server or use <code>POST /admin/backup</code> / <code>veltrix backup</code>, and leaves the live files untouched. <code>restore</code> and <code>restore-pitr</code> take the same lock on their destination dirs. Until you run that release, the v1.12 rule above still applies.</span>
 </div>
 <pre class="code-block"><code>go build -o veltrixdb-backup ./cmd/backup
 

@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -117,7 +117,7 @@
 <table>
 <thead><tr><th>Command</th><th>Response</th></tr></thead>
 <tbody>
-<tr><td><code>PUTEX &lt;key&gt; &lt;ttl-seconds&gt; &lt;value&gt;</code></td><td><code>OK</code> — a <code>PUT</code> with expiration (the text-protocol counterpart of the binary <code>PUT</code>'s TTL field). TTL must be &ge; 1; <code>ERR bad ttl</code> otherwise.</td></tr>
+<tr><td><code>PUTEX &lt;key&gt; &lt;ttl-seconds&gt; &lt;value&gt;</code></td><td><code>OK</code> — a <code>PUT</code> with expiration. The binary <code>PUT</code> frame (<code>0x01</code>) has no TTL field; binary clients send a TTL in <code>MPUT</code>&rsquo;s per-entry header (<code>[2B keyLen][4B valLen][4B ttl]</code>). TTL must be &ge; 1; <code>ERR bad ttl</code> otherwise.</td></tr>
 <tr><td><code>INCR &lt;key&gt; [delta]</code> / <code>DECR &lt;key&gt; [delta]</code></td><td>The new integer value, as a decimal line. <code>delta</code> defaults to <code>1</code>; a missing key counts from zero.</td></tr>
 <tr><td><code>SETNX &lt;key&gt; &lt;value&gt;</code></td><td><code>1</code> (created) or <code>0</code> (key already exists).</td></tr>
 <tr><td><code>CAS &lt;key&gt; &lt;expected&gt; &lt;new&gt;</code></td><td><code>OK</code> (swapped), <code>MISMATCH</code> (current value differed), or <code>NOTFOUND</code> (key absent).</td></tr>
