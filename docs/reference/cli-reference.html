@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -101,7 +101,7 @@
 <pre class="code-block"><code>go build -o veltrix ./cmd/veltrix</code></pre>
 
 <h3>Global flags</h3>
-<p>The usage is <code>veltrix [flags] COMMAND [args]</code>, and the flags must come <strong>before</strong> the command: the CLI uses Go's <code>flag</code> package, which stops parsing at the first non-flag argument, so anything after the command is treated as an argument and a flag there is silently ignored. <code>veltrix --watch 5 top</code> refreshes every 5&nbsp;s; <code>veltrix top --watch 5</code> runs at the 2&nbsp;s default. (The CLI's own built-in help still shows the second form in its examples.)</p>
+<p>The usage is <code>veltrix [flags] COMMAND [args]</code>, and the flags must come <strong>before</strong> the command: the CLI uses Go's <code>flag</code> package, which stops parsing at the first non-flag argument, so anything after the command is treated as an argument and a flag there is silently ignored. <code>veltrix --watch 5 top</code> refreshes every 5&nbsp;s; <code>veltrix top --watch 5</code> runs at the 2&nbsp;s default. (The v1.12 CLI's own built-in help still shows the second form in its examples.) <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> flags work before or after the command, so <code>veltrix top --watch 5</code> and <code>veltrix --watch 5 top</code> are the same; put <code>--</code> before an argument that starts with <code>-</code> (<code>veltrix put k -- -1</code>).</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
@@ -112,13 +112,15 @@
 <tr><td><code>--json</code></td><td><code>false</code></td><td>Print raw JSON instead of formatted tables (for the commands that render admin-API JSON).</td></tr>
 <tr><td><code>--no-color</code></td><td><code>false</code></td><td>Disable ANSI colors (auto-disabled when stdout is not a TTY).</td></tr>
 <tr><td><code>--prefix</code></td><td><em>(empty)</em></td><td>Key prefix filter, used by <code>cdc-tail</code>.</td></tr>
+<tr><td><code>--admin-token</code> <span class="badge good">Fixed on main after v1.13 — ships in the next release</span></td><td><em>(empty; env <code>VELTRIX_ADMIN_TOKEN</code>)</em></td><td>Admin token sent as <code>Authorization: Bearer</code> to <code>/admin/*</code>. Not in v1.12.</td></tr>
+<tr><td><code>--duration</code> <span class="badge good">Fixed on main after v1.13 — ships in the next release</span></td><td><code>0</code></td><td>Stop <code>cdc-tail</code> after N seconds (0 = until Ctrl+C). Not in v1.12.</td></tr>
 </tbody>
 </table>
 </div>
 
 <div class="callout warn">
 <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-<span><span class="callout-title">No admin token</span> <code>veltrix</code> sends no <code>Authorization</code> / <code>X-Admin-Token</code> header. Every command that reads <code>/admin/*</code> therefore works only against a server started without <code>-admin-token</code>, from a loopback address (on the host, or through an SSH tunnel / <code>kubectl port-forward</code>); otherwise it gets <code>403</code> (remote, no token configured) or <code>401</code> (token configured). <code>metrics</code>, <code>traces</code>, <code>ping</code> and the key commands use unguarded paths or the data port and are not affected. See <a class="inline-link" href="admin-api.html">Admin API</a>.</span>
+<span><span class="callout-title">v1.12: no admin token</span> The v1.12 <code>veltrix</code> sends no <code>Authorization</code> / <code>X-Admin-Token</code> header. Every command that reads <code>/admin/*</code> therefore works only against a server started without <code>-admin-token</code>, from a loopback address (on the host, or through an SSH tunnel / <code>kubectl port-forward</code>); otherwise it gets <code>403</code> (remote, no token configured) or <code>401</code> (token configured). <code>metrics</code>, <code>traces</code>, <code>ping</code> and the key commands use unguarded paths or the data port and are not affected. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> pass the server&rsquo;s token with <code>--admin-token</code> or <code>VELTRIX_ADMIN_TOKEN</code>; without it a guarded server answers <code>401</code> and the CLI prints a hint. See <a class="inline-link" href="admin-api.html">Admin API</a>.</span>
 </div>
 
 <h3>Subcommands</h3>
@@ -126,19 +128,19 @@
 <table>
 <thead><tr><th>Subcommand</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>status</code></td><td>Full node health + ops summary: health/readiness, index size, cache, WAL, CDC, per-disk VLog table, admission-control state. Known issue: the readiness line checks the <code>/readyz</code> body for <code>ok</code>, but a ready server answers <code>ready</code>, so it always prints <code>NOT READY</code>; check <code>curl -s localhost:2112/readyz</code> instead.</td></tr>
+<tr><td><code>status</code></td><td>Full node health + ops summary: health/readiness, index size, cache, WAL, CDC, per-disk VLog table, admission-control state. Known issue in v1.12: the readiness line checks the <code>/readyz</code> body for <code>ok</code>, but a ready server answers <code>ready</code>, so it always prints <code>NOT READY</code>; check <code>curl -s localhost:2112/readyz</code> instead. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> readiness comes from the <code>/readyz</code> status code (200 <code>ready</code>, 503 <code>initializing</code> / <code>degraded: &hellip;</code>).</td></tr>
 <tr><td><code>nodes</code></td><td>Cluster topology table &mdash; role (leader/follower), Raft term, health, address, replication lag. Backed by <code>/admin/cluster</code>.</td></tr>
 <tr><td><code>compaction</code> (alias <code>gc</code>)</td><td>Per-disk VLog GC status: size, live/dead bytes, GC ratio (color-coded), GC run counters, admission-control thresholds.</td></tr>
-<tr><td><code>replication</code> (alias <code>repl</code>)</td><td>Per-replica state, consistency level, lag, ACK watermark.</td></tr>
+<tr><td><code>replication</code> (alias <code>repl</code>)</td><td>Per-replica state, consistency level, lag, ACK watermark. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> read from <code>/admin/cluster</code> (v1.12 reads <code>/admin/stats</code>).</td></tr>
 <tr><td><code>cache</code></td><td>LIRS cache hit rate, fill bar, evictions, hot-key list.</td></tr>
 <tr><td><code>wal</code></td><td>WAL bytes written, entry count, flush count, average batch size.</td></tr>
 <tr><td><code>quotas</code> (alias <code>quota</code>)</td><td>Per-namespace quota usage table. Backed by <code>/admin/quotas</code>.</td></tr>
 <tr><td><code>cdc</code></td><td>CDC broker stats: events broadcast, dropped, active subscribers.</td></tr>
-<tr><td><code>cdc-tail</code></td><td>Streams live CDC events from <code>/admin/cdc</code> to stdout (Ctrl+C to stop); filter with <code>veltrix --prefix orders/ cdc-tail</code>. Known issue: the formatter reads lowercase field names (<code>op</code>, <code>key</code>, <code>timestamp_us</code>) while the server emits <code>Op</code>, <code>Key</code>, <code>Timestamp</code>, so the op and key columns print <code>&mdash;</code>; use <code>curl -N "localhost:2112/admin/cdc?prefix=orders/"</code> to see the events.</td></tr>
+<tr><td><code>cdc-tail</code></td><td>Streams live CDC events from <code>/admin/cdc</code> to stdout (Ctrl+C to stop); filter with <code>veltrix --prefix orders/ cdc-tail</code>. Known issue in v1.12: the formatter reads lowercase field names (<code>op</code>, <code>key</code>, <code>timestamp_us</code>) while the server emits <code>Op</code>, <code>Key</code>, <code>Timestamp</code>, so the op and key columns print <code>&mdash;</code>; on v1.13 and earlier use <code>curl -N "localhost:2112/admin/cdc?prefix=orders/"</code> to see the events. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> it decodes <code>Op</code> / <code>Key</code> / <code>Value</code> (base64) / <code>Timestamp</code> and shows a value preview.</td></tr>
 <tr><td><code>scrubber</code></td><td>Data-integrity scrubber status from <code>/metrics</code>: records scanned, corruption count.</td></tr>
 <tr><td><code>metrics [filter]</code></td><td>Raw Prometheus metrics, optionally grep-filtered by substring. An unknown command containing <code>_</code> is treated as a filter, so <code>veltrix vlog_gc</code> works too.</td></tr>
 <tr><td><code>traces</code></td><td>Recent OTel spans (slow ops and errors) from the in-process ring buffer.</td></tr>
-<tr><td><code>top</code></td><td>Live full-screen dashboard until Ctrl+C, refreshing every <code>--watch</code> seconds (2 when <code>--watch</code> is 0). The flag goes before the command: <code>veltrix --watch 5 top</code>.</td></tr>
+<tr><td><code>top</code></td><td>Live full-screen dashboard until Ctrl+C, refreshing every <code>--watch</code> seconds (2 when <code>--watch</code> is 0). On v1.13 and earlier the flag goes before the command: <code>veltrix --watch 5 top</code> (after v1.13 either position works).</td></tr>
 <tr><td><code>ping</code></td><td>Round-trip latency check &mdash; 5 TCP <code>PING</code>s plus one HTTP <code>/healthz</code> check.</td></tr>
 <tr><td><code>put KEY VALUE</code></td><td>Write a key via the text protocol (one connection per call; remaining arguments are joined with spaces as the value).</td></tr>
 <tr><td><code>get KEY</code></td><td>Read a key via the text protocol; prints the reply line (an <code>ERR ...</code> line for a missing key).</td></tr>
@@ -150,6 +152,7 @@
 </tbody>
 </table>
 </div>
+<p><span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>cache</code>, <code>compaction</code>, <code>status</code> and <code>top</code> read the untagged <code>CacheStats</code> / <code>VLogStats</code> fields, <code>quotas</code> reads <code>QuotaSnapshot</code>, <code>traces</code> reads <code>start_unix_ns</code>, and a text-protocol <code>ERR &hellip;</code> from <code>get</code> is shown as-is. On v1.13 and earlier some of these fields print empty or zero; use <code>--json</code> or <code>curl</code> on the endpoint.</p>
 
 <h3>Examples</h3>
 <pre class="code-block"><code>veltrix status
@@ -420,10 +423,12 @@ veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
 <tr><td><code>--label-selector</code>, <code>-l</code></td><td><code>app.kubernetes.io/name=veltrixdb</code></td><td>Pod selector.</td></tr>
 <tr><td><code>--admin-port</code></td><td><code>2112</code></td><td>Admin HTTP port on the pod.</td></tr>
 <tr><td><code>--prefix</code></td><td><em>(empty)</em></td><td>Key prefix filter for <code>cdc-tail</code>.</td></tr>
+<tr><td><code>--admin-token</code> <span class="badge good">Fixed on main after v1.13 — ships in the next release</span></td><td><em>(empty; env <code>VELTRIX_ADMIN_TOKEN</code>)</em></td><td>Admin bearer token. Not in v1.12.</td></tr>
+<tr><td><code>--admin-url</code> <span class="badge good">Fixed on main after v1.13 — ships in the next release</span></td><td><em>(empty)</em></td><td>Admin URL to call directly instead of port-forwarding. Not in v1.12.</td></tr>
 </tbody>
 </table>
 </div>
-<p>As with <code>veltrix</code>, flags go <strong>before</strong> the command (<code>kubectl veltrix -n prod --prefix=orders/ cdc-tail</code>); after it they are ignored. The plugin sends no admin token: through the port-forward its requests arrive from loopback, which is enough for a server without <code>-admin-token</code> and gets <code>401</code> from one with it.</p>
+<p>As with <code>veltrix</code>, flags go <strong>before</strong> the command (<code>kubectl veltrix -n prod --prefix=orders/ cdc-tail</code>); after it they are ignored. The v1.12 plugin sends no admin token: through the port-forward its requests arrive from loopback, which is enough for a server without <code>-admin-token</code> and gets <code>401</code> from one with it. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> flags also work after the command, <code>--admin-token</code> / <code>VELTRIX_ADMIN_TOKEN</code> reaches guarded servers, and HTTP errors exit 1.</p>
 
 <h3>Commands</h3>
 <div class="table-wrap">
@@ -435,7 +440,7 @@ veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
 <tr><td><code>checkpoint</code></td><td><code>POST /admin/checkpoint</code></td><td>Force a WAL checkpoint.</td></tr>
 <tr><td><code>migrate</code></td><td><code>POST /admin/migrate</code></td><td>Run schema migrations.</td></tr>
 <tr><td><code>quotas</code></td><td><code>GET /admin/quotas</code></td><td>List per-namespace quotas.</td></tr>
-<tr><td><code>quota-set NS WPS MAX</code></td><td><code>POST /admin/quotas</code></td><td>Set <code>writes_per_sec=WPS</code>, <code>max_keys=MAX</code> for namespace <code>NS</code>. It sends no <code>burst</code>, so the burst is set to 0; use <code>curl</code> to set one.</td></tr>
+<tr><td><code>quota-set NS WPS MAX</code></td><td><code>POST /admin/quotas</code></td><td>Set <code>writes_per_sec=WPS</code>, <code>max_keys=MAX</code> for namespace <code>NS</code>. On v1.13 and earlier it sends no <code>burst</code>, so the burst is set to 0; use <code>curl</code> to set one. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>quota-set NS WPS MAX [--burst N]</code> (burst defaults to WPS), values are form-encoded and checked to be numbers.</td></tr>
 <tr><td><code>cdc-tail</code></td><td><code>GET /admin/cdc</code></td><td>Stream CDC events to stdout until interrupted.</td></tr>
 <tr><td><code>version</code></td><td><code>GET /admin/version</code></td><td>Print engine + schema version.</td></tr>
 </tbody>

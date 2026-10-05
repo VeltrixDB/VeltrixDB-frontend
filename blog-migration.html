@@ -409,7 +409,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
         <div class="ck">
           <div class="ck-h">Workload fit</div>
           <ul>
-            <li>Your hot path is <b>point lookups</b> — GET / PUT / DEL / HGET-style. Ordered range scans exist (<code>RANGE</code>, <code>SCANCUR</code>), but in cluster modes they read only the local node (and skip the Raft read barrier). So a critical path built on <code>Query</code> with sort-key ranges, or on <code>Scan</code>, needs a careful look.</li>
+            <li>Your hot path is <b>point lookups</b> — GET / PUT / DEL / HGET-style. Ordered range scans exist (<code>RANGE</code>, <code>SCANCUR</code>), but in cluster modes they read only the local node (and on v1.13 and earlier skip the Raft read barrier; <b>Fixed on main after v1.13 — ships in the next release:</b> they pass it). So a critical path built on <code>Query</code> with sort-key ranges, or on <code>Scan</code>, needs a careful look.</li>
             <li>GSI access patterns either become separate keys, or a secondary index on a record field (<code>IDXCREATE name field</code> / <code>IDXQUERY name value</code>). The field is read from a JSON or <code>k=v</code> value, so store items as flat JSON (unmarshal DynamoDB JSON first). <code>IDXQUERY</code> fans out to every node in a cluster; an index is equality-only.</li>
             <li>You have a <b>partition key</b> in DynamoDB that can map 1:1 to a VeltrixDB key. Composite (PK + SK) keys map to <code>pk:sk</code> string concatenations.</li>
             <li>Values are <b>≤ 400 KB</b> (DynamoDB's own limit). VeltrixDB supports up to 64 MB, but smaller values keep your RAM budget honest.</li>
@@ -770,7 +770,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.12</div>
+      <div>Latest release v1.13</div>
     </div>
   </div>
 </footer>

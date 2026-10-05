@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -94,7 +94,7 @@
 <p class="page-lede">A runbook-style summary of VeltrixDB's disaster recovery procedures, covering pod crash loops, data corruption, write outages, GC death-spirals, backup/restore, encryption key rotation, failed disks, metadata repair and WAL-format rollback. Assumes <code>kubectl</code> admin access with pods labeled <code>app.kubernetes.io/name=veltrixdb</code> in the <code>veltrixdb</code> namespace (the <code>kubectl veltrix</code> plugin's defaults).</p>
 <div class="callout note">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">The image has no shell.</span> The runtime image is distroless (no <code>sh</code>, <code>curl</code>, <code>rm</code> or <code>nc</code>), so <code>kubectl exec POD -- curl …</code> does not work. Reach the admin port with <code>kubectl port-forward</code> from your workstation, and run file commands from an ephemeral debug container that shares the server's process namespace (<code>kubectl debug --target=veltrixdb</code>; the server's filesystem is then under <code>/proc/1/root</code>) or a node debug pod (host filesystem under <code>/host</code>). The <code>kubectl veltrix</code> plugin port-forwards for you but sends no admin token, so it only works on servers started without <code>--admin-token</code>.</span>
+  <span><span class="callout-title">The image has no shell.</span> The runtime image is distroless (no <code>sh</code>, <code>curl</code>, <code>rm</code> or <code>nc</code>), so <code>kubectl exec POD -- curl …</code> does not work. Reach the admin port with <code>kubectl port-forward</code> from your workstation, and run file commands from an ephemeral debug container that shares the server's process namespace (<code>kubectl debug --target=veltrixdb</code>; the server's filesystem is then under <code>/proc/1/root</code>) or a node debug pod (host filesystem under <code>/host</code>). The <code>kubectl veltrix</code> plugin port-forwards for you; on v1.13 and earlier it sends no admin token, so it only works on servers started without <code>--admin-token</code>. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> it takes <code>--admin-token</code> / <code>VELTRIX_ADMIN_TOKEN</code> (and <code>--admin-url</code> to skip the port-forward).</span>
 </div>
 
 <h2 id="severity">Severity classes</h2>
@@ -196,7 +196,7 @@ veltrixdb-backup download --provider=s3 --bucket=my-bucket --region=us-east-1 \
 veltrixdb-backup restore --chain=/tmp/restore --data-dirs=/data-new</code></pre>
 <div class="callout danger">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title"><code>veltrixdb-backup</code> on a live server truncates its files.</span> It opens the data dirs with its own engine; pointed at a running server's directories it produced an empty backup and truncated the live <code>wal.log</code> and <code>vlog_active.dat</code> in testing. Use <code>POST /admin/backup</code> for running servers. The tool is not in the server image (the Dockerfile builds only <code>cmd/server</code>). With <code>--raw-vlogs</code>, backups contain no VLog data.</span>
+  <span><span class="callout-title">v1.12: <code>veltrixdb-backup</code> on a live server truncates its files.</span> It opens the data dirs with its own engine; on v1.13 and earlier, pointed at a running server's directories it produced an empty backup and truncated the live <code>wal.log</code> and <code>vlog_active.dat</code> in testing. Use <code>POST /admin/backup</code> for running servers. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> a data-dir lock makes it refuse a live server&rsquo;s dirs (<code>ErrDataDirLocked</code>) without touching them; <code>veltrix-repair</code> and a second server are refused the same way. The tool is not in the server image (the Dockerfile builds only <code>cmd/server</code>). With <code>--raw-vlogs</code>, backups contain no VLog data.</span>
 </div>
 <p>Kubernetes volume snapshots are an operator-side alternative if your CSI driver supports them: create a <code>VolumeSnapshot</code> object per PVC (there is no <code>kubectl create volumesnapshot</code> subcommand, and the main repository ships no snapshot manifests). Run <code>POST /admin/checkpoint</code> first so <code>wal.log</code> is a compacted checkpoint.</p>
 <p>Backups and PITR restores write a binary WAL; restoring into a build that predates the binary WAL (v1.5 and earlier) needs the <a class="inline-link" href="#wal-format-rollback">WAL rollback procedure</a> first. For the full backup/incremental/PITR model, see <a class="inline-link" href="backup-and-restore.html">Backup &amp; Restore</a>.</p>
@@ -212,7 +212,7 @@ veltrixdb-backup restore --chain=/tmp/restore --data-dirs=/data-new</code></pre>
 <li>Read every key from a node still running with the old key and write it into the new node (for example <code>veltrix-migrate</code> export/import over the binary protocol).</li>
 <li>Cut clients over to the new node, then retire the old one and its key.</li>
 </ol>
-<p>Values written by atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) are stored unencrypted today regardless of the key (known gap).</p>
+<p>On v1.13 and earlier, values written by atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) are stored unencrypted regardless of the key (known gap). <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> they are encrypted like <code>PUT</code>; values an older build wrote stay plaintext until their next update.</p>
 
 <h2 id="disk-failure">7. Failed disk — auto-degraded node (SEV-1)</h2>
 <p>VeltrixDB trips a per-disk breaker after <strong>5 consecutive I/O errors</strong> on a disk's WAL/VLog. The disk is marked <code>FAILED</code>: writes routed to it fail fast with <code>ErrDiskFailed</code>, GC skips it, and the node reports degraded. Reads still try the device and are served from cache when possible. Detection:</p>
@@ -256,6 +256,7 @@ veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair
 <li>Deploy the older build.</li>
 </ol>
 <p>If the node crashed instead of stopping cleanly, repeat steps 1&ndash;2. While running with <code>--wal-format=text</code>, keys containing <code>|</code> or a newline are not crash-safe: a crash can drop every acknowledged write after such a key.</p>
+<p><span class="badge good">Fixed on main after v1.13 — ships in the next release</span> the WAL record of a key with a TTL carries its expiry (binary record version 2, or an 11th text field), which no older build can read &mdash; it stops replay there and drops every later record. To roll back from that release to <em>any</em> older build, use <code>--wal-format=text-legacy</code> in step 1 instead of <code>text</code> (which keeps the TTL field and is not a rollback mode). TTL&rsquo;d keys come back without an expiry on the older build. On v1.13 and earlier the steps above are unchanged.</p>
 
 <h2 id="contact">Contact</h2>
 <ul>

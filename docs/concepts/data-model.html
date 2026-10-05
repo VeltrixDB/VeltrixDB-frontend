@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.12</span>
+    <span class="version-pill">v1.13</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -99,6 +99,7 @@
 
 <h2 id="ttl">Per-key TTL</h2>
 <p>Every <code>PUT</code> accepts an optional TTL in seconds. A key written with a TTL carries an absolute expiry timestamp (<code>TTLExpiryUs</code>) in its index entry; a TTL of <code>0</code> or a negative value means the key is immortal (no expiry). Expiry is checked lazily on read (a <code>GET</code> against an expired key returns not-found) and is also swept by a background TTL scanner so expired entries don't linger indefinitely and get reclaimed by VLog garbage collection.</p>
+<p><strong>v1.13 and earlier caveats:</strong> the WAL does not carry the TTL, so after any restart (crash replay or clean-shutdown checkpoint) a TTL&rsquo;d key comes back with no expiry, and one that had already expired comes back; and a key still in the cache can be served after it expires. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> every WAL record of a TTL&rsquo;d key carries its absolute expiry and replay restores it (keys already past it stay deleted); checkpoints, backups and PITR archives carry it too, and an expired key is no longer served from the cache. Before rolling back from that release to an older build, run once with <code>--wal-format=text-legacy</code> and stop cleanly (see <a class="inline-link" href="../operations/disaster-recovery.html#wal-format-rollback">WAL rollback</a>).</p>
 
 <h2 id="hash-fields">Hash fields with per-field TTL</h2>
 <p>A hash key groups multiple named fields under one logical key, and — unlike a single flat value — each field carries its own independent TTL. VeltrixDB implements this without a separate on-disk structure: a hash field is stored as a normal index entry whose internal key is <code>key + "\x01" + field</code> (a reserved separator byte distinct from the namespace separator). Because each field is just another entry in the same sharded index, per-field expiry, per-field overwrite, and per-field storage cost all fall out of the existing <code>PUT</code>/<code>GET</code>/<code>DELETE</code> machinery — no new WAL format or index type was needed.</p>
@@ -201,7 +202,7 @@ END</code></pre>
 <pre class="code-block"><code>PUT  doc-1 {"lang":"en","tier":"gold"}      <span class="cmt"># the record (filters read it)</span>
 VSET doc-1 NS docs 0.9 0.1 0.0 0.2          <span class="cmt"># its vector  → @vec/docs/doc-1</span>
 TSET doc-1 NS docs TEXT how to rotate api keys safely   <span class="cmt"># → @txt/docs/doc-1</span></code></pre>
-<p>Deleting the record with <code>DEL</code> does <strong>not</strong> delete its vector or document — use <code>VDEL</code> / <code>TDEL</code> as well. Commands, memory layouts (float32, int8, PQ, disk graph), filters, hybrid ranking, cluster fan-out and measured recall/latency/RAM are on <a class="inline-link" href="vector-search.html">Vector &amp; Hybrid Search</a>.</p>
+<p>On v1.13 and earlier, deleting the record with <code>DEL</code> does <strong>not</strong> delete its vector or document — use <code>VDEL</code> / <code>TDEL</code> as well. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>DEL</code> of a record also deletes its vectors and documents in every namespace; ones whose id never had a record are left alone. Commands, memory layouts (float32, int8, PQ, disk graph), filters, hybrid ranking, cluster fan-out and measured recall/latency/RAM are on <a class="inline-link" href="vector-search.html">Vector &amp; Hybrid Search</a>.</p>
 
 <h2 id="atomic-operations">Atomic operations</h2>
 <p>VeltrixDB provides four single-key atomic primitives: <code>CAS</code> (compare-and-swap), <code>INCR</code> / <code>DECR</code> (integer increment/decrement), and <code>SETNX</code> (set-if-not-exists). All four are implemented as a <strong>shard-locked read-modify-write</strong>: the operation holds the write lock on the key's index shard for the full duration of the read, compare, and durable persist (WAL + VLog fdatasync), so no interleaved write from another client can observe or clobber an in-flight atomic operation. Because the index is split across shards, a lock held during one key's atomic RMW only blocks the other keys that happen to hash to the same shard — not the whole keyspace.</p>

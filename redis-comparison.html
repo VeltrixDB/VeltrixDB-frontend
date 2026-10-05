@@ -656,7 +656,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
               <tr><td>Multi-key transactions</td><td class="yes">✓ MULTI / EXEC, WATCH</td><td class="yes">✓ one-shot TXN, version check, read-committed</td></tr>
               <tr><td>Secondary indexes</td><td class="warn">⚠ Redis Query Engine / RediSearch</td><td class="yes">✓ IDXCREATE / IDXQUERY (equality)</td></tr>
               <tr><td>Vector · full-text · hybrid search</td><td class="warn">⚠ Redis Query Engine / RediSearch</td><td class="yes">✓ built in — see §08</td></tr>
-              <tr><td>TTL / key expiry</td><td class="yes">✓</td><td class="yes">✓ PUTEX / binary PUT TTL</td></tr>
+              <tr><td>TTL / key expiry</td><td class="yes">✓</td><td class="yes">✓ PUTEX / binary MPUT per-entry TTL</td></tr>
               <tr><td>Encryption at rest (AES-256-GCM)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
               <tr><td>TLS in transit</td><td class="yes">✓</td><td class="yes">✓</td></tr>
               <tr><td>Multi-node replication</td><td class="yes">✓</td><td class="yes">✓ Raft, or replicated (eventual default / quorum / strong)</td></tr>
@@ -731,7 +731,7 @@ echo -e <span class="s">"SET hello world\nGET hello\nPING"</span> | nc localhost
         <div class="spec">
           <table>
             <tr><td>SET / GET / DEL</td><td><code>PUT</code> (alias <code>SET</code>) / <code>GET</code> / <code>DEL</code> — text-protocol <code>PUT</code> takes the rest of the line as the value</td></tr>
-            <tr><td>SET … EX / SETEX</td><td><code>PUTEX key ttl-seconds value</code>, or the TTL field of a binary PUT. There is no standalone <code>EXPIRE</code> / <code>TTL</code> on plain keys</td></tr>
+            <tr><td>SET … EX / SETEX</td><td><code>PUTEX key ttl-seconds value</code>, or the per-entry TTL of a binary MPUT (the binary PUT frame has no TTL field). There is no standalone <code>EXPIRE</code> / <code>TTL</code> on plain keys</td></tr>
             <tr><td>SETNX / INCR / DECR</td><td><code>SETNX</code>, <code>INCR key [delta]</code>, <code>DECR key [delta]</code>; compare-and-swap is <code>CAS key expected new</code></td></tr>
             <tr><td>MGET / pipelines</td><td><code>MGET</code>; binary <code>MPUT</code> / <code>MGET</code> batches (one WAL write, one VLog <code>pwrite</code>, one <code>fdatasync</code> per disk)</td></tr>
             <tr><td>Hashes</td><td><code>HSET key field value [ttl]</code>, <code>HGET</code>, <code>HDEL</code>, <code>HGETALL</code>, <code>HKEYS</code>, <code>HLEN</code>, <code>HEXPIRE</code>, <code>HTTL</code></td></tr>
@@ -902,7 +902,7 @@ val = r.get(<span class="s">'key'</span>)</pre>
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.12</div>
+      <div>Latest release v1.13</div>
     </div>
   </div>
 </footer>
