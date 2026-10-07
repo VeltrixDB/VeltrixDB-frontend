@@ -564,7 +564,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="chaos-cell">
         <div class="ic">06</div>
         <h4>Node loss</h4>
-        <p>A node is <code>FAILED</code> after 10 s without a heartbeat and is left out of search fan-out, but it stays on the hash ring, so the client keeps routing its keys to it. In <code>--mode=raft</code> a lost leader is replaced by election (400–800 ms timeout) and writes follow <code>MOVED</code>. In <code>--mode=replicated</code> on v1.13 and earlier a replica whose send fails is marked <code>FAILED</code> and is <b>not</b> brought back until the primary restarts. <b>Fixed on main after v1.13 — ships in the next release:</b> failed replicas are re-probed with backoff and caught up (<code>SYNC_PENDING</code> &rarr; <code>SYNC</code>), and a <code>RECOVERING</code> node returns to <code>ACTIVE</code> after 2 good pings. Nothing re-creates lost copies. <b>Covered by the node-failover e2e suite</b>; we don't publish recovery times we haven't measured reproducibly.</p>
+        <p>A node is <code>FAILED</code> after 10 s without a heartbeat and is left out of search fan-out, but it stays on the hash ring, so the client keeps routing its keys to it. In <code>--mode=raft</code> a lost leader is replaced by election (400–800 ms timeout) and writes follow <code>MOVED</code>. In <code>--mode=replicated</code> on v1.13 and earlier a replica whose send fails is marked <code>FAILED</code> and is <b>not</b> brought back until the primary restarts. <b>Fixed in v1.14:</b> failed replicas are re-probed with backoff and caught up (<code>SYNC_PENDING</code> &rarr; <code>SYNC</code>), and a <code>RECOVERING</code> node returns to <code>ACTIVE</code> after 2 good pings. On v1.14 and earlier a node marked <code>FAILED</code> also starts auto-rebalance, which deletes keys outside the Raft log: killing the leader of a loaded 3-node raft cluster left the survivors with 5,435 and 7,875 of 20,000 keys. Run with <code>--auto-rebalance=false</code> until you upgrade. <b>Fixed in v1.15:</b> node failures never migrate keys, raft mode never migrates, and replicated mode deletes a key only after every replica acknowledged it. Nothing re-creates lost copies. <b>Covered by the node-failover e2e suite</b>; we don't publish recovery times we haven't measured reproducibly.</p>
       </div>
     </div>
   </div>
@@ -611,7 +611,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
       <div class="chaos-cell">
         <div class="ic">07</div>
         <h4>Raft read barrier — v1.12</h4>
-        <p>A freshly elected leader used to serve a local GET before applying everything its predecessor had acknowledged. Reads now wait (&le; 2 s) for the leader&rsquo;s no-op to apply. Without it a unit test missed the acknowledged write in 20 of 20 failovers; with it, 0 of 20. <b>In v1.12 it covers GET and MGET only</b>: hash, namespace and <code>RANGE</code> / <code>SCANCUR</code> reads stay local. <b>Fixed on main after v1.13 — ships in the next release:</b> every read on both protocols passes it (namespace, hash, list, set, range, <code>VER</code>, <code>IDXQUERY</code>, <code>QUERY</code> and searches).</p>
+        <p>A freshly elected leader used to serve a local GET before applying everything its predecessor had acknowledged. Reads now wait (&le; 2 s) for the leader&rsquo;s no-op to apply. Without it a unit test missed the acknowledged write in 20 of 20 failovers; with it, 0 of 20. <b>In v1.12 it covers GET and MGET only</b>: hash, namespace and <code>RANGE</code> / <code>SCANCUR</code> reads stay local. <b>Fixed in v1.14:</b> every read on both protocols passes it (namespace, hash, list, set, range, <code>VER</code>, <code>IDXQUERY</code>, <code>QUERY</code> and searches).</p>
       </div>
       <div class="chaos-cell">
         <div class="ic">08</div>
@@ -726,7 +726,7 @@ footer,.terminal,.dash,.pipe-wrap,.globe-wrap{background:#0A0B2E !important}
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.13</div>
+      <div>Latest release v1.15</div>
     </div>
   </div>
 </footer>

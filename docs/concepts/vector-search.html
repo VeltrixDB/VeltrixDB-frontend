@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -186,7 +186,7 @@ OK</code></pre>
 <tbody>
 <tr><td><code>VCREATE ns dim [QUANT none|int8|pq] [PQM m] [PQTRAIN n] [GRAPH memory|disk]</code> <span class="badge good">v1.11</span></td><td>Create or reconfigure a namespace. Optional: the first <code>VSET</code> creates a float32 one. <code>PQM</code>, <code>PQTRAIN</code> and <code>GRAPH</code> are <span class="badge good">v1.12</span>.</td></tr>
 <tr><td><code>VSET id [NS ns] f1 f2 ...</code></td><td>Upsert a vector. <code>NS</code> is v1.11; without it the namespace is <code>default</code>.</td></tr>
-<tr><td><code>VDEL id [NS ns]</code> <span class="badge good">v1.11</span></td><td>Delete a vector. (<span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>DEL id</code> of its record also does, in every namespace.)</td></tr>
+<tr><td><code>VDEL id [NS ns]</code> <span class="badge good">v1.11</span></td><td>Delete a vector. (<span class="badge good">Fixed in v1.14</span> <code>DEL id</code> of its record also does, in every namespace.)</td></tr>
 <tr><td><code>VSEARCH k [NS ns] [EF n] [FILTER field op value] f1 f2 ...</code></td><td>Top-k by cosine; <code>k = 0</code> returns every match (exact scan). <code>NS</code>/<code>EF</code>/<code>FILTER</code> are v1.11.</td></tr>
 <tr><td><code>TSET id [NS ns] TEXT free text</code> / <code>TDEL id [NS ns]</code> <span class="badge good">v1.11</span></td><td>Upsert / delete a text document (text = rest of the line, at most 1 MiB).</td></tr>
 <tr><td><code>TSEARCH k [NS ns] [FILTER field op value] QUERY free text</code> <span class="badge good">v1.11</span></td><td>Top-k by BM25; <code>k = 0</code> returns every match.</td></tr>
@@ -344,7 +344,7 @@ OK</code></pre>
 </ul>
 
 <h2 id="limitations">Limitations</h2>
-<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">v1.13 and earlier: <code>DEL</code> does not delete a record's vector or text</span> On v1.13 and earlier, deleting the KV record removes only the record: the vector and document stay searchable (an unfiltered search still returns the id; a filter on that record no longer matches). Use <code>VDEL</code> / <code>TDEL</code> as well. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> <code>DEL doc-42</code> (or a <code>TXN</code> delete, or the same delete applied by raft / replication on another node) also deletes <code>@vec/&lt;ns&gt;/doc-42</code> and <code>@txt/&lt;ns&gt;/doc-42</code> in every namespace, so the record stops appearing in <code>VSEARCH</code>, <code>TSEARCH</code> and <code>HSEARCH</code>. If the process dies between the two, the startup rebuild deletes the leftovers. A vector or document whose id never had a record is untouched (only <code>VDEL</code> / <code>TDEL</code> remove it), TTL expiry of a record does not cascade, and vectors left behind by deletes made on v1.13 and earlier still need <code>VDEL</code> / <code>TDEL</code>.</span></div>
+<div class="callout limitation"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">v1.13 and earlier: <code>DEL</code> does not delete a record's vector or text</span> On v1.13 and earlier, deleting the KV record removes only the record: the vector and document stay searchable (an unfiltered search still returns the id; a filter on that record no longer matches). Use <code>VDEL</code> / <code>TDEL</code> as well. <span class="badge good">Fixed in v1.14</span> <code>DEL doc-42</code> (or a <code>TXN</code> delete, or the same delete applied by raft / replication on another node) also deletes <code>@vec/&lt;ns&gt;/doc-42</code> and <code>@txt/&lt;ns&gt;/doc-42</code> in every namespace, so the record stops appearing in <code>VSEARCH</code>, <code>TSEARCH</code> and <code>HSEARCH</code>. If the process dies between the two, the startup rebuild deletes the leftovers. A vector or document whose id never had a record is untouched (only <code>VDEL</code> / <code>TDEL</code> remove it), TTL expiry of a record does not cascade, and vectors left behind by deletes made on v1.13 and earlier still need <code>VDEL</code> / <code>TDEL</code>.</span></div>
 <ul>
 <li>The graph and inverted index are rebuilt at every start (not persisted); searches are refused until the rebuild ends. Budget for it on large namespaces.</li>
 <li>Graph nodes, ids and the upper HNSW layers stay on the Go heap even with <code>GRAPH disk</code>; the constant ~280–400 B per vector does not shrink with quantization.</li>
