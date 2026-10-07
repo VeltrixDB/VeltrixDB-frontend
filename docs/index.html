@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="./resources/faq.html">FAQ</a>
     <a class="btn primary" href="./getting-started/quickstart.html">Quickstart</a>
@@ -109,6 +109,14 @@
   </table>
 </div>
 <p style="margin:-16px 0 28px"><a class="inline-link" href="resources/benchmarking.html">Full benchmark methodology and hardware spec →</a></p>
+
+<h2 id="whats-new-115">What's new in v1.14 and v1.15</h2>
+<div class="card-grid">
+  <a class="card" href="architecture/cluster-and-consensus.html#raft-persistence"><div class="card-title">Incremental Raft persistence <span class="badge good">v1.15</span></div><div class="card-desc">Append-only raft_log.dat plus raft_meta.dat instead of rewriting the whole log; followers fsync outside the node lock and acknowledge only durable entries. Upgrade migrates automatically; a rollback needs a re-sync.</div></a>
+  <a class="card" href="architecture/cluster-and-consensus.html#auto-rebalance"><div class="card-title">Auto-rebalance no longer deletes keys <span class="badge good">v1.15</span></div><div class="card-desc">Raft mode never migrates keys, node failure or recovery moves nothing, and replicated mode deletes a key from a node only after every replica acknowledged it. New opt-in --raft-pipeline flag.</div></a>
+  <a class="card" href="resources/benchmarking.html#three-node"><div class="card-title">3-node benchmark harness <span class="badge good">v1.15</span></div><div class="card-desc">bench/compare runs RF 3 clusters of each database (NODES=3) and gcp-multihost.sh drives a multi-host run. No multi-host result is published yet.</div></a>
+  <a class="card" href="resources/limitations-and-roadmap.html#fixed-after-v112"><div class="card-title">Correctness fixes <span class="badge good">v1.14</span></div><div class="card-desc">TTLs survive restarts, a data-dir lock, atomic ops encrypted like PUT, CDC and audit on every write path, the Raft read barrier on every read, DEL removes a record's vectors and documents, FAILED replicas recover, and CLI fixes.</div></a>
+</div>
 
 <h2 id="whats-new-search">What's new in v1.11 and v1.12</h2>
 <div class="card-grid">

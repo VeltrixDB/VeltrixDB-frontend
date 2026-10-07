@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -412,7 +412,7 @@ VELTRIX_CHAOS_CYCLES=10 go test ./tests/integration/ -run TestSearchCrashRecover
 <p>Writes in flight at the kill are not checked. After each crash cycle the test rewrites every id whose write had an unknown outcome to a fresh, fully acknowledged version, so later cycles check those ids too.</p>
 
 <h2 id="same-hardware">Against Aerospike and ScyllaDB (same hardware)</h2>
-<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No shared run yet</span> The harness exists; no same-hardware comparison has been run or published. The Aerospike and ScyllaDB drivers (upstream go-ycsb code), <code>docker-compose.yml</code> and <code>aerospike.conf</code> are compile-checked only. There is no vector driver for Aerospike Vector Search or ScyllaDB vector search.</span></div>
+<div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No shared run yet</span> The harness exists; no same-hardware comparison has been run or published. The Aerospike and ScyllaDB drivers (upstream go-ycsb code), <code>docker-compose.yml</code> and <code>aerospike.conf</code> (and, since v1.15, <code>docker-compose.cluster.yml</code> and the 3-node Aerospike confs) are compile-checked only. There is no vector driver for Aerospike Vector Search or ScyllaDB vector search.</span></div>
 <p><code>bench/compare/compare.sh</code> runs go-ycsb workloads through a VeltrixDB driver and go-ycsb&rsquo;s Aerospike and Cassandra (ScyllaDB) drivers, one database at a time on the same machine, and writes <code>results/&lt;ts&gt;/summary.md</code>.</p>
 <pre class="code-block"><code># On the machine under test (Linux, NVMe), with Docker and Go &ge; 1.25:
 export BENCH_DATA=/mnt/nvme0/bench BENCH_CPUS=8 BENCH_MEM=16g
@@ -422,7 +422,16 @@ RECORDS=10000000 OPS=10000000 THREADS=128 WORKLOADS="a b c d f" ./compare.sh
 # Vectors (VeltrixDB only):
 ../../scripts/ann-dataset.py glove-100-angular /mnt/nvme0/ann --train 1000000 --test 1000
 VECTORS=1 ANN_DIR=/mnt/nvme0/ann VEC_ARGS="-quant pq -graph disk" ./compare.sh</code></pre>
-<p>Publish a result only with all of these stated next to it: the same machine and disk with one database running at a time (a client on a second machine is better still); the durability setting of each (VeltrixDB ACKs after <code>fdatasync</code> of WAL and VLog; ScyllaDB&rsquo;s default <code>commitlog_sync: periodic</code> ACKs before the write is on disk, so use <code>batch</code> or report both; Aerospike ACKs from its write buffer); warm-up and a dataset larger than the caches if the point is disk performance; replication factor 1; and the versions of all three.</p>
+<p>Publish a result only with all of these stated next to it: the same machine and disk with one database running at a time (a client on a second machine is better still); the durability setting of each (VeltrixDB ACKs after <code>fdatasync</code> of WAL and VLog; ScyllaDB&rsquo;s default <code>commitlog_sync: periodic</code> ACKs before the write is on disk, so use <code>batch</code> or report both; Aerospike ACKs from its write buffer); warm-up and a dataset larger than the caches if the point is disk performance; the replication factor (1 with <code>NODES=1</code>, 3 with <code>NODES=3</code>); and the versions of all three.</p>
+<h3 id="three-node">3-node clusters, replication factor 3 <span class="badge good">Fixed in v1.15</span></h3>
+<p><code>NODES=3</code> sets RF 3 for every database and needs three addresses per database. For VeltrixDB: <code>VELTRIX_ADDRS</code> (comma-separated), <code>VELTRIX_MODE=raft|replicated</code>, and <code>VELTRIX_RAFT_PIPELINE=true|false</code> so the summary records which <a class="inline-link" href="../architecture/cluster-and-consensus.html#raft-pipeline"><code>--raft-pipeline</code></a> setting the servers ran. The VeltrixDB driver homes threads round-robin over the addresses and reads locally; writes follow the first <code>MOVED &lt;leader&gt;</code> and share the leader address across threads; <code>MOVED -</code> (election running) waits and retries; a connection error fails over to the next listed node. After the run, <code>cmd/keycount</code> checks that every node holds every record. The guarantees differ per database (raft: quorum commit through the leader; ScyllaDB: QUORUM; Aerospike CE: all three copies), so state them next to any number.</p>
+<pre class="code-block"><code># servers already running on three hosts
+START=0 NODES=3 VELTRIX_MODE=raft \
+  VELTRIX_ADDRS=10.0.0.11:9000,10.0.0.12:9000,10.0.0.13:9000 DBS=veltrixdb ./compare.sh
+
+# GCP: 3 server VMs with local NVMe + 1 client, raft-off / raft-on / replicated, then deletes everything
+PROJECT=&lt;your project&gt; ./gcp-multihost.sh</code></pre>
+<p><code>START=1 NODES=3</code> runs three containers per database on one machine (<code>docker-compose.cluster.yml</code>) to check that clusters form and drivers route &mdash; <strong>not for performance</strong>. That compose file is syntax-checked only; the 3-node VeltrixDB path was run as local processes on one laptop, against raft and replicated clusters and with a raft leader killed mid-run. Laptop figures, which are not cluster results (three raft nodes share one drive): the incremental raft log took load from 70 to 1,046 inserts/s (one run each), and <code>--raft-pipeline</code> was slower on load (560 vs 1,038 inserts/s, medians of 2 runs). No multi-host run has been published yet.</p>
 
 <h2 id="cluster-benchmark">Internal GKE run (unverified)</h2>
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Not a reproducible result</span> These figures come from an internal run with no published harness or raw output. They have not been reproduced, and &ldquo;1 billion keys&rdquo; has not been measured reproducibly. Do not use them for capacity planning; the YCSB results above are the only reproducible headline numbers.</span></div>

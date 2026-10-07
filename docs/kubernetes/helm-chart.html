@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -254,7 +254,7 @@ tls:
 <pre class="code-block"><code>security:
   encryptionAtRest: true
   encryptionSecretName: veltrixdb-encryption</code></pre>
-<p>Each pod loads the key from the <code>VELTRIXDB_ENCRYPTION_KEY</code> env var at startup; without the secret, startup fails when <code>security.encryptionAtRest</code> is true. <strong>Key rotation is not implemented</strong> &mdash; never change the Secret under existing data (see <a class="inline-link" href="../operations/disaster-recovery.html#key-rotation">Disaster Recovery</a>). On v1.13 and earlier, atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) store their values unencrypted. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> they are encrypted like <code>PUT</code>.</p>
+<p>Each pod loads the key from the <code>VELTRIXDB_ENCRYPTION_KEY</code> env var at startup; without the secret, startup fails when <code>security.encryptionAtRest</code> is true. <strong>Key rotation is not implemented</strong> &mdash; never change the Secret under existing data (see <a class="inline-link" href="../operations/disaster-recovery.html#key-rotation">Disaster Recovery</a>). On v1.13 and earlier, atomic ops (<code>CAS</code>/<code>INCR</code>/<code>DECR</code>/<code>SETNX</code>) store their values unencrypted. <span class="badge good">Fixed in v1.14</span> they are encrypted like <code>PUT</code>.</p>
 
 <h3>Background scrubber</h3>
 <pre class="code-block"><code>scrubber:
@@ -326,7 +326,7 @@ podDisruptionBudget:
 <pre class="code-block"><code>helm upgrade veltrixdb veltrixdb/veltrixdb \
   --namespace veltrixdb \
   --values my-values.yaml</code></pre>
-<p>The StatefulSet uses <code>RollingUpdate</code> with <code>maxUnavailable: 1</code>, so pods are replaced one at a time. The PodDisruptionBudget bounds voluntary disruptions from node drains that happen concurrently with the rollout. Server facts for upgrades: the binary WAL needs no upgrade step (rolling back to v1.5 or earlier needs one clean restart with <code>--wal-format=text</code>; <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> rolling back from that release to any older build needs <code>--wal-format=text-legacy</code> instead, because TTL&rsquo;d keys&rsquo; WAL records carry their expiry), and after each restart searches are refused until the node's index rebuild finishes (<code>INFO</code> &rarr; <code>search_ready=1</code>), which <code>/readyz</code> does not wait for.</p>
+<p>The StatefulSet uses <code>RollingUpdate</code> with <code>maxUnavailable: 1</code>, so pods are replaced one at a time. The PodDisruptionBudget bounds voluntary disruptions from node drains that happen concurrently with the rollout. Server facts for upgrades: the binary WAL needs no upgrade step (rolling back to v1.5 or earlier needs one clean restart with <code>--wal-format=text</code>; <span class="badge good">Fixed in v1.14</span> rolling back from that release to any older build needs <code>--wal-format=text-legacy</code> instead, because TTL&rsquo;d keys&rsquo; WAL records carry their expiry), and after each restart searches are refused until the node's index rebuild finishes (<code>INFO</code> &rarr; <code>search_ready=1</code>), which <code>/readyz</code> does not wait for.</p>
 
 <h2 id="validating">Validating a deployment</h2>
 <p><code>scripts/bench.sh</code> in the main repository is a <em>local</em> harness: it builds its own server and load generator, starts the server on <code>ADDR</code> (default <code>127.0.0.1:9000</code>) and wipes <code>/tmp</code> data dirs, so it cannot be pointed at a deployed cluster. Run it on a node of the same hardware class to gate a build (packing density &le; 1.2 &times; (24 + value size) bytes/record, zero GC emergency runs, read P99 &le; 5 ms; exit 0 = pass, log in <code>/tmp/veltrixbench-out/run.log</code>).</p>

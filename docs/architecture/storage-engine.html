@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -151,7 +151,7 @@
 <p>Replay still reads legacy text records, in any mix with binary ones (the first byte of each record decides), so an upgraded node keeps appending binary records after existing text ones:</p>
 <pre class="code-block"><code>timestamp|isTombstone|key|valueLen|crc32hex|version|vlogOffset|packed|diskLen|xflags
 [value bytes]</code></pre>
-<p><code>--wal-format=text</code> (server only; it logs a warning) writes the legacy format and exists only to roll back to a pre-binary build: run once with it, stop cleanly so the checkpoint rewrites <code>wal.log</code> as text, then downgrade. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> a key written with a TTL gets a version-2 record (the same header with byte 1 = 2, then its 8-byte absolute expiry in Unix &micro;s) or an 11th text field, so TTLs survive restarts (in v1.13 and earlier the WAL carries no TTL and TTL&rsquo;d keys come back without one); TTL-free records stay version 1, byte for byte. Older builds cannot read those records, so the rollback mode becomes <code>--wal-format=text-legacy</code>. <code>veltrixdb-backup</code>, PITR restore and <code>veltrix-repair</code> always write binary.</p>
+<p><code>--wal-format=text</code> (server only; it logs a warning) writes the legacy format and exists only to roll back to a pre-binary build: run once with it, stop cleanly so the checkpoint rewrites <code>wal.log</code> as text, then downgrade. <span class="badge good">Fixed in v1.14</span> a key written with a TTL gets a version-2 record (the same header with byte 1 = 2, then its 8-byte absolute expiry in Unix &micro;s) or an 11th text field, so TTLs survive restarts (in v1.13 and earlier the WAL carries no TTL and TTL&rsquo;d keys come back without one); TTL-free records stay version 1, byte for byte. Older builds cannot read those records, so the rollback mode becomes <code>--wal-format=text-legacy</code>. <code>veltrixdb-backup</code>, PITR restore and <code>veltrix-repair</code> always write binary.</p>
 
 <h3>Group-commit mechanics</h3>
 <p>Fsync-per-write is the classic throughput killer for any durable log. VeltrixDB amortizes this cost with a <strong>group commit</strong> pattern:</p>
@@ -197,7 +197,7 @@ pwrite64(fd, value, offset)                     // POSIX-safe concurrent writes<
 <p><span class="badge good">New in v1.7</span> On Linux cgo builds the batch write can instead be submitted through an io_uring bridge (one ring per disk). It is <strong>off by default</strong>, since the batch is already a single <code>pwrite</code>. Opt in with <code>VELTRIXDB_URING_BRIDGE=on</code> (no SQPOLL) or <code>sqpoll</code>; <code>VELTRIXDB_DISABLE_CGO_ENGINE=1</code> forces it off. If ring setup fails (for example, the Kubernetes RuntimeDefault seccomp profile blocks <code>io_uring_setup</code>) the engine logs it and falls back to <code>pwrite</code>.</p>
 
 <h3>Read path</h3>
-<p><code>Get</code> checks, in order: the LIRS cache, the index (absent / tombstone / expired), a dirty value still in RAM, and finally the VLog. On v1.13 and earlier a cache hit is returned without an expiry check, so a cached key can be served after its TTL. <span class="badge good">Fixed on main after v1.13 — ships in the next release</span> each cache entry carries its key&rsquo;s TTL deadline, and a hit past it falls through to the index (tombstone + evict + not-found); immortal keys pay one compare. The VLog read is Go code (<code>storage/vlog.go</code> <code>ReadValue</code>): a 4 KB-aligned <code>pread</code> that verifies the record magic and CRC32C. It is not io_uring and not zero-copy.</p>
+<p><code>Get</code> checks, in order: the LIRS cache, the index (absent / tombstone / expired), a dirty value still in RAM, and finally the VLog. On v1.13 and earlier a cache hit is returned without an expiry check, so a cached key can be served after its TTL. <span class="badge good">Fixed in v1.14</span> each cache entry carries its key&rsquo;s TTL deadline, and a hit past it falls through to the index (tombstone + evict + not-found); immortal keys pay one compare. The VLog read is Go code (<code>storage/vlog.go</code> <code>ReadValue</code>): a 4 KB-aligned <code>pread</code> that verifies the record magic and CRC32C. It is not io_uring and not zero-copy.</p>
 <p><span class="badge good">New in v1.7</span> <code>GetNoIO</code> runs the same steps but stops before the VLog read and returns <code>needIO=true</code> instead; <code>GetAfterNoIO</code> completes that key, and the pair counts as one read. It exists for callers that must not block on disk, such as the opt-in C++ network front-end's event loops.</p>
 
 <h2 id="block-packing">Block packing: high-density mode</h2>
@@ -246,7 +246,7 @@ pwrite64(fd, value, offset)                     // POSIX-safe concurrent writes<
 ├── vlog_active.dat  — Value Log (24 B header, 4 KB-aligned)
 ├── seg_active.dat   — Segment file (KV separation off only)
 └── .vlog_punch_wm   — GC punch-hole watermark (8 B offset)</code></pre>
-<p>The first data dir also holds <code>index_defs.json</code> (secondary-index definitions). Raft state is not per disk: in <code>--mode=raft</code> it lives in <code>&lt;--data&gt;/raft/</code> (<code>raft_state.gob</code>, <code>raft_snapshot.gob</code>).</p>
+<p>The first data dir also holds <code>index_defs.json</code> (secondary-index definitions). Raft state is not per disk: in <code>--mode=raft</code> it lives in <code>&lt;--data&gt;/raft/</code>. On v1.14 and earlier that is <code>raft_state.gob</code> (rewritten whole on every commit) and <code>raft_snapshot.gob</code>. <span class="badge good">Fixed in v1.15</span> the log is the append-only, CRC-checked <code>raft_log.dat</code>, term and vote are in <code>raft_meta.dat</code>, and <code>raft_snapshot.gob</code> is unchanged; an existing <code>raft_state.gob</code> is migrated on first start. Older builds cannot read the new files &mdash; see <a class="inline-link" href="cluster-and-consensus.html#raft-persistence">Raft log persistence</a>.</p>
 <p>With multiple disks (<code>-data-dirs /mnt/nvme0,...,/mnt/nvme7</code>), each disk gets its own independent WAL, VLog, segment file, and compaction goroutine. Shard <code>i</code> always lives on disk <code>i % numDisks</code> — a failure on one disk does not affect the other disks' shards.</p>
 
 <h2 id="value-transform-pipeline">Value transform pipeline</h2>

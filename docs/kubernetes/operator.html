@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.13</span>
+    <span class="version-pill">v1.15</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -271,7 +271,7 @@ kubectl get veltrixcluster -n veltrixdb</code></pre>
 <p>The reconciler compares the StatefulSet's previous replica count to <code>spec.size</code> on every pass. When the cluster has grown (<code>prevSize &lt; spec.size</code>), it calls <code>triggerResharding</code>, which:</p>
 <ol>
 <li>Blocks (up to 5 minutes) until all desired pods report <code>PodReady</code>.</li>
-<li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. <strong>Server fact: nothing in the VeltrixDB server reads these annotations.</strong> A server builds its membership once at startup from <code>--peers</code> (or <code>--seeds</code>), gossip does not add members, and there is no runtime join command; <code>--auto-rebalance</code> migrates keys only when that static membership changes state. In practice a new node joins the ring only when every pod restarts with it listed in <code>--peers</code>.</li>
+<li>Annotates every pod with <code>veltrix.io/cluster-size</code> and <code>veltrix.io/prev-cluster-size</code>. <strong>Server fact: nothing in the VeltrixDB server reads these annotations.</strong> A server builds its membership once at startup from <code>--peers</code> (or <code>--seeds</code>), gossip does not add members, and there is no runtime join command; on v1.14 and earlier <code>--auto-rebalance</code> migrates keys only when that static membership changes state (a node fails or recovers). <span class="badge good">Fixed in v1.15</span> state changes never migrate and raft mode never migrates, so with static membership no keys move. In practice a new node joins the ring only when every pod restarts with it listed in <code>--peers</code>.</li>
 <li>Records <code>status.lastScaleTime</code> and a <code>status.partitionMap</code> summary string.</li>
 </ol>
 <div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Scale-down is not specially handled</span> The resharding trigger only fires when the new size is <em>greater</em> than the previous size. Scaling down updates the StatefulSet's replica count (removing the highest-ordinal pods) but does not go through the same annotate-and-wait resharding path.</span></div>
