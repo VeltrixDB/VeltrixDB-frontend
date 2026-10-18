@@ -347,7 +347,7 @@
         <div class="article-body">
           <div class="article-kicker">Engine work · v1.6–v1.12</div>
           <h3 class="article-h">What shipped, <span class="em">and what didn't pay off</span>.</h3>
-          <p class="article-lede">v1.6 through v1.12 carry engine changes we measured — including one that did not pay off overall. v1.13 (2026-10-01) was documentation and test fixes over v1.12; v1.14 (2026-10-05) and v1.15 (2026-10-07, the latest release) fix correctness gaps and make Raft persistence incremental.</p>
+          <p class="article-lede">v1.6 through v1.12 carry engine changes we measured — including one that did not pay off overall. v1.13 (2026-10-01) was documentation and test fixes over v1.12; v1.14 (2026-10-05) and v1.15 (2026-10-07) fix correctness gaps and make Raft persistence incremental; v1.16 (2026-10-08, the latest release) adds mutex / block profiling flags and striped read counters.</p>
           <p><b>Binary WAL (default since v1.6).</b> 48-byte header, CRC32C over the whole record. Keys containing <code>|</code> or a newline no longer cut replay short — with the old text format, an acknowledged write after such a key could be lost on a crash restart. Encoding is 4× faster per record, replay 2.5× faster; old text WALs still replay. <b>Ordered index:</b> overwrites of a live key no longer re-insert into the skiplist — server batch writes went from 1.45M to 3.54M keys/s (8 clients × 1024-key MPUT, 1M keys, macOS).</p>
           <p><b>Adaptive group commit (default since v1.12).</b> The WAL and VLog flush windows became upper bounds: a lone writer is synced at once, concurrent writers after an idle gap of about one fdatasync; <code>--group-commit=fixed</code> restores the full-window wait. With an emulated 300 µs fdatasync on a macOS laptop (15 ms window, 128 B values): one writer&rsquo;s P50 went from 16 ms to <b>0.45 ms</b>, and 64 writers from 4.0K to 37.5K durable writes/s at P99 2.6 ms. It has not yet been measured on Linux NVMe. <b>Raft read barrier (v1.12):</b> a newly elected leader now waits for its no-op before serving local reads, and MGET passes the same barrier as GET.</p>
           <p><b>C++ network front-end (experimental, opt-in).</b> <code>--net=cpp|uring|poll</code> runs one event loop per core for the binary PUT GET DEL PING MPUT MGET commands, standalone mode only; reads that need disk are handed to goroutines. On a 4-CPU CI runner (measured before disk reads moved off the loop) it lowered read P50 (154 vs 286 µs) but had a worse read P99 and ~12% lower batch-write throughput than the default Go listener. It does not serve the search commands. <b>It is not faster overall</b>, so <code>--net=go</code> stays the default.</p>
@@ -695,7 +695,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.15</div>
+      <div>Latest release v1.16</div>
     </div>
   </div>
 </footer>
