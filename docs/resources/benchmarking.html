@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.15</span>
+    <span class="version-pill">v1.16</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -410,6 +410,28 @@ VELTRIX_ANN_DIR=/tmp/ann go test ./storage -run TestRealEmbeddings -v -timeout 3
 <pre class="code-block"><code>VELTRIX_SOAK_DURATION=20m go test ./tests/integration/ -run TestSearchSoak -v -timeout 40m
 VELTRIX_CHAOS_CYCLES=10 go test ./tests/integration/ -run TestSearchCrashRecovery -v -timeout 25m</code></pre>
 <p>Writes in flight at the kill are not checked. After each crash cycle the test rewrites every id whose write had an unknown outcome to a fresh, fully acknowledged version, so later cycles check those ids too.</p>
+
+<h3 id="consistency-testing">Consistency and rolling-upgrade tests <span class="badge good">New on main after v1.16 — ships in the next release</span></h3>
+<p><strong>Jepsen-style harness</strong> (<code>tests/jepsen</code>, Go standard library only, all in <code>_test.go</code> files): 3-node raft and replicated clusters of real server processes, 8 clients on the text protocol (<code>GET</code>, <code>PUT</code>, <code>CAS</code>, <code>INCR</code>, set adds), and a nemesis that SIGKILLs or SIGSTOPs the leader or a random node, crashes a follower mid-InstallSnapshot, and &mdash; through an iptables hook on Linux as root &mdash; partitions it. Checkers: per-key linearizability (Wing &amp; Gong search with memoisation, shrunk to a minimal failing history), counters, sets, read validity and copy counts. A negative control must find stale reads.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Test</th><th>Configuration</th><th>Checked</th></tr></thead>
+<tbody>
+<tr><td><code>TestJepsenRaftLinearizable</code></td><td>raft, <code>--linearizable-reads</code></td><td>Every key linearizable including reads; counters; sets</td></tr>
+<tr><td><code>TestJepsenRaftLocalReads</code></td><td>raft, local reads on random nodes</td><td>Writes, CAS, INCR and final leader reads linearizable; ordinary reads for validity only (follower reads may be stale); all nodes converge</td></tr>
+<tr><td><code>TestJepsenReplicated/strong</code>, <code>/quorum</code></td><td>replicated, kill / pause only</td><td>Only what the mode promises: an acknowledged write is on RF (strong) or RF/2+1 (quorum) nodes once healed; no value no client wrote. No linearizability check</td></tr>
+<tr><td><code>TestJepsenNegativeControl_StaleReads</code></td><td>raft, local reads in the linearizability check</td><td>Must find a violation</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>go test ./tests/jepsen/ -short -timeout 120s          # checker unit tests only
+go test ./tests/jepsen/ -v -timeout 15m               # every mode, 20 s of workload each
+VELTRIX_JEPSEN_DURATION=5m VELTRIX_JEPSEN_SEED=42 \
+  go test ./tests/jepsen/ -v -run TestJepsenRaftLinearizable -timeout 20m</code></pre>
+<p>Limits: one host (shared disk, kernel and clock; faults are process-level), no real partitions on macOS, no clock skew, power loss not simulated, single-key text-protocol operations only (no multi-key <code>TXN</code>, <code>MPUT</code>, namespaces, search or binary protocol).</p>
+<p><strong>Rolling-upgrade tests</strong> (<code>tests/upgrade</code>, <code>VELTRIX_UPGRADE_TEST=1</code>): real v1.16 and current-build processes on the same data dirs &mdash; raft rolling upgrades with and without snapshots, mixed-version snapshot transfers in both directions, a replicated rolling upgrade, standalone upgrade and downgrade (clean stop and SIGKILL), and raft downgrade with and without a wipe. They found the v1.16 snapshot TTL loss on upgrade (fixed) and corrected the downgrade guidance.</p>
+<pre class="code-block"><code>VELTRIX_UPGRADE_TEST=1 go test ./tests/upgrade/ -v -timeout 30m   # builds v1.16 from the tag</code></pre>
+<p>Both run nightly (<code>.github/workflows/nightly.yml</code>, jobs <code>jepsen</code> &mdash; with and without <code>--raft-pipeline</code>, partitions enabled &mdash; and <code>upgrade</code>).</p>
 
 <h2 id="same-hardware">Against Aerospike and ScyllaDB (same hardware)</h2>
 <div class="callout warn"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">No shared run yet</span> The harness exists; no same-hardware comparison has been run or published. The Aerospike and ScyllaDB drivers (upstream go-ycsb code), <code>docker-compose.yml</code> and <code>aerospike.conf</code> (and, since v1.15, <code>docker-compose.cluster.yml</code> and the 3-node Aerospike confs) are compile-checked only. There is no vector driver for Aerospike Vector Search or ScyllaDB vector search.</span></div>

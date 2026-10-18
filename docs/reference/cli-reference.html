@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.15</span>
+    <span class="version-pill">v1.16</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -114,6 +114,8 @@
 <tr><td><code>--prefix</code></td><td><em>(empty)</em></td><td>Key prefix filter, used by <code>cdc-tail</code>.</td></tr>
 <tr><td><code>--admin-token</code> <span class="badge good">Fixed in v1.14</span></td><td><em>(empty; env <code>VELTRIX_ADMIN_TOKEN</code>)</em></td><td>Admin token sent as <code>Authorization: Bearer</code> to <code>/admin/*</code>. Not in v1.12.</td></tr>
 <tr><td><code>--duration</code> <span class="badge good">Fixed in v1.14</span></td><td><code>0</code></td><td>Stop <code>cdc-tail</code> after N seconds (0 = until Ctrl+C). Not in v1.12.</td></tr>
+<tr><td><code>--force</code> <span class="badge good">New on main after v1.16 — ships in the next release</span></td><td><code>false</code></td><td><code>cluster remove-node</code>: remove a dead node without draining it (replicated mode; its acknowledged but unreplicated writes are lost).</td></tr>
+<tr><td><code>--wait-ms</code> <span class="badge good">New on main after v1.16 — ships in the next release</span></td><td><code>0</code> (server default)</td><td><code>cluster add-node</code> / <code>remove-node</code>: how long the server waits for the catch-up / drain.</td></tr>
 </tbody>
 </table>
 </div>
@@ -145,8 +147,9 @@
 <tr><td><code>put KEY VALUE</code></td><td>Write a key via the text protocol (one connection per call; remaining arguments are joined with spaces as the value).</td></tr>
 <tr><td><code>get KEY</code></td><td>Read a key via the text protocol; prints the reply line (an <code>ERR ...</code> line for a missing key).</td></tr>
 <tr><td><code>del KEY</code></td><td>Delete a key via the text protocol.</td></tr>
-<tr><td><code>checkpoint</code></td><td>Force a WAL checkpoint on all disks. Calls <code>POST /admin/checkpoint</code>.</td></tr>
-<tr><td><code>backup DEST_DIR</code></td><td>Trigger a full backup of the <strong>running</strong> server to <code>DEST_DIR</code> on the server host. Calls <code>POST /admin/backup</code>; the server process writes the files. Incremental backups are only available through the endpoint itself.</td></tr>
+<tr><td><code>checkpoint</code></td><td>Force a WAL checkpoint on all disks. Calls <code>POST /admin/checkpoint</code>. On v1.16 and earlier, restart the node cleanly afterwards: writes made after a runtime checkpoint are lost on a crash until then (<a class="inline-link" href="../operations/backup-and-restore.html#checkpoint-data-loss">details</a>).</td></tr>
+<tr><td><code>backup DEST_DIR</code></td><td>Trigger a full backup of the <strong>running</strong> server to <code>DEST_DIR</code> on the server host. Calls <code>POST /admin/backup</code>; the server process writes the files. Incremental backups are only available through the endpoint itself. Same v1.16-and-earlier caveat as <code>checkpoint</code>: restart the node cleanly after the backup.</td></tr>
+<tr><td><code>cluster members | add-node ID@HOST:PORT | remove-node ID</code> <span class="badge good">New on main after v1.16 — ships in the next release</span></td><td>Online membership over <code>GET</code> / <code>POST /admin/cluster/members</code> and <code>DELETE /admin/cluster/members/{id}</code> (aliases <code>ls</code>, <code>add</code>, <code>rm</code>). <code>HOST:PORT</code> is the new node&rsquo;s client <code>--addr</code>. A <code>202</code> (raft learner added, promotion pending) is reported, not treated as an error. See the <a class="inline-link" href="../concepts/deployment-modes.html#membership-runbook">membership runbook</a>.</td></tr>
 <tr><td><code>version</code></td><td>Print the on-disk schema version + encryption status (<code>/admin/version</code>).</td></tr>
 <tr><td><code>help</code></td><td>Print the built-in usage text.</td></tr>
 </tbody>
@@ -164,6 +167,9 @@ veltrix metrics vlog_gc
 veltrix put mykey "hello world"
 veltrix get mykey
 veltrix backup /mnt/backup/2026-07-05
+veltrix cluster members                       # next release (main after v1.16)
+veltrix cluster add-node n4@10.0.0.14:9000
+veltrix cluster remove-node n2
 veltrix checkpoint
 veltrix --addr 127.0.0.1:2112 --tcp 127.0.0.1:9000 status</code></pre>
 
@@ -437,7 +443,7 @@ veltrix-repair --data-dirs /mnt/nvme0,/mnt/nvme1 --repair</code></pre>
 <tbody>
 <tr><td><code>stats</code></td><td><code>GET /admin/stats</code></td><td>Print engine stats from the first matching pod.</td></tr>
 <tr><td><code>gc-status</code></td><td><code>GET /metrics</code> (filtered)</td><td>Print VLog GC + scrubber metric lines.</td></tr>
-<tr><td><code>checkpoint</code></td><td><code>POST /admin/checkpoint</code></td><td>Force a WAL checkpoint.</td></tr>
+<tr><td><code>checkpoint</code></td><td><code>POST /admin/checkpoint</code></td><td>Force a WAL checkpoint. On v1.16 and earlier, restart the pod cleanly afterwards (<a class="inline-link" href="../operations/backup-and-restore.html#checkpoint-data-loss">details</a>).</td></tr>
 <tr><td><code>migrate</code></td><td><code>POST /admin/migrate</code></td><td>Run schema migrations.</td></tr>
 <tr><td><code>quotas</code></td><td><code>GET /admin/quotas</code></td><td>List per-namespace quotas.</td></tr>
 <tr><td><code>quota-set NS WPS MAX</code></td><td><code>POST /admin/quotas</code></td><td>Set <code>writes_per_sec=WPS</code>, <code>max_keys=MAX</code> for namespace <code>NS</code>. On v1.13 and earlier it sends no <code>burst</code>, so the burst is set to 0; use <code>curl</code> to set one. <span class="badge good">Fixed in v1.14</span> <code>quota-set NS WPS MAX [--burst N]</code> (burst defaults to WPS), values are form-encoded and checked to be numbers.</td></tr>

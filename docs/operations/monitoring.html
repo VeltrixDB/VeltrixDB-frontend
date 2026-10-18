@@ -29,7 +29,7 @@
     <kbd>&#8984;K</kbd>
   </div>
   <div class="topbar-right">
-    <span class="version-pill">v1.15</span>
+    <span class="version-pill">v1.16</span>
     <a href="https://github.com/VeltrixDB/veltrixdb" target="_blank" rel="noopener">GitHub</a>
     <a href="../resources/faq.html">FAQ</a>
     <a class="btn primary" href="../getting-started/quickstart.html">Quickstart</a>
@@ -102,7 +102,7 @@ open http://localhost:2112/admin/ui  # web dashboard (loopback-only unless -admi
 <p>All of these are served on the admin/metrics port (<code>-metrics-addr</code>, <code>:2112</code> by default), separate from the client data port (<code>9000</code> by default). <code>/metrics</code>, <code>/healthz</code> and <code>/readyz</code> are never authenticated. <code>/readyz</code> answers <code>503 initializing</code> until the engine is open and <code>503 degraded: disks [N] failed</code> when a disk breaker has tripped; it does <em>not</em> wait for WAL replay or the search-index rebuild &mdash; check <code>INFO</code> for <code>search_ready=1</code> before sending searches to a restarted node.</p>
 <div class="callout note">
   <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
-  <span><span class="callout-title">Only <code>veltrixdb_*</code> series are exported.</span> The server registers its own collector on a private registry: there are <strong>no <code>go_*</code> runtime or <code>process_*</code> metrics</strong>, and the runtime / process / system / disk collector in <code>metrics/hardware.go</code> is not registered either. Get process and host metrics from node-exporter or a process exporter. Search has no Prometheus metrics; its state is in <code>INFO</code> (<code>search_ready</code>, <code>search_loaded=x/y</code>) and the logs.</span>
+  <span><span class="callout-title">On v1.16 and earlier only <code>veltrixdb_*</code> series are exported.</span> The server registers its own collector on a private registry: there are <strong>no <code>go_*</code> runtime or <code>process_*</code> metrics</strong>, and the runtime / process / system / disk collector in <code>metrics/hardware.go</code> is not registered either. Get process and host metrics from node-exporter or a process exporter. Search and raft have no Prometheus metrics; search state is in <code>INFO</code> (<code>search_ready</code>, <code>search_loaded=x/y</code>), raft state in <code>/admin/cluster</code>, and both in the logs.<br/><span class="badge good">New on main after v1.16 — ships in the next release</span> <code>/metrics</code> also serves <code>go_*</code> and <code>process_*</code> (labelled <code>node</code>; <code>process_*</code> reads <code>/proc</code>, so it is Linux only &mdash; macOS serves only <code>process_start_time_seconds</code>), the hardware collector the Grafana dashboards read (<code>veltrixdb_runtime_*</code>, <code>_process_*</code>, <code>_system_*</code>, <code>_disk_*</code>; the last three Linux only), and the <a class="inline-link" href="#search-metrics">search</a>, <a class="inline-link" href="#raft-metrics">raft</a> and <a class="inline-link" href="#replication-recovery">replication-recovery</a> series below. A scrape of a fresh node takes about 8 ms.</span>
 </div>
 
 <h2 id="key-metrics">Key metrics to watch</h2>
@@ -136,7 +136,7 @@ open http://localhost:2112/admin/ui  # web dashboard (loopback-only unless -admi
 <tr><td><code>veltrixdb_vlog_file_bytes</code></td><td>VLog size per NVMe disk — also the numerator for capacity planning against PVC size</td></tr>
 <tr><td><code>veltrixdb_vlog_gc_runs_total</code> / <code>veltrixdb_vlog_gc_bytes_total</code></td><td>Background GC activity</td></tr>
 <tr><td><code>veltrixdb_storage_index_size_keys</code></td><td>In-memory index size (keys held in DRAM)</td></tr>
-<tr><td><code>veltrixdb_storage_native_index_bytes</code> <span class="badge good">New in v1.6</span></td><td>Bytes held off the Go heap by the native C++ index (0 when the Go map index is in use). It is C memory outside the Go heap; the server exports no <code>go_memstats_*</code>, so compare it with the container's RSS when sizing memory</td></tr>
+<tr><td><code>veltrixdb_storage_native_index_bytes</code> <span class="badge good">New in v1.6</span></td><td>Bytes held off the Go heap by the native C++ index (0 when the Go map index is in use). It is C memory outside the Go heap, so it is not in <code>go_memstats_*</code> (which v1.16 and earlier do not export at all); compare it with the container's RSS when sizing memory</td></tr>
 <tr><td><code>veltrixdb_vlog_disk_slow</code> / <code>veltrixdb_vlog_disk_read_latency_ewma_seconds</code></td><td>Per-disk slow-disk flag and smoothed read latency</td></tr>
 <tr><td><code>veltrixdb_scrub_corruption_total</code></td><td>CRC32C mismatches found by the background scrubber &mdash; should stay 0</td></tr>
 <tr><td><code>veltrixdb_cluster_nodes_total</code></td><td>Cluster topology size, for multi-node deployments</td></tr>
@@ -162,6 +162,54 @@ rate(veltrixdb_storage_writes_total[1m]) / rate(veltrixdb_storage_wal_flushes_to
 
 histogram_quantile(0.99, rate(veltrixdb_storage_read_latency_seconds_bucket[5m])) # P99 read</code></pre>
 
+<h2 id="search-metrics">Search metrics <span class="badge good">New on main after v1.16 — ships in the next release</span></h2>
+<p>Every mode. The coordinating node counts each client vector (<code>VSEARCH</code>, <code>VSEARCHX</code>), text (<code>TSEARCH</code>) and hybrid (<code>HSEARCH</code>) request once, fan-out included; peer-to-peer <code>/internal/search</code> calls are not counted. Recording a request allocates nothing.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>veltrixdb_search_requests_total{kind}</code></td><td>Requests per <code>kind</code> = vector | text | hybrid, failed ones included</td></tr>
+<tr><td><code>veltrixdb_search_errors_total{kind,reason}</code></td><td><code>rebuilding</code> (refused during the index rebuild), <code>incomplete</code> (a peer did not answer the fan-out), <code>other</code></td></tr>
+<tr><td><code>veltrixdb_search_latency_seconds{kind}</code></td><td>Latency on the coordinating node, fan-out included (0.5 ms &ndash; 5 s buckets)</td></tr>
+<tr><td><code>veltrixdb_search_partial_total</code></td><td>Searches answered without every peer (<code>--search-allow-partial</code>)</td></tr>
+<tr><td><code>veltrixdb_search_ready</code></td><td>1 when the search indexes are complete; 0 while the startup or snapshot-restore rebuild runs</td></tr>
+<tr><td><code>veltrixdb_search_rebuild_loaded_keys</code> / <code>_rebuild_total_keys</code></td><td>Rebuild progress (the total stays 0 until the rebuild's scan finishes)</td></tr>
+<tr><td><code>veltrixdb_search_vectors</code> / <code>_vector_tombstones</code> / <code>_vector_namespaces</code>, <code>veltrixdb_search_namespace_vectors{namespace}</code></td><td>Live vectors, graph tombstones awaiting compaction, namespaces; per-namespace series for the first 64 namespaces only</td></tr>
+<tr><td><code>veltrixdb_search_text_documents</code> / <code>_text_namespaces</code></td><td>Indexed text documents and BM25 namespaces</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="raft-metrics">Raft and snapshot metrics <span class="badge good">New on main after v1.16 — ships in the next release</span></h2>
+<p><code>--mode=raft</code> only, read from the raft node at scrape time. On v1.16 and earlier read the term and leader from <code>GET /admin/cluster</code> or <code>veltrix nodes</code>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>veltrixdb_raft_term</code> / <code>_is_leader</code></td><td>Current term; 1 on the leader</td></tr>
+<tr><td><code>veltrixdb_raft_commit_index</code> / <code>_applied_index</code></td><td>Commit and apply position; the difference is how stale local reads are</td></tr>
+<tr><td><code>veltrixdb_raft_snapshot_index</code> / <code>_snapshot_term</code>, <code>_log_retained_entries</code>, <code>_snapshot_threshold_entries</code></td><td>Snapshot position, log kept after it, and <code>--raft-snapshot-threshold</code></td></tr>
+<tr><td><code>veltrixdb_raft_snapshot_captures_total</code> / <code>_installs_total</code>, <code>_chunks_sent_total</code> / <code>_chunks_received_total</code>, <code>_legacy_sent_total</code></td><td>Captures, installs from a leader, InstallSnapshot chunks, single-shot snapshots sent to v1.16 and older followers</td></tr>
+<tr><td><code>veltrixdb_raft_snapshot_last_capture_seconds</code> / <code>_last_apply_fence_seconds</code> / <code>_last_bytes</code></td><td>Duration, Apply stall and file size of the last capture</td></tr>
+<tr><td><code>veltrixdb_raft_snapshot_capture_failures_total</code>, <code>_sent_total</code>, <code>_transfer_failures_total</code>, <code>_install_failures_total</code>, <code>_restore_failures_total</code></td><td>Failed captures; leader: completed and failed transfers (including a single-shot over 256 MB, <code>NOT sending snapshot … upgrade peer</code>); follower: failed installs and restore attempts</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="replication-recovery">Replication recovery metrics <span class="badge good">New on main after v1.16 — ships in the next release</span></h2>
+<p><code>--mode=replicated</code> only. Per replica, the same state is in <code>GET /admin/cluster</code> as <code>replication[].resync_pending</code> and <code>replication[].delete_gap</code>. See <a class="inline-link" href="replication-and-cdc.html#replicated-recovery">Replication &amp; CDC</a>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>veltrixdb_replication_full_resyncs_total</code></td><td>Catch-ups that streamed the whole change feed (watermark older than the tombstone retention, or <code>replication_state.json</code> unreadable; ERROR <code>FULL RESYNC</code>)</td></tr>
+<tr><td><code>veltrixdb_replication_catchup_gaps_total</code></td><td>Recoveries that could not replay everything the replica missed; deletes may be missing on it</td></tr>
+<tr><td><code>veltrixdb_replication_replicas_delete_gap</code> / <code>_replicas_resync_pending</code></td><td>Gauges: replicas flagged with a delete gap; replicas whose catch-up is pending or running</td></tr>
+<tr><td><code>veltrixdb_replication_state_persists_total</code> / <code>_state_persist_errors_total</code></td><td>Writes of <code>replication_state.json</code> (at most one per second), and failed ones</td></tr>
+</tbody>
+</table>
+</div>
+
 <h2 id="disk-failure-auto-degrade">Disk-failure auto-degrade</h2>
 <p>VeltrixDB detects failing disks automatically with a per-disk consecutive-error breaker: <strong>5 consecutive I/O errors</strong> on a disk's WAL/VLog trip the breaker and mark the disk <code>FAILED</code>. Any successful I/O before the fifth error resets the streak, so transient hiccups don't trip it. Once tripped:</p>
 <ul>
@@ -182,11 +230,12 @@ histogram_quantile(0.99, rate(veltrixdb_storage_read_latency_seconds_bucket[5m])
 curl    http://localhost:2112/admin/version     # schema version
 curl -X POST http://localhost:2112/admin/checkpoint  # force WAL checkpoint
 curl    http://localhost:2112/admin/cdc?prefix= # live CDC events (NDJSON)
-curl    http://localhost:2112/admin/cluster     # topology: role, raft term/leader, peers, epoch, replica lag</code></pre>
+curl    http://localhost:2112/admin/cluster     # topology: role, raft term/leader, peers, epoch, replica lag
+curl    http://localhost:2112/admin/cluster/members  # membership (new on main after v1.16)</code></pre>
 
 <h2 id="grafana">Grafana dashboards</h2>
-<p>The repository ships provisioned Grafana dashboards under <code>grafana/</code> — a Prometheus datasource and dashboard provider under <code>grafana/provisioning/</code>, an operational dashboard (<code>veltrixdb_dashboard.json</code>: throughput, latency percentiles, cache hit rate and evictions, per-disk VLog size and garbage ratio, GC), a larger <code>veltrixdb_complete_dashboard.json</code>, and a CI dashboard (<code>ci_dashboard.json</code>). The runtime, process, system and disk panels query <code>veltrixdb_runtime_*</code> / <code>veltrixdb_process_*</code> / <code>veltrixdb_system_*</code> / <code>veltrixdb_disk_*</code> series from the unregistered hardware collector, so they stay empty against a stock server.</p>
-<p>The repository also ships <code>monitoring/servicemonitor.yaml</code> (scrapes port <code>metrics</code> every 15 s on pods labelled <code>app.kubernetes.io/name=veltrixdb</code> in namespace <code>veltrixdb</code>) and <code>monitoring/prometheus-rules.yaml</code>, a <code>PrometheusRule</code> with 10 alerts:</p>
+<p>The repository ships provisioned Grafana dashboards under <code>grafana/</code> — a Prometheus datasource and dashboard provider under <code>grafana/provisioning/</code>, an operational dashboard (<code>veltrixdb_dashboard.json</code>: throughput, latency percentiles, cache hit rate and evictions, per-disk VLog size and garbage ratio, GC), a larger <code>veltrixdb_complete_dashboard.json</code>, and a CI dashboard (<code>ci_dashboard.json</code>). The runtime, process, system and disk panels query <code>veltrixdb_runtime_*</code> / <code>veltrixdb_process_*</code> / <code>veltrixdb_system_*</code> / <code>veltrixdb_disk_*</code> series from the hardware collector, which v1.16 and earlier do not register, so they stay empty against those servers (<span class="badge good">New on main after v1.16 — ships in the next release</span> registered).</p>
+<p>The repository also ships <code>monitoring/servicemonitor.yaml</code> (scrapes port <code>metrics</code> every 15 s on pods labelled <code>app.kubernetes.io/name=veltrixdb</code> in namespace <code>veltrixdb</code>) and <code>monitoring/prometheus-rules.yaml</code>, a <code>PrometheusRule</code> with 10 alerts in v1.16:</p>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Alert</th><th>Fires on</th></tr></thead>
@@ -200,16 +249,25 @@ curl    http://localhost:2112/admin/cluster     # topology: role, raft term/lead
 <tr><td><code>VeltrixDBNodeFailed</code></td><td>failed minus recovered peers &gt; 0 over 10 m (critical)</td></tr>
 <tr><td><code>VeltrixDBClusterShrank</code></td><td><code>cluster_nodes_total</code> below its 1-hour max</td></tr>
 <tr><td><code>VeltrixDBDiskUsageHigh</code></td><td><code>/mnt/nvme*</code> &gt; 85% full &mdash; needs node-exporter</td></tr>
-<tr><td><code>VeltrixDBProcessRestarted</code></td><td><code>process_start_time_seconds{job="veltrixdb"}</code> &mdash; <strong>never fires</strong> against a stock server, which exports no <code>process_*</code> metrics; supply a process exporter or drop it</td></tr>
+<tr><td><code>VeltrixDBProcessRestarted</code></td><td><code>process_start_time_seconds{job="veltrixdb"}</code> &mdash; <strong>never fires</strong> against a v1.16 or earlier server, which exports no <code>process_*</code> metrics; supply a process exporter or drop it</td></tr>
 </tbody>
 </table>
 </div>
+<p><span class="badge good">New on main after v1.16 — ships in the next release</span> the rules file has <strong>24 rules</strong> (the Helm chart's <code>prometheusRule.extendedAlerts</code> groups match), and a test starts a raft and a replicated server and fails if a rule names a metric neither serves:</p>
+<ul>
+<li><strong>storage</strong>: the eight above. <code>VeltrixDBVLogGCStalled</code> now compares the target's worst disk (on v1.16 it joined a per-node counter with a per-disk ratio and could not fire).</li>
+<li><strong>process</strong>: disk over 85% full (node-exporter); <code>VeltrixDBProcessRestarted</code> fires while <code>process_start_time_seconds</code> is less than 5 minutes old (also on a first start).</li>
+<li><strong>search</strong>: rebuild stuck (not ready, no keys loaded for 30 minutes), partial results, <code>rebuilding</code> / <code>incomplete</code> errors for 10 minutes, P99 over 1 s.</li>
+<li><strong>raft</strong>: snapshot captures failing, snapshot transfers failing (leader), snapshot install or restore failing (follower), log not compacted (retained log over 4&times; the threshold for 15 minutes), apply lag over 10,000 entries, term churn, no leader.</li>
+<li><strong>replication</strong>: full resync / delete gap (critical: deletes may be missing on a replica), <code>replication_state.json</code> write errors, a replica catch-up pending for 30 minutes.</li>
+</ul>
 
 <h2 id="profiling">Profiling <span class="badge good">New in v1.7</span></h2>
 <p>Start the server with <code>-pprof-addr=127.0.0.1:6060</code> to serve CPU, heap, goroutine and execution-trace profiles on a separate listener (never the metrics port):</p>
 <pre class="code-block"><code>go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30   # CPU
 go tool pprof http://127.0.0.1:6060/debug/pprof/heap                 # heap
 curl -o trace.out 'http://127.0.0.1:6060/debug/pprof/trace?seconds=5' # execution trace</code></pre>
+<p><span class="badge good">New in v1.16</span> <code>/debug/pprof/mutex</code> and <code>/debug/pprof/block</code> stay empty unless you also pass <code>-pprof-mutex-fraction N</code> (sample 1 in N mutex contention events; 5&ndash;100 is typical) and <code>-pprof-block-rate NS</code> (record blocking events of at least NS nanoseconds, e.g. 10000). Both default to 0 (off) and are ignored without <code>-pprof-addr</code>.</p>
 <p>When the experimental C++ network front-end (<code>-net=cpp|uring|poll</code>) is in use, the server also logs a per-stage latency report at shutdown (stages <code>iter</code>, <code>cb_enter</code>, <code>exec</code>, <code>put_sched</code>, <code>put_exec</code>, <code>wake</code>, <code>defer_sched</code>, <code>defer_exec</code>; log2 &micro;s buckets).</p>
 
 <div class="card-grid">

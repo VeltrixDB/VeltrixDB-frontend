@@ -85,7 +85,7 @@
       </details>
       <details>
         <summary>What happens when I outgrow a cluster?</summary>
-        <div class="answer">Add nodes. Gossip does not add members on its own: every node has to know the new one, which for the server means restarting each node with it in <code>--peers</code>; on v1.14 and earlier keys then migrate to their new owners in the background (<code>--auto-rebalance</code>, on by default), and a node failure also triggers that migration, which can delete keys, so run clusters with <code>--auto-rebalance=false</code>. <b>Fixed in v1.15:</b> raft mode never migrates keys (every node applies the whole log), and replicated mode copies a key to its new replicas and deletes it from a node only after every replica acknowledged it. The Kubernetes operator — a separate repository — automates resharding when the replica count changes. Distributed searches ask every node, so their cost grows with the cluster. There are no plans or capacity tiers to upgrade — the open-source engine has no limits beyond your hardware.</div>
+        <div class="answer">Add nodes. Gossip does not add members on its own: every node has to know the new one, which on v1.16 and earlier means restarting each node with it in <code>--peers</code> (<b>New on main after v1.16 — ships in the next release:</b> nodes are added and removed online with <code>veltrix cluster add-node</code> / <code>remove-node</code> or <code>--join</code>); on v1.14 and earlier keys then migrate to their new owners in the background (<code>--auto-rebalance</code>, on by default), and a node failure also triggers that migration, which can delete keys, so run clusters with <code>--auto-rebalance=false</code>. <b>Fixed in v1.15:</b> raft mode never migrates keys (every node applies the whole log), and replicated mode copies a key to its new replicas and deletes it from a node only after every replica acknowledged it. The Kubernetes operator — a separate repository — automates resharding when the replica count changes. Distributed searches ask every node, so their cost grows with the cluster. There are no plans or capacity tiers to upgrade — the open-source engine has no limits beyond your hardware.</div>
       </details>
       <details>
         <summary>Is VeltrixDB open source? Is there a managed service?</summary>
@@ -222,7 +222,7 @@
     </div>
     <div class="ft-bar">
       <div>© 2026 VeltrixDB · Apache 2.0</div>
-      <div>Latest release v1.15</div>
+      <div>Latest release v1.16</div>
     </div>
   </div>
 </footer>
