@@ -91,7 +91,7 @@
   <main class="content-col">
     <div class="breadcrumb"><a href="../index.html">Docs</a><span class="sep">/</span>Getting Started<span class="sep">/</span>Quickstart</div>
     <h1>Quickstart</h1>
-<p class="page-lede">Run VeltrixDB in Docker, talk to it over the text protocol (keys, data types, vector, text and hybrid search), and confirm the server is healthy.</p>
+<p class="page-lede">Run VeltrixDB in Docker, talk to it over the text protocol (keys, data types, vector, text and hybrid search), start a local 3-node cluster, benchmark it with one command, and confirm the server is healthy.</p>
 
 <h2 id="run-with-docker">Run with Docker</h2>
 <p>No build required. Pull and run the published image, then talk to it over the text protocol using <code>nc</code>:</p>
@@ -159,6 +159,34 @@ go run ./cmd/server -addr :9000 -data ./dev-data -cache 256</code></pre>
 /mnt/nvme4,/mnt/nvme5,/mnt/nvme6,/mnt/nvme7 \
   -cache 65536</code></pre>
 <p>With 8 disks, each disk serves 1024 of the 8192 shards, and a 64 GB (<code>65536</code> MB) cache is allocated for hot data.</p>
+
+<h2 id="local-cluster">A 3-node cluster on one machine</h2>
+<p>From a server checkout, <code>make</code> starts three local nodes. Node <em>i</em> listens on <code>9000 + 10·(i−1)</code>, and its metrics / admin port is that port + 4:</p>
+<pre class="code-block"><code>make cluster-up                    # raft: n1 :9000, n2 :9010, n3 :9020
+make cluster-up MODE=replicated    # primary-copy replication, quorum ACK
+make cluster-status                # nodes and the raft leader
+make cluster-clean                 # stop and delete the data</code></pre>
+<p>In raft mode a follower answers writes with <code>ERR MOVED &lt;leader&gt;</code>, which the SDKs follow. All three nodes share one CPU and one disk, so use this to check behaviour, not to measure performance.</p>
+
+<h2 id="benchmark">Benchmark in one command</h2>
+<p>Each target builds what it needs, starts a throwaway server and cleans up afterwards. <code>make help</code> in the server repo lists them all.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Command</th><th>What you get</th><th>Needs</th></tr></thead>
+<tbody>
+<tr><td><code>make bench-quick</code></td><td>One table in ~1 minute: MPUT keys/s, durable PUT, GET and a 70/30 mix, each with throughput, P50, P99 and errors</td><td>Go</td></tr>
+<tr><td><code>make bench-ycsb</code></td><td>YCSB A/B/C/F through the server (go-ycsb), <code>summary.md</code> with P99 and P99.9</td><td>Go 1.25+</td></tr>
+<tr><td><code>make bench-ycsb-cluster</code></td><td>The same against the local 3-node cluster, plus a per-node replica check and client routing</td><td>Go 1.25+</td></tr>
+<tr><td><code>make bench</code></td><td>The gated storage benchmark: fails on packing density or VLog GC emergency runs</td><td>Go</td></tr>
+<tr><td><code>make bench-compare</code></td><td>VeltrixDB vs Aerospike vs ScyllaDB on the same machine, one at a time</td><td>Linux, Docker, NVMe</td></tr>
+<tr><td><code>make bench-gcp PROJECT=…</code></td><td>Real multi-host numbers: 3 NVMe VMs + 1 client, created and deleted by the script (<code>make bench-gcp-dry-run</code> prints the commands only)</td><td>gcloud, a sandbox project</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="code-block"><code>DURATION=30 CONCURRENCY=128 VALUE_SIZE=1024 make bench-quick
+ADDR=10.0.0.5:9000 ./scripts/quick-bench.sh          # a server that is already running
+make bench-ycsb WORKLOADS="a b c d e f" RECORDS=1000000</code></pre>
+<div class="callout note"><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 7v4M8 5.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span><span class="callout-title">Read laptop numbers with care</span> On macOS <code>fsync</code> returns at the drive cache, so durable writes look faster than on Linux NVMe. The local targets also run the client on the same machine. Quote a number with its hardware, value size, concurrency and durability setting. QUICKSTART.md in the server repo has the full guide.</span></div>
 
 <h2 id="connect-with-a-client-sdk">Connect with a client SDK</h2>
 <p>Client SDKs for six languages speak the same binary protocol; they live in the separate Veltrixdb-client repository. The cluster-aware Go client in the server repo (<code>client/</code>) is the only one with the search API — from other languages, send the search commands above over a TCP socket. Here's the Python SDK:</p>
