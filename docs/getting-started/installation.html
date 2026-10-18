@@ -107,6 +107,7 @@ cd veltrixdb
 go build ./...                  # cgo build (default): native index
 CGO_ENABLED=0 go build ./...    # pure-Go build: Go map index, no C++
 go run ./cmd/server -addr :9000 -data ./dev-data -cache 256</code></pre>
+<p>Or use the <code>Makefile</code> shortcuts: <code>make build</code> puts the server, the <code>veltrix</code> CLI and <code>loadtest</code> in <code>./bin</code>, and <code>make run</code> starts one node on <code>127.0.0.1:9000</code>. <code>make help</code> lists the cluster and benchmark targets, which are covered in the <a class="inline-link" href="quickstart.html#benchmark">Quickstart</a>.</p>
 <p>For release artifacts, <code>scripts/build.sh</code> builds the C++ library and the Go binaries together (Linux, requires CMake and liburing); <code>./scripts/build.sh --go-only</code> skips the CMake step. The cgo directives target a portable <code>-march=x86-64-v2</code> baseline on amd64; <code>scripts/build.sh</code> re-adds <code>-march=native</code> when it builds on the target machine.</p>
 <p>To build the standalone binary and additional tooling (operator CLI, backup tool):</p>
 <pre class="code-block"><code>go build -o veltrix ./cmd/veltrix        # cluster CLI: status, nodes, top, put/get, backup
@@ -130,6 +131,9 @@ kubectl get pods -n veltrixdb -l app.kubernetes.io/name=veltrixdb
 kubectl port-forward -n veltrixdb veltrixdb-0 9000:9000 &amp;
 echo PING | nc 127.0.0.1 9000
 # Expected: PONG</code></pre>
+<p>To try the chart on kind, minikube or Docker Desktop, install it from a checkout with the bundled laptop values. They give 3 small pods, one 2 GiB PVC each on the <code>standard</code> StorageClass, no hugepages, no NVMe affinity and no Prometheus Operator objects:</p>
+<pre class="code-block"><code>git clone https://github.com/VeltrixDB/VeltrixDB-Helm-Chart.git &amp;&amp; cd VeltrixDB-Helm-Chart
+helm install veltrixdb . -n veltrixdb --create-namespace -f examples/values-dev.yaml</code></pre>
 <p>See the <a class="inline-link" href="../kubernetes/helm-chart.html">Helm Chart reference</a> for the full values table, including cache sizing, TLS, encryption, quotas, and raw block-device VLog options.</p>
 
 <h2 id="kubernetes-operator">Kubernetes Operator</h2>
@@ -137,20 +141,25 @@ echo PING | nc 127.0.0.1 9000
 <p>Deploy the NVMe mount keeper first — it ensures real NVMe XFS filesystems are mounted at the PV source paths before kubelet binds them into the pod (skipping this causes <code>ENOSPC</code> on the first WAL write):</p>
 <pre class="code-block"><code>kubectl apply -f config/manager/nvme-mount-keeper.yaml
 kubectl rollout status daemonset/nvme-mount-keeper -n veltrixdb</code></pre>
-<p>Install the CRDs, then deploy the operator:</p>
-<pre class="code-block"><code>kubectl apply -f config/crd/bases/
-kubectl apply -f config/manager/manager.yaml</code></pre>
+<p>Install the CRD, RBAC and the operator (namespace <code>veltrixdb-operator-system</code>):</p>
+<pre class="code-block"><code>make deploy</code></pre>
+<p>To try it without building or pushing an image, run the controller from your workstation against the current kube context (kind, minikube), then apply the single-node dev sample:</p>
+<pre class="code-block"><code>make install &amp;&amp; make run          # CRD + controller in the foreground
+kubectl create namespace veltrixdb-dev
+kubectl apply -f config/samples/veltrix_v1alpha1_veltrixcluster_dev.yaml</code></pre>
 <p>Create a cluster:</p>
-<pre class="code-block"><code>apiVersion: veltrixdb.io/v1alpha1
+<pre class="code-block"><code>apiVersion: veltrix.io/v1alpha1
 kind: VeltrixCluster
 metadata:
   name: my-cluster
   namespace: veltrixdb
 spec:
-  replicas: 3
-  image: ghcr.io/veltrixdb/veltrixdb:v1.16
+  size: 3
+  version: "v1.16"
+  mode: replicated
+  consistency: quorum
   disksPerNode: 8
-  cacheSizeMB: 262144
+  cacheMaxSizeMB: 262144
   walFlushWindowMs: 15
   vlogFlushWindowMs: 15</code></pre>
 <pre class="code-block"><code>kubectl apply -f veltrixcluster.yaml
